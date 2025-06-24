@@ -8,9 +8,7 @@ on:
 jobs:
   publish:
     uses: sava-software/sava-build/.github/workflows/publish.yml@main
+    secrets: inherit
     permissions:
       contents: read
       packages: write
-    secrets: inherit
-    with:
-      projects: "json-iterator"
