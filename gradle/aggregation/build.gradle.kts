@@ -5,3 +5,8 @@ plugins {
 dependencies {
   nmcpAggregation(project(":json-iterator"))
 }
+
+tasks.register("publishToGitHubPackages") {
+  group = "publishing"
+  dependsOn(":json-iterator:publish")
+}
