@@ -22,3 +22,19 @@ If the presence and ordering of the JSON object fields are guaranteed to always 
 Otherwise, follow the [`IocLoopCompareStringFieldToCharsIf`](systems.comodal.json_iterator/src/jmh/java/systems/comodal/jsoniter/jmh/styles/IocLoopCompareStringFieldToCharsIf.java#L22) style, which enables inversion of control while it iterates over object fields in conjunction with comparing expected field strings against a field character array.  The advantage of this strategy is that it avoids constructing Strings for object fields.
 
 If the first character for all of an objects' fields are unique, follow either the [`IocLoopCharIf`](systems.comodal.json_iterator/src/jmh/java/systems/comodal/jsoniter/jmh/styles/IocLoopCharIf.java#L20) or [`IocLoopCharSwitch`](systems.comodal.json_iterator/src/jmh/java/systems/comodal/jsoniter/jmh/styles/IocLoopCharSwitch.java#L20) style.  Similar to the style `IocLoopCompareStringFieldToCharsIf`, these styles avoid constructing Strings for object fields.
+
+## Build
+
+[Generate a classic token](https://github.com/settings/tokens) with the `read:packages` scope needed to access
+dependencies hosted on GitHub Package Repository.
+
+Add the following properties to `$HOME/.gradle/gradle.properties`.
+
+```gradle.properties
+savaGithubPackagesUsername=GITHUB_USERNAME
+savaGithubPackagesPassword=GITHUB_TOKEN
+```
+
+```shell
+./gradlew check
+```
