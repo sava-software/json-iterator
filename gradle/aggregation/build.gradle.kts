@@ -8,5 +8,5 @@ dependencies {
 
 tasks.register("publishToGitHubPackages") {
   group = "publishing"
-  dependsOn(":json-iterator:publishMavenJavaPublicationToGithubPackagesRepository")
+  dependsOn(":json-iterator:publishMavenJavaPublicationToSavaGithubPackagesRepository")
 }
