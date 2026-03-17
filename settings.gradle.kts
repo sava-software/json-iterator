@@ -10,7 +10,7 @@ pluginManagement {
 }
 
 plugins {
-  id("software.sava.build") version "0.1.21"
+  id("software.sava.build") version "21.3.6"
 }
 
 rootProject.name = "json-iterator"

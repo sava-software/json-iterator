@@ -123,6 +123,98 @@ public final class JIUtil {
     }
   }
 
+  public static String escapeQuotesRemoveNewLinesChecked(final String str) {
+    final int len = str.length();
+    int from = 0;
+    do {
+      final char c = str.charAt(from);
+      if (c == '"') {
+        int i = from - 1;
+        if (i < 0) {
+          return escapeQuotesRemoveNewLines(str, from);
+        }
+        if (str.charAt(i) == '\\') {
+          int escapes = 1;
+          while (--i >= 0) {
+            if (str.charAt(i) == '\\') {
+              ++escapes;
+            } else {
+              break;
+            }
+          }
+          if ((escapes & 1) == 0) {
+            return escapeQuotesRemoveNewLines(str, from);
+          }
+        } else {
+          return escapeQuotesRemoveNewLines(str, from);
+        }
+      } else if (c == '\n' || c == '\r') {
+        return escapeQuotesRemoveNewLines(str, from);
+      }
+    } while (++from < len);
+    return str;
+  }
+
+  public static String escapeQuotesRemoveNewLines(final String str) {
+    return escapeQuotesRemoveNewLines(str, -1);
+  }
+
+  private static String escapeQuotesRemoveNewLines(final String str, final int firstIdx) {
+    final char[] chars = str.toCharArray();
+    final char[] escaped = new char[chars.length << 1];
+
+    int from, to, dest;
+    if (firstIdx < 0) {
+      from = 0;
+      to = 0;
+      dest = 0;
+    } else {
+      System.arraycopy(chars, 0, escaped, 0, firstIdx);
+      if (chars[firstIdx] == '"') {
+        escaped[firstIdx] = '\\';
+        from = firstIdx;
+        dest = firstIdx + 1;
+      } else {
+        from = firstIdx + 1;
+        dest = firstIdx;
+      }
+      to = firstIdx + 1;
+    }
+
+    char c;
+    for (int escapes = 0; ; ++to) {
+      if (to == chars.length) {
+        if (from == 0) {
+          return str;
+        } else {
+          final int len = to - from;
+          System.arraycopy(chars, from, escaped, dest, len);
+          dest += len;
+          return new String(escaped, 0, dest);
+        }
+      } else {
+        c = chars[to];
+        if (c == '\\') {
+          escapes++;
+        } else if (c == '"' && (escapes & 1) == 0) {
+          final int len = to - from;
+          System.arraycopy(chars, from, escaped, dest, len);
+          dest += len;
+          escaped[dest++] = '\\';
+          from = to;
+          escapes = 0;
+        } else if (c == '\n' || c == '\r') {
+          final int len = to - from;
+          System.arraycopy(chars, from, escaped, dest, len);
+          dest += len;
+          from = to + 1;
+        } else {
+          escapes = 0;
+        }
+      }
+    }
+  }
+
   private static String escapeOddBackslashGroups(final String str) {
     return escapeOddBackslashGroups(str, '\\');
   }

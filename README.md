@@ -1,4 +1,4 @@
-# JSON Iterator [![Gradle Check](https://github.com/sava-software/json-iterator/actions/workflows/build.yml/badge.svg)](https://github.com/sava-software/json-iterator/actions/workflows/build.yml) [![Publish Release](https://github.com/sava-software/json-iterator/actions/workflows/publish.yml/badge.svg)](https://github.com/sava-software/json-iterator/actions/workflows/publish.yml)
+# JSON Iterator [![Gradle Check](https://github.com/sava-software/json-iterator/actions/workflows/build.yml/badge.svg)](https://github.com/sava-software/json-iterator/actions/workflows/build.yml)
 
 JSON Iterator is a minimal adaption of the [stream parsing features](http://jsoniter.com/java-features.html#iterator-to-rescue) from the project [json-iterator/java](https://github.com/json-iterator/java).
 
