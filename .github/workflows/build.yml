@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
-  pull_request_target:
-    types: [ opened, synchronize ]
+
+concurrency:
+  group: build-${{ github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  check:
     uses: sava-software/sava-build/.github/workflows/build.yml@main
     secrets: inherit
