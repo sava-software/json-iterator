@@ -1,40 +1,48 @@
 package systems.comodal.jsoniter;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
 import static org.junit.jupiter.api.Assertions.*;
 
+@ParameterizedClass
+@FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
 final class TestObject {
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_empty_object(final JsonIteratorFactory factory) {
+  private final JsonIteratorFactory factory;
+
+  TestObject(final JsonIteratorFactory factory) {
+    this.factory = factory;
+  }
+
+  @Test
+  void test_empty_object() {
     var ji = factory.create("{}");
     assertNull(ji.readObject());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_one_field(final JsonIteratorFactory factory) {
-    var ji = factory.create("{ \"field1\"\n" +
-        ":\n" +
-        "\t\"hello\" }");
+  @Test
+  void test_one_field() {
+    final var json = """
+        { "field1"
+        :
+        \t"hello" }""";
+
+    var ji = factory.create(json);
     assertEquals("field1", ji.readObject());
     assertEquals("hello", ji.readString());
     assertNull(ji.readObject());
 
-    ji = factory.create("{ \"field1\"\n" +
-        ":\n" +
-        "\t\"hello\" }");
+    ji = factory.create(json);
     assertNull(ji.applyObject(TRUE, ((context, buf, offset, len, jsonIterator) -> {
       assertEquals(TRUE, context);
       assertEquals("field1", new String(buf, offset, len));
       assertEquals("hello", jsonIterator.readString());
-      return jsonIterator.applyObject(FALSE, (_context, _buf, _offset, _len, _jsonIterator) -> {
+      return jsonIterator.applyObject(FALSE, (_context, _buf, o, _len, _ji) -> {
         assertEquals(FALSE, _context);
         assertEquals(-1, _len);
         assertNull(_buf);
@@ -42,17 +50,14 @@ final class TestObject {
       });
     })));
 
-    ji = factory.create("{ \"field1\"\n" +
-        ":\n" +
-        "\t\"hello\" }");
+    ji = factory.create(json);
     assertEquals(ji, ji.skipObjField());
     assertEquals("hello", ji.readString());
     assertNull(ji.skipObjField());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_two_fields(final JsonIteratorFactory factory) {
+  @Test
+  void test_two_fields() {
     var ji = factory.create("{ \"field1\" : \"hello\" , \"field2\": \"world\" }");
     assertEquals("field1", ji.readObject());
     assertEquals("hello", ji.readString());
@@ -64,16 +69,14 @@ final class TestObject {
     assertEquals("world", ji.skipUntil("field2").readString());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_skip_until(final JsonIteratorFactory factory) {
+  @Test
+  void test_skip_until() {
     var ji = factory.create("{ \"field1\" : \"hello\" , \"field2\": {\"nested1\" : \"blah\", \"nested2\": \"world\"} }");
     assertEquals("world", ji.skipUntil("field2").skipUntil("nested2").readString());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_read_null(final JsonIteratorFactory factory) {
+  @Test
+  void test_read_null() {
     var ji = factory.create("null");
     assertTrue(ji.readNull());
   }

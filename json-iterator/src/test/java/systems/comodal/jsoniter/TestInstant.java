@@ -1,7 +1,8 @@
 package systems.comodal.jsoniter;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import java.time.Instant;
@@ -11,11 +12,18 @@ import static java.time.format.DateTimeFormatter.ISO_DATE_TIME;
 import static java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class TestInstant {
+@ParameterizedClass
+@FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
+final class TestInstant {
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void testParseInstants(final JsonIteratorFactory factory) {
+  private final JsonIteratorFactory factory;
+
+  TestInstant(final JsonIteratorFactory factory) {
+    this.factory = factory;
+  }
+
+  @Test
+  void testParseInstants() {
     var dateTime = "2018-03-31T13:43:19.82";
     var ji = factory.create('"' + dateTime + '"');
     assertEquals(ISO_DATE_TIME.withZone(ZoneOffset.UTC).parse(dateTime, Instant::from), ji.readDateTime());

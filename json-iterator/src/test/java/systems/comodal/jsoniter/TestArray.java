@@ -1,16 +1,24 @@
 package systems.comodal.jsoniter;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@ParameterizedClass
+@FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
 final class TestArray {
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_empty_array(final JsonIteratorFactory factory) {
+  private final JsonIteratorFactory factory;
+
+  TestArray(final JsonIteratorFactory factory) {
+    this.factory = factory;
+  }
+
+  @Test
+  void test_empty_array() {
     final var json = "[]";
 
     var ji = factory.create(json);
@@ -21,9 +29,8 @@ final class TestArray {
     assertEquals(ji, ji.closeArray());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_one_element(final JsonIteratorFactory factory) {
+  @Test
+  void test_one_element() {
     final var json = "[1]";
 
     var ji = factory.create(json);
@@ -37,9 +44,8 @@ final class TestArray {
     assertEquals(ji, ji.closeArray());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_two_elements(final JsonIteratorFactory factory) {
+  @Test
+  void test_two_elements() {
     final var json = " [ 1 , 2 ] ";
 
     var ji = factory.create(json);
@@ -57,9 +63,8 @@ final class TestArray {
     assertEquals(ji, ji.closeArray());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_three_elements(final JsonIteratorFactory factory) {
+  @Test
+  void test_three_elements() {
     final var json = " [ 1 , 2, 3 ] ";
 
     var ji = factory.create(json);
@@ -81,9 +86,8 @@ final class TestArray {
     assertEquals(ji, ji.closeArray());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_four_elements(final JsonIteratorFactory factory) {
+  @Test
+  void test_four_elements() {
     final var json = " [ 1 , 2, 3, 4 ] ";
     final var ji = factory.create(json);
     assertTrue(ji.readArray());
@@ -97,9 +101,8 @@ final class TestArray {
     assertFalse(ji.readArray());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_five_elements(final JsonIteratorFactory factory) {
+  @Test
+  void test_five_elements() {
     final var json = " [ 1 , 2, 3, 4, 5  ] ";
     final var ji = factory.create(json);
     assertTrue(ji.readArray());

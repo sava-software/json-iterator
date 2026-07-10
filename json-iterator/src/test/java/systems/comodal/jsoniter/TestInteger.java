@@ -1,7 +1,8 @@
 package systems.comodal.jsoniter;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import java.math.RoundingMode;
@@ -11,11 +12,18 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@ParameterizedClass
+@FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
 final class TestInteger {
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_positive_negative_int(final JsonIteratorFactory factory) {
+  private final JsonIteratorFactory factory;
+
+  TestInteger(final JsonIteratorFactory factory) {
+    this.factory = factory;
+  }
+
+  @Test
+  void test_positive_negative_int() {
     assertEquals(0, factory.create("0").readInt());
     assertEquals(4321, factory.create("4321").readInt());
     assertEquals(54321, factory.create("54321").readInt());
@@ -40,9 +48,8 @@ final class TestInteger {
     assertEquals(-2147483648, factory.create("\"-2147483648\"").readInt());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_positive_negative_long(final JsonIteratorFactory factory) {
+  @Test
+  void test_positive_negative_long() {
     assertEquals(0L, factory.create("0").readLong());
     assertEquals(4321L, factory.create("4321").readLong());
     assertEquals(54321L, factory.create("54321").readLong());
@@ -66,9 +73,8 @@ final class TestInteger {
     assertEquals(-9223372036854775808L, factory.create("\"-9223372036854775808\"").readLong());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_max_min_int(final JsonIteratorFactory factory) {
+  @Test
+  void test_max_min_int() {
     assertEquals(Integer.MAX_VALUE, factory.create(Integer.toString(Integer.MAX_VALUE)).readInt());
     assertEquals(Integer.MAX_VALUE - 1, factory.create(Integer.toString(Integer.MAX_VALUE - 1)).readInt());
     assertEquals(Integer.MIN_VALUE + 1, factory.create(Integer.toString(Integer.MIN_VALUE + 1)).readInt());
@@ -81,9 +87,8 @@ final class TestInteger {
     assertEquals(Integer.MIN_VALUE, factory.create(String.format("\"%d\"", Integer.MIN_VALUE)).readInt());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_max_min_long(final JsonIteratorFactory factory) {
+  @Test
+  void test_max_min_long() {
     assertEquals(Long.MAX_VALUE, factory.create(Long.toString(Long.MAX_VALUE)).readLong());
     assertEquals(Long.MAX_VALUE - 1, factory.create(Long.toString(Long.MAX_VALUE - 1)).readLong());
     assertEquals(Long.MIN_VALUE + 1, factory.create(Long.toString(Long.MIN_VALUE + 1)).readLong());
@@ -96,9 +101,8 @@ final class TestInteger {
     assertEquals(Long.MIN_VALUE, factory.create(String.format("\"%d\"", Long.MIN_VALUE)).readLong());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_large_number(final JsonIteratorFactory factory) {
+  @Test
+  void test_large_number() {
     var ji = factory.create("2147483648");
     assertThrows(JsonException.class, ji::readInt);
 
@@ -144,9 +148,8 @@ final class TestInteger {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_leading_zero(final JsonIteratorFactory factory) {
+  @Test
+  void test_leading_zero() {
     var ji = factory.create("0");
     assertEquals(0, ji.readInt());
 
@@ -185,9 +188,8 @@ final class TestInteger {
     assertThrows(JsonException.class, ji::readLong);
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_max_int(final JsonIteratorFactory factory) {
+  @Test
+  void test_max_int() {
     var ji = factory.create("[2147483647,-2147483648]");
     ji.readArray();
     assertEquals(Integer.MAX_VALUE, ji.readInt());
@@ -202,9 +204,8 @@ final class TestInteger {
     assertEquals(Integer.MIN_VALUE, ji.readInt());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void testParseMicroseconds(final JsonIteratorFactory factory) {
+  @Test
+  void testParseMicroseconds() {
     final CharBufferFunction<Instant> MICROS_PARSER = (buf, offset, len) -> {
       final int secondsLength = len - 6;
       final long seconds = Long.parseLong(new String(buf, offset, secondsLength));

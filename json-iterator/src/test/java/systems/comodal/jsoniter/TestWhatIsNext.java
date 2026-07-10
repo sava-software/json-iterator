@@ -1,18 +1,26 @@
 package systems.comodal.jsoniter;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@ParameterizedClass
+@FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
 final class TestWhatIsNext {
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test(final JsonIteratorFactory factory) {
+  private final JsonIteratorFactory factory;
+
+  TestWhatIsNext(final JsonIteratorFactory factory) {
+    this.factory = factory;
+  }
+
+  @Test
+  void test() {
     assertEquals(ValueType.OBJECT, factory.create("{}").whatIsNext());
     assertEquals(ValueType.STRING, factory.create("\"string\"").whatIsNext());
     assertEquals(ValueType.ARRAY, factory.create("[\"array\"]").whatIsNext());

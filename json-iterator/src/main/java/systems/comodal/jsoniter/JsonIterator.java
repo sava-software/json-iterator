@@ -214,12 +214,10 @@ public interface JsonIterator extends Closeable {
     return this;
   }
 
-  /**
-   * Advances the iterator if the next item is 'null' and returns true.
-   * Otherwise, stays in place and returns false.
-   *
-   * @return true if value was 'null'.
-   */
+  /// Advances the iterator if the next item is `null` and returns true.
+  /// Otherwise, stays in place and returns false.
+  ///
+  /// @return true if value was `null`.
   boolean readNull();
 
   String readString();
@@ -249,39 +247,33 @@ public interface JsonIterator extends Closeable {
     return readBigDecimalDropZeroes();
   }
 
-  /**
-   * Drops trailing decimal zeroes.
-   */
+  /// Drops trailing decimal zeroes.
   BigDecimal readBigDecimalDropZeroes();
 
   long readUnscaledAsLong(final int scale);
 
   BigInteger readBigInteger();
 
-  /**
-   * Parses ISO-like or RFC_1123_DATE_TIME formats such as:
-   * - YYYY*MM*DD*HH*MM*SS.?\d{0,9}Z?
-   * - YYYY*MM*DD*HH*MM*SS[+-]HH*MM
-   * - Tue, 3 Jun 2008 11:05:30 GMT
-   * <p>
-   * Defaults to UTC if no offset is provided.
-   *
-   * @return the parsed Instant
-   * @throws java.time.DateTimeException - on any unexpected character or length
-   */
+  /// Parses ISO-like or RFC_1123_DATE_TIME formats such as:
+  /// - `YYYY*MM*DD*HH*MM*SS.?\d{0,9}Z?`
+  /// - `YYYY*MM*DD*HH*MM*SS[+-]HH*MM`
+  /// - `Tue, 3 Jun 2008 11:05:30 GMT`
+  ///
+  /// Defaults to UTC if no offset is provided.
+  ///
+  /// @return the parsed Instant
+  /// @throws java.time.DateTimeException on any unexpected character or length
   Instant readDateTime();
 
   // IOC Field Value Methods
 
-  /**
-   * Construct an Object of type R directly from the char[] representing the next String value.
-   * <p>
-   * The function is not called for null values, instead null is directly returned.
-   *
-   * @param applyChars This array buffer is reused throughout the life of this iterator.
-   * @param <R>        Resulting Object Type.
-   * @return Object constructed from applyChars.
-   */
+  /// Construct an Object of type R directly from the `char[]` representing the next String value.
+  ///
+  /// The function is not called for null values, instead null is directly returned.
+  ///
+  /// @param applyChars This array buffer is reused throughout the life of this iterator.
+  /// @param <R>        Resulting Object Type.
+  /// @return Object constructed from applyChars.
   <R> R applyChars(final CharBufferFunction<R> applyChars);
 
   <C, R> R applyChars(final C context, final ContextCharBufferFunction<C, R> applyChars);

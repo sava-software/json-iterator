@@ -68,14 +68,12 @@ final class CharsJsonIterator extends BaseJsonIterator {
     for (int i = head; ; ) {
       c = buf[i++];
       switch (c) {
-        case ' ':
-        case '\n':
-        case '\r':
-        case '\t':
-          break;
-        default:
+        case ' ', '\n', '\r', '\t' -> {
+        }
+        default -> {
           head = i;
           return c;
+        }
       }
     }
   }
@@ -86,14 +84,12 @@ final class CharsJsonIterator extends BaseJsonIterator {
     for (int i = head; ; i++) {
       c = buf[i];
       switch (c) {
-        case ' ':
-        case '\n':
-        case '\r':
-        case '\t':
-          break;
-        default:
+        case ' ', '\n', '\r', '\t' -> {
+        }
+        default -> {
           head = i;
           return c;
+        }
       }
     }
   }
@@ -165,29 +161,13 @@ final class CharsJsonIterator extends BaseJsonIterator {
         return len;
       }
       switch (peekChar(i)) {
-        case ' ':
-          continue;
-        case '.':
-        case 'e':
-        case 'E':
-          // dot found
-        case '-':
-        case '+':
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-          len++;
-          continue;
-        default:
+        case ' ' -> {
+        }
+        case '.', 'e', 'E', '-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> len++;
+        default -> {
           head = i;
           return len;
+        }
       }
     }
   }

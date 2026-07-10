@@ -111,14 +111,12 @@ class BytesJsonIterator extends BaseJsonIterator {
       }
       c = buf[i++];
       switch (c) {
-        case ' ':
-        case '\n':
-        case '\t':
-        case '\r':
-          continue;
-        default:
+        case ' ', '\n', '\t', '\r' -> {
+        }
+        default -> {
           head = i;
           return (char) (c & 0xff);
+        }
       }
     }
   }
@@ -136,14 +134,12 @@ class BytesJsonIterator extends BaseJsonIterator {
       }
       c = buf[i];
       switch (c) {
-        case ' ':
-        case '\n':
-        case '\t':
-        case '\r':
-          continue;
-        default:
+        case ' ', '\n', '\t', '\r' -> {
+        }
+        default -> {
           head = i;
           return (char) (c & 0xff);
+        }
       }
     }
   }
@@ -255,13 +251,9 @@ class BytesJsonIterator extends BaseJsonIterator {
     }
   }
 
-  @FunctionalInterface
-  private interface BytesFunction<T> {
-
-    T apply(final byte[] buf, final int from, final int to);
+  private static byte[] decodeBase64(final byte[] buf, final int from, final int to) {
+    return Base64.getDecoder().decode(Arrays.copyOfRange(buf, from, to));
   }
-
-  private static final BytesFunction<byte[]> BASE64_DECODER = (buf, from, to) -> Base64.getDecoder().decode(Arrays.copyOfRange(buf, from, to));
 
   @Override
   public byte[] decodeBase64String() {
@@ -281,7 +273,7 @@ class BytesJsonIterator extends BaseJsonIterator {
     int nextOffset = head + Long.BYTES;
     if (nextOffset > tail) {
       final int len = parse();
-      return BytesJsonIterator.BASE64_DECODER.apply(buf, from, from + len);
+      return decodeBase64(buf, from, from + len);
     } else {
       long word, tmp;
       for (int i = head; ; ) {
@@ -290,7 +282,7 @@ class BytesJsonIterator extends BaseJsonIterator {
         if (tmp != 0) {
           i += (Long.numberOfTrailingZeros(tmp << 1) >>> 3);
           final int to = i - 1;
-          final var data = BytesJsonIterator.BASE64_DECODER.apply(buf, head, to);
+          final var data = decodeBase64(buf, head, to);
           head = i;
           return data;
         } else {
@@ -696,29 +688,13 @@ class BytesJsonIterator extends BaseJsonIterator {
         doubleReusableCharBuffer();
       }
       switch ((c = peekChar(i))) {
-        case ' ':
-          continue;
-        case '.':
-        case 'e':
-        case 'E':
-          // dot found
-        case '-':
-        case '+':
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-          charBuf[len++] = c;
-          continue;
-        default:
+        case ' ' -> {
+        }
+        case '.', 'e', 'E', '-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> charBuf[len++] = c;
+        default -> {
           head = i;
           return len;
+        }
       }
     }
   }

@@ -1,16 +1,24 @@
 package systems.comodal.jsoniter;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@ParameterizedClass
+@FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
 final class TestBoolean {
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_boolean_array(final JsonIteratorFactory factory) {
+  private final JsonIteratorFactory factory;
+
+  TestBoolean(final JsonIteratorFactory factory) {
+    this.factory = factory;
+  }
+
+  @Test
+  void test_boolean_array() {
     final var json = "[true,false,null,true]";
     var ji = factory.create(json);
     ji.readArray();
@@ -31,9 +39,8 @@ final class TestBoolean {
     assertNotNull(ji.closeArray());
   }
 
-  @ParameterizedTest
-  @MethodSource("systems.comodal.jsoniter.TestFactories#factories")
-  void test_booleans(final JsonIteratorFactory factory) {
+  @Test
+  void test_booleans() {
     assertTrue(factory.create("true").readBoolean());
     assertFalse(factory.create("false").readBoolean());
     assertTrue(factory.create("null").readNull());
