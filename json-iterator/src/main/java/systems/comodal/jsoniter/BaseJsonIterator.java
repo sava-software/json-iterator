@@ -13,6 +13,8 @@ abstract class BaseJsonIterator implements JsonIterator {
 
   protected static final CharBufferFunction<String> READ_STRING_FUNCTION = String::new;
 
+  static final char[] EMPTY_CHARS = new char[0];
+
   static final int INVALID_CHAR_FOR_NUMBER = -1;
   static final int[] INT_DIGITS = INIT_INT_DIGITS.initIntDigits();
 
@@ -143,9 +145,18 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
+  private static final CharBufferFunction<byte[]> DECODE_BASE64 = (chars, offset, len) -> {
+    // Narrow the base64 alphabet chars without an intermediate String.
+    final byte[] ascii = new byte[len];
+    for (int i = 0; i < len; ++i) {
+      ascii[i] = (byte) chars[offset + i];
+    }
+    return Base64.getDecoder().decode(ascii);
+  };
+
   @Override
   public byte[] decodeBase64String() {
-    return Base64.getDecoder().decode(readString());
+    return applyChars(DECODE_BASE64);
   }
 
   abstract int parse();
@@ -189,7 +200,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return parse(applyChars);
     } else if (c == 'n') {
       skip(3);
-      return applyChars.applyAsInt(new char[0], 0, 0);
+      return applyChars.applyAsInt(EMPTY_CHARS, 0, 0);
     } else {
       throw reportError("applyCharsAsInt", "expected string or null, but " + c);
     }
@@ -204,7 +215,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return parse(context, applyChars);
     } else if (c == 'n') {
       skip(3);
-      return applyChars.applyAsInt(context, new char[0], 0, 0);
+      return applyChars.applyAsInt(context, EMPTY_CHARS, 0, 0);
     } else {
       throw reportError("applyCharsAsInt", "expected string or null, but " + c);
     }
@@ -219,7 +230,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return parse(applyChars);
     } else if (c == 'n') {
       skip(3);
-      return applyChars.applyAsLong(new char[0], 0, 0);
+      return applyChars.applyAsLong(EMPTY_CHARS, 0, 0);
     } else {
       throw reportError("applyCharsAsLong", "expected string or null, but " + c);
     }
@@ -234,7 +245,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return parse(context, applyChars);
     } else if (c == 'n') {
       skip(3);
-      return applyChars.applyAsLong(context, new char[0], 0, 0);
+      return applyChars.applyAsLong(context, EMPTY_CHARS, 0, 0);
     } else {
       throw reportError("applyCharsAsLong", "expected string or null, but " + c);
     }
@@ -417,7 +428,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') {
       return null; // end of object
     } else if (c == 'n') {
-      final var result = applyChars.apply(new char[0], 0, 0);
+      final var result = applyChars.apply(EMPTY_CHARS, 0, 0);
       skip(3);
       return result;
     } else {
@@ -457,7 +468,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') {
       return terminalSentinel; // end of object
     } else if (c == 'n') {
-      final var result = applyChars.applyAsInt(new char[0], 0, 0);
+      final var result = applyChars.applyAsInt(EMPTY_CHARS, 0, 0);
       skip(3); // null
       return result;
     } else {
@@ -497,7 +508,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') {
       return terminalSentinel; // end of object
     } else if (c == 'n') {
-      final var result = applyChars.applyAsInt(context, new char[0], 0, 0);
+      final var result = applyChars.applyAsInt(context, EMPTY_CHARS, 0, 0);
       skip(3); // null
       return result;
     } else {
@@ -537,7 +548,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') {
       return terminalSentinel; // end of object
     } else if (c == 'n') {
-      final var result = applyChars.applyAsLong(new char[0], 0, 0);
+      final var result = applyChars.applyAsLong(EMPTY_CHARS, 0, 0);
       skip(3); // null
       return result;
     } else {
@@ -577,7 +588,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') {
       return terminalSentinel; // end of object
     } else if (c == 'n') {
-      final var result = applyChars.applyAsLong(context, new char[0], 0, 0);
+      final var result = applyChars.applyAsLong(context, EMPTY_CHARS, 0, 0);
       skip(3); // null
       return result;
     } else {
