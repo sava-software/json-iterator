@@ -92,13 +92,12 @@ class BytesJsonIterator extends BaseJsonIterator {
         throw reportError("nextToken", "unexpected end");
       }
       c = buf[i++];
-      switch (c) {
-        case ' ', '\n', '\t', '\r' -> {
-        }
-        default -> {
-          head = i;
-          return (char) (c & 0xff);
-        }
+      // Tokens are almost always > ' ', so the common case is a single branch;
+      // the exact whitespace check only runs for bytes <= ' ' (multi-byte
+      // UTF-8 bytes are negative and fall through as tokens, as before).
+      if (c > ' ' || (c != ' ' && c != '\n' && c != '\t' && c != '\r')) {
+        head = i;
+        return (char) (c & 0xff);
       }
     }
   }
@@ -111,13 +110,9 @@ class BytesJsonIterator extends BaseJsonIterator {
         throw reportError("peekToken", "unexpected end");
       }
       c = buf[i];
-      switch (c) {
-        case ' ', '\n', '\t', '\r' -> {
-        }
-        default -> {
-          head = i;
-          return (char) (c & 0xff);
-        }
+      if (c > ' ' || (c != ' ' && c != '\n' && c != '\t' && c != '\r')) {
+        head = i;
+        return (char) (c & 0xff);
       }
     }
   }
@@ -174,8 +169,9 @@ class BytesJsonIterator extends BaseJsonIterator {
   int parse() {
     final int lanes = VectorSupport.BYTE_LANES;
     int j = 0;
-    while (head + lanes <= tail) {
-      final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
+    int h = head;
+    while (h + lanes <= tail) {
+      final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, h);
       final long special = chunk.eq(BACKSLASH).toLong() | chunk.compare(VectorOperators.LT, (byte) 0).toLong();
       final long quote = chunk.eq(QUOTE).toLong();
       final long stop = special | quote;
@@ -183,23 +179,24 @@ class BytesJsonIterator extends BaseJsonIterator {
         ensureCharBufCapacity(j + lanes);
         widenToCharBuf(chunk, j);
         j += lanes;
-        head += lanes;
+        h += lanes;
       } else {
         final int n = Long.numberOfTrailingZeros(stop);
         ensureCharBufCapacity(j + n);
         for (int i = 0; i < n; ++i) {
-          charBuf[j + i] = (char) buf[head + i];
+          charBuf[j + i] = (char) buf[h + i];
         }
         j += n;
-        head += n;
         if (((quote >>> n) & 1) != 0) {
-          ++head;
+          head = h + n + 1;
           return j;
         }
         // An escape sequence or a UTF-8 multi-byte character requires the scalar decoder.
+        head = h + n;
         return parseMultiByteString(j);
       }
     }
+    head = h;
     byte c;
     while (head < tail) {
       c = buf[head];
@@ -759,27 +756,30 @@ class BytesJsonIterator extends BaseJsonIterator {
     final int lanes = VectorSupport.BYTE_LANES;
     final byte openByte = (byte) open;
     final byte closeByte = (byte) close;
+    int h = head;
     outer:
-    while (head + lanes <= tail) {
-      final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
+    while (h + lanes <= tail) {
+      final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, h);
       long bits = chunk.eq(openByte).toLong() | chunk.eq(closeByte).toLong() | chunk.eq(QUOTE).toLong();
       while (bits != 0) {
         final int n = Long.numberOfTrailingZeros(bits);
-        final byte c = buf[head + n];
+        final byte c = buf[h + n];
         if (c == QUOTE) {
-          head += n + 1;
+          head = h + n + 1;
           skipPastEndQuote();
+          h = head;
           continue outer;
         } else if (c == openByte) {
           ++level;
         } else if (--level == 0) {
-          head += n + 1;
+          head = h + n + 1;
           return;
         }
         bits &= bits - 1;
       }
-      head += lanes;
+      h += lanes;
     }
+    head = h;
     super.skipContainer(open, close, level);
   }
 

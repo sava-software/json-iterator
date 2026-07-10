@@ -68,13 +68,10 @@ class CharsJsonIterator extends BaseJsonIterator {
     char c;
     for (int i = head; ; ) {
       c = buf[i++];
-      switch (c) {
-        case ' ', '\n', '\r', '\t' -> {
-        }
-        default -> {
-          head = i;
-          return c;
-        }
+      // Tokens are almost always > ' ', so the common case is a single branch.
+      if (c > ' ' || (c != ' ' && c != '\n' && c != '\t' && c != '\r')) {
+        head = i;
+        return c;
       }
     }
   }
@@ -84,13 +81,9 @@ class CharsJsonIterator extends BaseJsonIterator {
     char c;
     for (int i = head; ; i++) {
       c = buf[i];
-      switch (c) {
-        case ' ', '\n', '\r', '\t' -> {
-        }
-        default -> {
-          head = i;
-          return c;
-        }
+      if (c > ' ' || (c != ' ' && c != '\n' && c != '\t' && c != '\r')) {
+        head = i;
+        return c;
       }
     }
   }
@@ -194,27 +187,30 @@ class CharsJsonIterator extends BaseJsonIterator {
   @Override
   void skipContainer(final char open, final char close, int level) {
     final int lanes = VectorSupport.SHORT_LANES;
+    int h = head;
     outer:
-    while (head + lanes <= tail) {
-      final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, head);
+    while (h + lanes <= tail) {
+      final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, h);
       long bits = chunk.eq((short) open).toLong() | chunk.eq((short) close).toLong() | chunk.eq(QUOTE).toLong();
       while (bits != 0) {
         final int n = Long.numberOfTrailingZeros(bits);
-        final char c = buf[head + n];
+        final char c = buf[h + n];
         if (c == '"') {
-          head += n + 1;
+          head = h + n + 1;
           skipPastEndQuote();
+          h = head;
           continue outer;
         } else if (c == open) {
           ++level;
         } else if (--level == 0) {
-          head += n + 1;
+          head = h + n + 1;
           return;
         }
         bits &= bits - 1;
       }
-      head += lanes;
+      h += lanes;
     }
+    head = h;
     super.skipContainer(open, close, level);
   }
 

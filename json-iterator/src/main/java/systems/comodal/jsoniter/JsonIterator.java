@@ -7,6 +7,13 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 
+/// A pull-style JSON iterator over an in-memory document.
+///
+/// Performance note: four implementations back this interface — byte and char
+/// sources, each in plain and [indexed][IndexedJsonIterator] form. A hot call
+/// site that observes more than two of them becomes megamorphic and loses JIT
+/// inlining on the small scanning methods, so prefer a consistent source type
+/// (and indexing strategy) per parsing path.
 public interface JsonIterator {
 
   /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
