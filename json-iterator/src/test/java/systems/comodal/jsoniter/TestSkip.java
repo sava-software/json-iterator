@@ -39,10 +39,11 @@ final class TestSkip {
 
   @Test
   void test_skip_string_streaming() {
-    var ji = factory.create("\"hello", 2, 2);
-    assertThrows(JsonException.class, ji::skip);
+    // Indexed factories detect the unclosed string when the index is built,
+    // scalar iterators when it is skipped.
+    assertThrows(JsonException.class, () -> factory.create("\"hello", 2, 2).skip());
 
-    ji = factory.create("\"hello\"", 2, 2);
+    var ji = factory.create("\"hello\"", 2, 2);
     ji.skip();
 
     ji = factory.create("\"hello\"1", 2, 2);

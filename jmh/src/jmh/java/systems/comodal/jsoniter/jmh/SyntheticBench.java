@@ -7,7 +7,7 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import systems.comodal.jsoniter.JsonIter;
+import systems.comodal.jsoniter.IndexedJsonIterator;
 import systems.comodal.jsoniter.JsonIterator;
 
 import java.nio.charset.StandardCharsets;
@@ -27,7 +27,7 @@ public class SyntheticBench {
   private byte[] stringsDoc;
   private byte[] longsDoc;
   private JsonIterator jsonIterator;
-  private JsonIter jsonIter;
+  private IndexedJsonIterator jsonIter;
 
   @Setup
   public void setup() {
@@ -61,7 +61,7 @@ public class SyntheticBench {
     longsDoc = longs.append(']').toString().getBytes(StandardCharsets.UTF_8);
 
     jsonIterator = JsonIterator.parse(skipDoc);
-    jsonIter = JsonIter.parse(skipDoc);
+    jsonIter = IndexedJsonIterator.parse(skipDoc);
 
     check(skipHeavy_jsonIterator(), skipHeavy_jsonIter());
     check(longStrings_read_jsonIterator(), longStrings_read_jsonIter());

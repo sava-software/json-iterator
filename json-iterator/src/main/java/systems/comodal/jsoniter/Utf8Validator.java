@@ -1,22 +1,16 @@
 package systems.comodal.jsoniter;
 
 import jdk.incubator.vector.ByteVector;
-import jdk.incubator.vector.IntVector;
-import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorShuffle;
 
 import java.util.Arrays;
 
 import static jdk.incubator.vector.VectorOperators.*;
-import static systems.comodal.jsoniter.VectorSupport.BYTE_LANES;
-import static systems.comodal.jsoniter.VectorSupport.BYTE_SPECIES;
-import static systems.comodal.jsoniter.VectorSupport.INT_SPECIES;
+import static systems.comodal.jsoniter.VectorSupport.*;
 
 /// Vectorized UTF-8 validation using the lookup algorithm from Keiser &
-/// Lemire, "Validating UTF-8 In Less Than One Instruction Per Byte"
-/// (https://arxiv.org/abs/2010.03090), adapted from simdjson-java's port but
-/// generic over vector width (128/256/512-bit).
-///
+/// Lemire, [Validating UTF-8 In Less Than One Instruction Per Byte](https://arxiv.org/abs/2010.03090),
+/// adapted from simdjson-java's port but generic over vector width (128/256/512-bit).
 /// Each byte is classified by three 16-entry nibble lookups — the previous
 /// byte's high and low nibbles and the current byte's high nibble — whose
 /// intersection flags every 1-2 byte error class (overlong encodings,
@@ -24,12 +18,12 @@ import static systems.comodal.jsoniter.VectorSupport.INT_SPECIES;
 /// sequences are then cross-checked by comparing bytes two and three back
 /// against the minimum leading byte values.
 ///
-/// The buffer must be padded with at least one vector of ASCII (e.g. spaces)
-/// past `len`: the padding terminates any trailing incomplete sequence, which
-/// is then reported through the incomplete-check accumulator.
+/// The tail is loaded with a range mask, zero-filling the unused lanes; the
+/// ASCII zeros terminate any trailing incomplete sequence, which is then
+/// reported through the incomplete-check accumulator.
 final class Utf8Validator {
 
-  // Leading byte not followed by a continuation byte, e.g. 11______ 0_______.
+  // The leading byte isn't followed by a continuation byte, e.g. 11______ 0_______.
   private static final byte TOO_SHORT = 1;
   // ASCII followed by a continuation byte, e.g. 01111111 10_000000.
   private static final byte TOO_LONG = 1 << 1;
@@ -62,19 +56,20 @@ final class Utf8Validator {
   private Utf8Validator() {
   }
 
-  /// Validates `buf[0, len)`; requires at least [VectorSupport#BYTE_LANES]
-  /// bytes of ASCII padding past `len`.
-  static void validate(final byte[] buf, final int len) {
+  /// Validates `buf[from, to)`.
+  static void validate(final byte[] buf, final int from, final int to) {
     long previousIncomplete = 0;
     long errors = 0;
     int previousFourUtf8Bytes = 0;
-    // One chunk past len is always processed: its ASCII padding surfaces any
-    // trailing incomplete sequence via previousIncomplete.
-    final int bound = ((len / BYTE_LANES) + 1) * BYTE_LANES;
-    for (int offset = 0; offset < bound; offset += BYTE_LANES) {
-      final var chunk = ByteVector.fromArray(BYTE_SPECIES, buf, offset);
+    // The final iteration loads with a range mask (zero-filling past `to`), and
+    // always runs so trailing incomplete sequences surface via previousIncomplete.
+    final int loopBound = from + BYTE_SPECIES.loopBound(to - from);
+    for (int offset = from; offset <= loopBound; offset += BYTE_LANES) {
+      final var chunk = offset < loopBound
+          ? ByteVector.fromArray(BYTE_SPECIES, buf, offset)
+          : ByteVector.fromArray(BYTE_SPECIES, buf, offset, BYTE_SPECIES.indexInRange(offset, to));
       final var chunkAsInts = chunk.reinterpretAsInts();
-      // The ASCII fast path bypasses the multi-byte classification.
+      // The ASCII fast path bypasses the multibyte classification.
       if (chunk.and(ALL_ASCII_MASK).compare(EQ, 0).allTrue()) {
         errors |= previousIncomplete;
       } else {
@@ -107,12 +102,12 @@ final class Utf8Validator {
             .lanewise(LSHL, TWO_BYTES_SIZE)
             .or(chunkWithPreviousFourBytes.lanewise(LSHR, TWO_BYTES_SIZE))
             .reinterpretAsBytes();
-        final VectorMask<Byte> is3ByteLead = previousTwoBytes.compare(UGT, MAX_2_LEADING_BYTE);
+        final var is3ByteLead = previousTwoBytes.compare(UGT, MAX_2_LEADING_BYTE);
         final var previousThreeBytes = chunkAsInts
             .lanewise(LSHL, THREE_BYTES_SIZE)
             .or(chunkWithPreviousFourBytes.lanewise(LSHR, Byte.SIZE))
             .reinterpretAsBytes();
-        final VectorMask<Byte> is4ByteLead = previousThreeBytes.compare(UGT, MAX_3_LEADING_BYTE);
+        final var is4ByteLead = previousThreeBytes.compare(UGT, MAX_3_LEADING_BYTE);
         final var secondCheck = firstCheck.add((byte) 0x80, is3ByteLead.or(is4ByteLead));
         errors |= secondCheck.compare(NE, 0).toLong();
       }
@@ -124,7 +119,7 @@ final class Utf8Validator {
   }
 
   private static ByteVector createIncompleteCheck() {
-    // The previous chunk ends incomplete if its last byte is >= 0xC0,
+    // The previous chunk ends incompletely if its last byte is >= 0xC0,
     // its second to last is >= 0xE0, or its third to last is >= 0xF0.
     final byte[] eofArray = new byte[BYTE_LANES];
     Arrays.fill(eofArray, (byte) 255);

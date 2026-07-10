@@ -129,10 +129,10 @@ final class TestInteger {
     assertThrows(JsonException.class, ji::readInt);
 
     for (int i = 300000000; i < 2000000000; i += 10000000) {
-      ji = factory.create('"' + i + "0\"");
+      ji = factory.create("\"" + i + "0\"");
       assertThrows(JsonException.class, ji::readInt);
 
-      ji = factory.create('"' + -i + "0\"");
+      ji = factory.create("\"" + -i + "0\"");
       assertThrows(JsonException.class, ji::readInt);
     }
 
@@ -140,10 +140,10 @@ final class TestInteger {
     assertThrows(JsonException.class, ji::readLong);
 
     for (long i = 1000000000000000000L; i < 9000000000000000000L; i += 100000000000000000L) {
-      ji = factory.create('"' + i + "0\"");
+      ji = factory.create("\"" + i + "0\"");
       assertThrows(JsonException.class, ji::readLong);
 
-      ji = factory.create('"' + -i + "0\"");
+      ji = factory.create("\"" + -i + "0\"");
       assertThrows(JsonException.class, ji::readLong);
     }
   }

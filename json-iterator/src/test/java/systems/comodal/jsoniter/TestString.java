@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.CharArray;
+import systems.comodal.jsoniter.factories.IndexedCharArray;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import java.util.Base64;
@@ -89,8 +90,9 @@ final class TestString {
 
   @Test
   void test_incomplete_escape() {
-    var ji = factory.create("\"\\");
-    assertThrows(JsonException.class, ji::readString);
+    // Indexed factories detect the unclosed string when the index is built,
+    // scalar iterators when it is read.
+    assertThrows(JsonException.class, () -> factory.create("\"\\").readString());
   }
 
   @Test
@@ -153,7 +155,8 @@ final class TestString {
   void test_unicode_escape_positions() {
     // CharsJsonIterator has never decoded \\uXXXX escapes; its escape handling
     // only strips backslashes.
-    assumeTrue(factory != CharArray.INSTANCE, "CharsJsonIterator does not decode unicode escapes");
+    assumeTrue(factory != CharArray.INSTANCE && factory != IndexedCharArray.INSTANCE,
+        "CharsJsonIterator does not decode unicode escapes");
     for (int prefix = 0; prefix <= 70; prefix += 3) {
       final var pad = "x".repeat(prefix);
       final var json = '"' + pad + "\\u4e2d\\ud83d\\udc4a tail with ascii run afterwards 0123456789\"";

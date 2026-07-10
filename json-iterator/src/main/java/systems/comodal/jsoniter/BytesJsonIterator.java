@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 
-final class BytesJsonIterator extends BaseJsonIterator {
+class BytesJsonIterator extends BaseJsonIterator {
 
   private static final byte QUOTE = '"';
   private static final byte BACKSLASH = '\\';
@@ -57,6 +57,11 @@ final class BytesJsonIterator extends BaseJsonIterator {
   @Override
   public JsonIterator reset(final char[] buf, final int head, final int tail) {
     return new CharsJsonIterator(buf, head, tail);
+  }
+
+  @Override
+  public IndexedJsonIterator index() {
+    return new IndexedBytesJsonIterator(buf, head, tail, false);
   }
 
   @Override

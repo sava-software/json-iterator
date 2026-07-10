@@ -5,16 +5,21 @@ import jdk.incubator.vector.ShortVector;
 import java.io.InputStream;
 import java.math.BigDecimal;
 
-final class CharsJsonIterator extends BaseJsonIterator {
+class CharsJsonIterator extends BaseJsonIterator {
 
   private static final short QUOTE = '"';
   private static final short BACKSLASH = '\\';
 
-  private char[] buf;
+  char[] buf;
 
   CharsJsonIterator(final char[] buf, final int head, final int tail) {
     super(head, tail);
     this.buf = buf;
+  }
+
+  @Override
+  public IndexedJsonIterator index() {
+    return new IndexedCharsJsonIterator(buf, head, tail);
   }
 
   @Override

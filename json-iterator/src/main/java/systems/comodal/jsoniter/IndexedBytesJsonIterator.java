@@ -1,0 +1,100 @@
+package systems.comodal.jsoniter;
+
+final class IndexedBytesJsonIterator extends BytesJsonIterator implements IndexedJsonIterator {
+
+  private final StructuralIndex index;
+  private final boolean validateUtf8;
+  private int[] tokens;
+  private int pos;
+
+  IndexedBytesJsonIterator(final byte[] buf, final int head, final int tail, final boolean validateUtf8) {
+    super(buf, head, tail);
+    this.index = new StructuralIndex();
+    this.validateUtf8 = validateUtf8;
+    index(buf, head, tail);
+  }
+
+  private void index(final byte[] buf, final int from, final int to) {
+    if (validateUtf8) {
+      Utf8Validator.validate(buf, from, to);
+    }
+    index.index(buf, from, to);
+    this.tokens = index.indexes();
+    this.pos = 0;
+  }
+
+  @Override
+  public IndexedJsonIterator index() {
+    return this;
+  }
+
+  @Override
+  public JsonIterator reset(final byte[] buf) {
+    super.reset(buf);
+    index(buf, 0, buf.length);
+    return this;
+  }
+
+  @Override
+  public JsonIterator reset(final byte[] buf, final int head, final int tail) {
+    super.reset(buf, head, tail);
+    index(buf, head, tail);
+    return this;
+  }
+
+  @Override
+  public JsonIterator reset(final char[] buf) {
+    return new IndexedCharsJsonIterator(buf, 0, buf.length);
+  }
+
+  @Override
+  public JsonIterator reset(final char[] buf, final int head, final int tail) {
+    return new IndexedCharsJsonIterator(buf, head, tail);
+  }
+
+  // reset(InputStream) is inherited: it dispatches to reset(byte[]), which re-indexes.
+
+  /// Moves the token cursor to the first structural token at or after `head`.
+  /// `head` is the source of truth: scalar reads advance it without touching
+  /// the cursor, and both directions of drift are reconciled here.
+  private int syncTokens() {
+    int p = pos;
+    final int[] tokens = this.tokens;
+    while (p > 0 && tokens[p - 1] >= head) {
+      --p;
+    }
+    while (tokens[p] < head) {
+      ++p;
+    }
+    return p;
+  }
+
+  /// The closing quote is not a structural token; the next token is, and only
+  /// whitespace can separate the two.
+  @Override
+  void skipPastEndQuote() {
+    final int p = syncTokens();
+    pos = p;
+    head = tokens[p];
+  }
+
+  @Override
+  void skipContainer(final char open, final char close, int level) {
+    int p = syncTokens();
+    final int[] tokens = this.tokens;
+    for (; ; ++p) {
+      final int i = tokens[p];
+      if (i >= tail) {
+        throw reportError("skipContainer", "incomplete " + (open == '{' ? "object" : "array"));
+      }
+      final char c = (char) (buf[i] & 0xff);
+      if (c == open) {
+        ++level;
+      } else if (c == close && --level == 0) {
+        pos = p + 1;
+        head = i + 1;
+        return;
+      }
+    }
+  }
+}

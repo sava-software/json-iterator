@@ -56,6 +56,16 @@ public interface JsonIterator {
     return new CharsJsonIterator(buf, head, tail);
   }
 
+  /// Builds a simdjson-style structural index over the remaining document
+  /// (from the current position to the end of the buffer) and returns an
+  /// [IndexedJsonIterator] view backed by the same buffer, without copying.
+  ///
+  /// Skips over indexed values touch only structural tokens, making the
+  /// indexed view considerably faster for selective, skip-heavy access.
+  /// Throws a [JsonException] if the remaining document contains an unclosed
+  /// string.
+  IndexedJsonIterator index();
+
   static JsonIterator parse(final String field) {
     return parse(field.getBytes());
   }

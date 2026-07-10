@@ -9,7 +9,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.simdjson.JsonValue;
 import org.simdjson.SimdJsonParser;
-import systems.comodal.jsoniter.JsonIter;
+import systems.comodal.jsoniter.IndexedJsonIterator;
 import systems.comodal.jsoniter.JsonIterator;
 
 import java.io.IOException;
@@ -18,15 +18,15 @@ import java.util.concurrent.TimeUnit;
 
 /// Compares three parsers over the classic simdjson twitter.json corpus (617 KiB):
 /// - `jsonIterator`: this library's original pull parser (vectorized fast paths)
-/// - `jsonIter`: this library's two-stage structural-index iterator
+/// - `jsonIter`: this library's IndexedJsonIterator (structural-index navigation)
 /// - `simdjson`: simdjson-java (eager two-stage parse to a tape/DOM)
 ///
 /// Workloads:
 /// - `fullWalk`: touch every field name and value in the document.
 /// - `screenNames`: extract statuses[*].user.screen_name and skip everything
 ///   else — the classic simdjson on-demand showcase.
-/// - `parseOnly`: the fixed per-document cost — stage 1 indexing for JsonIter,
-///   stage 1 + tape construction for simdjson (JsonIterator has no equivalent).
+/// - `parseOnly`: the fixed per-document cost — stage 1 indexing for the
+///   indexed iterator, stage 1 + tape construction for simdjson.
 ///
 /// All implementations are cross-checked for agreement during setup.
 @State(Scope.Benchmark)
@@ -36,7 +36,7 @@ public class TwitterBench {
 
   private byte[] json;
   private JsonIterator jsonIterator;
-  private JsonIter jsonIter;
+  private IndexedJsonIterator jsonIter;
   private SimdJsonParser simdParser;
 
   @Setup
@@ -47,7 +47,7 @@ public class TwitterBench {
       throw new UncheckedIOException(e);
     }
     jsonIterator = JsonIterator.parse(json);
-    jsonIter = JsonIter.parse(json);
+    jsonIter = IndexedJsonIterator.parse(json);
     simdParser = new SimdJsonParser(json.length + 1_024, 1_024);
 
     check(fullWalk_jsonIterator(), fullWalk_jsonIter(), fullWalk_simdjson());
@@ -94,33 +94,6 @@ public class TwitterBench {
       case OBJECT -> {
         long sum = 0;
         for (var field = ji.readObjField(); field != null; field = ji.readObjField()) {
-          sum += field.length() + walk(ji);
-        }
-        yield sum;
-      }
-      case ARRAY -> {
-        long sum = 0;
-        while (ji.readArray()) {
-          sum += walk(ji);
-        }
-        yield sum;
-      }
-      case STRING -> ji.readString().length();
-      case NUMBER -> number(ji.readNumberAsString());
-      case BOOLEAN -> ji.readBoolean() ? 1 : 0;
-      case NULL -> {
-        ji.skip();
-        yield 1;
-      }
-      default -> throw new IllegalStateException(ji.currentBuffer());
-    };
-  }
-
-  private static long walk(final JsonIter ji) {
-    return switch (ji.whatIsNext()) {
-      case OBJECT -> {
-        long sum = 0;
-        for (var field = ji.nextField(); field != null; field = ji.nextField()) {
           sum += field.length() + walk(ji);
         }
         yield sum;
