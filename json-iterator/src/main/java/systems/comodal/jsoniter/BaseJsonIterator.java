@@ -311,22 +311,25 @@ abstract class BaseJsonIterator implements JsonIterator {
 
   abstract <C> void parse(final C context, final ContextCharBufferConsumer<C> testChars);
 
-  abstract boolean fieldEquals(final String field, final int offset, final int len);
+  /// Compares the field name whose opening quote was just consumed against
+  /// `field`, leaving head past the closing quote. Implementations compare in
+  /// place against the buffer and only fall back to an unescaping parse when
+  /// the name contains escapes.
+  abstract boolean parseFieldEquals(final String field);
 
   @Override
   public final JsonIterator skipUntil(final String field) {
     char c;
-    for (int offset, len; ; ) {
+    for (boolean match; ; ) {
       if ((c = nextToken()) == ',') {
         c = nextToken();
         if (c != '"') {
           throw reportError("skipUntil", "expected string field, but " + c);
         } else {
-          offset = head;
-          len = parse();
+          match = parseFieldEquals(field);
           if ((c = nextToken()) != ':') {
             throw reportError("skipUntil", "expected :, but " + c);
-          } else if (fieldEquals(field, offset, len)) {
+          } else if (match) {
             return this;
           } else {
             skip();
@@ -335,11 +338,10 @@ abstract class BaseJsonIterator implements JsonIterator {
       } else if (c == '{') {
         c = nextToken();
         if (c == '"') {
-          offset = head;
-          len = parse();
+          match = parseFieldEquals(field);
           if ((c = nextToken()) != ':') {
             throw reportError("skipUntil", "expected :, but " + c);
-          } else if (fieldEquals(field, offset, len)) {
+          } else if (match) {
             return this;
           } else {
             skip();

@@ -420,7 +420,33 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  boolean fieldEquals(final String field, final int offset, final int len) {
+  boolean parseFieldEquals(final String field) {
+    final int fieldLength = field.length();
+    int i = head;
+    for (int f = 0; f < fieldLength; ++f, ++i) {
+      if (i >= tail) {
+        return parseFieldEqualsSlow(field); // reports the incomplete string
+      }
+      final byte b = buf[i];
+      if (b == '\\' || b < 0) {
+        // Escaped or multi-byte field names take the unescaping slow path.
+        return parseFieldEqualsSlow(field);
+      } else if ((char) (b & 0xff) != field.charAt(f)) {
+        skipPastEndQuote();
+        return false;
+      }
+    }
+    if (i < tail && buf[i] == '"') {
+      head = i + 1;
+      return true;
+    }
+    // The name continues past the compared prefix, or the buffer ended.
+    skipPastEndQuote();
+    return false;
+  }
+
+  private boolean parseFieldEqualsSlow(final String field) {
+    final int len = parse();
     return JsonIterator.fieldEquals(field, charBuf, 0, len);
   }
 
