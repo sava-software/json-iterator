@@ -1132,7 +1132,8 @@ abstract class BaseJsonIterator implements JsonIterator {
     return VALUE_TYPES[peekToken()];
   }
 
-  private void skipUntilBreak() {
+  /// Skips past a number to the next whitespace or structural character.
+  void skipUntilBreak() {
     for (int i = head; ; i++) {
       if (i == tail) {
         head = tail;

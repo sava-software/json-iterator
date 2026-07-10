@@ -108,8 +108,10 @@ final class StructuralIndex {
     prevEscaped = 0;
     prevScalar = 0;
     prevStructurals = 0;
-    if (indexes.length < len + 2) {
-      indexes = new int[len + 2]; // worst case is one structural per character, plus two sentinels
+    if (indexes.length < len + 18) {
+      // Worst case is one structural per character, plus two sentinels, plus
+      // 16 slots of slack for write()'s unconditional eight-slot stores.
+      indexes = new int[len + 18];
     }
   }
 
@@ -191,10 +193,30 @@ final class StructuralIndex {
   }
 
   private void write(final int base, long bits) {
-    for (int i = count; bits != 0; bits &= bits - 1) {
-      indexes[i++] = base + Long.numberOfTrailingZeros(bits);
-      count = i;
+    if (bits == 0) {
+      return;
     }
+    // Blocks rarely hold more than eight structurals, so extract eight slots
+    // unconditionally instead of branching per bit: exhausted masks write
+    // harmless garbage (base + 64) beyond `count`, which the next write or the
+    // sentinels overwrite, and which no reader ever visits.
+    final int i = count;
+    final int cnt = Long.bitCount(bits);
+    for (int j = 0; j < 8; ++j) {
+      indexes[i + j] = base + Long.numberOfTrailingZeros(bits);
+      bits &= bits - 1;
+    }
+    if (cnt > 8) {
+      for (int j = 8; j < 16; ++j) {
+        indexes[i + j] = base + Long.numberOfTrailingZeros(bits);
+        bits &= bits - 1;
+      }
+      for (int j = 16; j < cnt; ++j) {
+        indexes[i + j] = base + Long.numberOfTrailingZeros(bits);
+        bits &= bits - 1;
+      }
+    }
+    count = i + cnt;
   }
 
   /// Carry-less multiply by ~0: flips the running in-string state at every quote.

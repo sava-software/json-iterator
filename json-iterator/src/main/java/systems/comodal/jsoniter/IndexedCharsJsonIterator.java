@@ -89,6 +89,15 @@ final class IndexedCharsJsonIterator extends CharsJsonIterator implements Indexe
     head = tokens[p];
   }
 
+  /// Only the first character of a number is a structural token; hop to the
+  /// next token instead of scanning the remaining digits.
+  @Override
+  void skipUntilBreak() {
+    final int p = syncTokens();
+    pos = p;
+    head = tokens[p];
+  }
+
   @Override
   void skipContainer(final char open, final char close, int level) {
     int p = syncTokens();
