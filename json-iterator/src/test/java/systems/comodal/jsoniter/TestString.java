@@ -3,6 +3,7 @@ package systems.comodal.jsoniter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.FieldSource;
+import systems.comodal.jsoniter.factories.CharArray;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import java.util.Base64;
@@ -10,6 +11,7 @@ import java.util.Random;
 
 import static java.lang.String.format;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @ParameterizedClass
 @FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
@@ -120,5 +122,44 @@ final class TestString {
   void test_long_string() {
     var ji = factory.create("\"[\\\"LL\\\",\\\"MM\\\\\\/LW\\\",\\\"JY\\\",\\\"S\\\",\\\"C\\\",\\\"IN\\\",\\\"ME \\\\\\/ LE\\\"]\"");
     assertEquals("[\"LL\",\"MM\\/LW\",\"JY\",\"S\",\"C\",\"IN\",\"ME \\/ LE\"]", ji.readString());
+  }
+
+  @Test
+  void test_escape_positions_across_vector_widths() {
+    // Sweep escapes, multi-byte characters, and unicode escapes across vector
+    // width boundaries, reading via readString and via applyChars, which
+    // exercise independent scan/copy paths.
+    for (int prefix = 0; prefix <= 70; prefix += 3) {
+      final var pad = "x".repeat(prefix);
+
+      var json = '"' + pad + "\\\"tail of the string 0123456789012345678901234567890123456789\"";
+      var expected = pad + "\"tail of the string 0123456789012345678901234567890123456789";
+      assertEquals(expected, factory.create(json).readString(), "prefix=" + prefix);
+      assertEquals(expected, factory.create(json).applyChars(String::new), "prefix=" + prefix);
+
+      json = '"' + pad + "中文 and more ascii after the multibyte section 01234567890123456789\"";
+      expected = pad + "中文 and more ascii after the multibyte section 01234567890123456789";
+      assertEquals(expected, factory.create(json).readString(), "prefix=" + prefix);
+      assertEquals(expected, factory.create(json).applyChars(String::new), "prefix=" + prefix);
+
+      json = '"' + pad + "y".repeat(150) + '"';
+      expected = pad + "y".repeat(150);
+      assertEquals(expected, factory.create(json).readString(), "prefix=" + prefix);
+      assertEquals(expected, factory.create(json).applyChars(String::new), "prefix=" + prefix);
+    }
+  }
+
+  @Test
+  void test_unicode_escape_positions() {
+    // CharsJsonIterator has never decoded \\uXXXX escapes; its escape handling
+    // only strips backslashes.
+    assumeTrue(factory != CharArray.INSTANCE, "CharsJsonIterator does not decode unicode escapes");
+    for (int prefix = 0; prefix <= 70; prefix += 3) {
+      final var pad = "x".repeat(prefix);
+      final var json = '"' + pad + "\\u4e2d\\ud83d\\udc4a tail with ascii run afterwards 0123456789\"";
+      final var expected = pad + "中👊 tail with ascii run afterwards 0123456789";
+      assertEquals(expected, factory.create(json).readString(), "prefix=" + prefix);
+      assertEquals(expected, factory.create(json).applyChars(String::new), "prefix=" + prefix);
+    }
   }
 }

@@ -1159,53 +1159,27 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
-  private void skipArray() {
+  /// Skips past the closing character of the container whose opening character
+  /// has already been consumed, tracking nesting `level` and skipping strings.
+  void skipContainer(final char open, final char close, int level) {
     char c;
-    for (int i = head, level = 1; ; i++) {
+    for (int i = head; ; i++) {
       if (i == tail) {
         if (loadMore()) {
           i = head;
         } else {
-          throw reportError("skipArray", "incomplete array");
-        }
-      }
-      if ((c = peekChar(i)) == '"') { // If inside string, skip it
-        head = i + 1;
-        skipPastEndQuote();
-        i = head - 1;
-      } else if (c == '[') { // If open symbol, increase level
-        level++;
-      } else if (c == ']') { // If close symbol, increase level
-        level--;
-        // If we have returned to the original level, we're done
-        if (level == 0) {
-          head = i + 1;
-          return;
-        }
-      }
-    }
-  }
-
-  private void skipObject() {
-    char c;
-    for (int i = head, level = 1; ; i++) {
-      if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          throw reportError("skipObject", "incomplete object");
+          throw reportError("skipContainer", "incomplete " + (open == '{' ? "object" : "array"));
         }
       }
       if ((c = peekChar(i)) == '"') { // If inside string, skip it
         head = i + 1;
         skipPastEndQuote();
         i = head - 1; // it will be i++ soon
-      } else if (c == '{') { // If open symbol, increase level
+      } else if (c == open) {
         level++;
-      } else if (c == '}') { // If close symbol, increase level
-        level--;
+      } else if (c == close) {
         // If we have returned to the original level, we're done
-        if (level == 0) {
+        if (--level == 0) {
           head = i + 1;
           return;
         }
@@ -1221,8 +1195,8 @@ abstract class BaseJsonIterator implements JsonIterator {
       case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> skipUntilBreak();
       case 't', 'n' -> skip(3); // true or null
       case 'f' -> skip(4); // false
-      case '[' -> skipArray();
-      case '{' -> skipObject();
+      case '[' -> skipContainer('[', ']', 1);
+      case '{' -> skipContainer('{', '}', 1);
       default -> throw reportError("skip", "Cannot skip: " + c);
     }
     return this;
@@ -1253,7 +1227,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
-  private void assertNotLeadingZero() {
+  final void assertNotLeadingZero() {
     if (head == tail && !loadMore()) {
       return;
     }
@@ -1401,7 +1375,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
-  private long readLong(final char c) {
+  long readLong(final char c) {
     final long ind = INT_DIGITS[c];
     if (ind == 0) {
       assertNotLeadingZero();

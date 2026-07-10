@@ -1,5 +1,9 @@
 package systems.comodal.jsoniter;
 
+import jdk.incubator.vector.ByteVector;
+import jdk.incubator.vector.ShortVector;
+import jdk.incubator.vector.VectorOperators;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
@@ -12,10 +16,8 @@ import java.util.Base64;
 
 class BytesJsonIterator extends BaseJsonIterator {
 
-  private static final VarHandle TO_LONG = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
-  private static final long QUOTE_PATTERN = JIUtil.compileReplacePattern((byte) '"');
-  private static final long ESCAPE_PATTERN = JIUtil.compileReplacePattern((byte) ('\\' & 0xFF));
-  private static final long MULTI_BYTE_CHAR_PATTERN = JIUtil.compileReplacePattern((byte) 0b1000_0000);
+  private static final byte QUOTE = '"';
+  private static final byte BACKSLASH = '\\';
 
   byte[] buf;
   private char[] charBuf;
@@ -28,24 +30,6 @@ class BytesJsonIterator extends BaseJsonIterator {
     super(head, tail);
     this.buf = buf;
     this.charBuf = new char[charBufferLength];
-  }
-
-  private static long matchPattern(final long input) {
-    // https://richardstartin.github.io/posts/finding-bytes
-    // Hacker's Delight ch. 6: https://books.google.com/books?id=VicPJYM0I5QC&lpg=PP1&pg=PA117#v=onepage&q&f=false
-    return ~(((input & 0x7F7F7F7F7F7F7F7FL) + 0x7F7F7F7F7F7F7F7FL) | input | 0x7F7F7F7F7F7F7F7FL);
-  }
-
-  private static boolean containsPattern(final long input) {
-    return matchPattern(input) != 0;
-  }
-
-  private static long matchQuotePattern(final long word) {
-    return matchPattern(word ^ BytesJsonIterator.QUOTE_PATTERN);
-  }
-
-  private static boolean containsMultiByteOrEscapePattern(final long word) {
-    return containsPattern(word ^ MULTI_BYTE_CHAR_PATTERN) || containsPattern(word ^ ESCAPE_PATTERN);
   }
 
   @Override
@@ -174,29 +158,75 @@ class BytesJsonIterator extends BaseJsonIterator {
     charBuf = newBuf;
   }
 
+  private void ensureCharBufCapacity(final int capacity) {
+    if (charBuf.length < capacity) {
+      int newLength = charBuf.length << 1;
+      while (newLength < capacity) {
+        newLength <<= 1;
+      }
+      final char[] newBuf = new char[newLength];
+      System.arraycopy(charBuf, 0, newBuf, 0, charBuf.length);
+      charBuf = newBuf;
+    }
+  }
+
+  /// Widens one full vector of ASCII bytes at `head` into charBuf at `j`.
+  private void widenToCharBuf(final ByteVector chunk, final int j) {
+    ((ShortVector) chunk.convertShape(VectorOperators.B2S, VectorSupport.SHORT_SPECIES, 0)).intoCharArray(charBuf, j);
+    ((ShortVector) chunk.convertShape(VectorOperators.B2S, VectorSupport.SHORT_SPECIES, 1)).intoCharArray(charBuf, j + (VectorSupport.BYTE_LANES >> 1));
+  }
+
   @Override
   final int parse() {
-    byte c;
-    for (int j = 0; head < tail || loadMore(); ) {
-      c = buf[head];
-      if (c == '"') {
-        head++;
-        return j;
-      } else if ((c ^ '\\') < 1) {
-        // If a backslash is encountered, which is a beginning of an escape sequence
-        // or a high bit was set - indicating an UTF-8 encoded multi-byte character,
-        // there is no chance that we can decode the string without instantiating
-        // a temporary buffer, so quit this loop.
-        return parseMultiByteString(j);
-      } else {
+    final int lanes = VectorSupport.BYTE_LANES;
+    int j = 0;
+    for (; ; ) {
+      while (head + lanes <= tail) {
+        final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
+        final long special = chunk.eq(BACKSLASH).toLong() | chunk.compare(VectorOperators.LT, (byte) 0).toLong();
+        final long quote = chunk.eq(QUOTE).toLong();
+        final long stop = special | quote;
+        if (stop == 0) {
+          ensureCharBufCapacity(j + lanes);
+          widenToCharBuf(chunk, j);
+          j += lanes;
+          head += lanes;
+        } else {
+          final int n = Long.numberOfTrailingZeros(stop);
+          ensureCharBufCapacity(j + n);
+          for (int i = 0; i < n; ++i) {
+            charBuf[j + i] = (char) buf[head + i];
+          }
+          j += n;
+          head += n;
+          if (((quote >>> n) & 1) != 0) {
+            ++head;
+            return j;
+          }
+          // An escape sequence or a UTF-8 multi-byte character requires the scalar decoder.
+          return parseMultiByteString(j);
+        }
+      }
+      byte c;
+      while (head < tail) {
+        c = buf[head];
+        if (c == '"') {
+          head++;
+          return j;
+        } else if ((c ^ '\\') < 1) {
+          // Backslash (escape sequence) or high bit set (UTF-8 multi-byte character).
+          return parseMultiByteString(j);
+        }
         head++;
         if (j == charBuf.length) {
           doubleReusableCharBuffer();
         }
         charBuf[j++] = (char) (c & 0xff);
       }
+      if (!loadMore()) {
+        throw reportError("parse", "incomplete string");
+      }
     }
-    throw reportError("parse", "incomplete string");
   }
 
   final void skipPastSingleByteEndQuote() {
@@ -215,38 +245,44 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   @Override
   final void skipPastEndQuote() {
-    int nextOffset = head + Long.BYTES;
+    final int lanes = VectorSupport.BYTE_LANES;
+    int nextOffset = head + lanes;
     if (nextOffset > tail) {
       skipPastSingleByteEndQuote();
-    } else {
-      for (long word, tmp; ; ) {
-        word = (long) TO_LONG.get(buf, head);
-        if (containsMultiByteOrEscapePattern(word)) {
+      return;
+    }
+    for (; ; ) {
+      final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
+      // Escapes need validation and multi-byte characters need decoding awareness,
+      // so either defers to the scalar path when encountered before the end quote.
+      final long special = chunk.eq(BACKSLASH).toLong() | chunk.compare(VectorOperators.LT, (byte) 0).toLong();
+      final long quote = chunk.eq(QUOTE).toLong();
+      if (quote == 0) {
+        if (special != 0) {
           skipPastMultiByteEndQuote();
           return;
-        } else {
-          tmp = matchQuotePattern(word);
-          if (tmp != 0) {
-            head += (Long.numberOfTrailingZeros(tmp << 1) >>> 3);
-            return;
-          } else {
-            head = nextOffset;
-            nextOffset += Long.BYTES;
+        }
+        head = nextOffset;
+        nextOffset += lanes;
+        if (nextOffset > tail) {
+          if (head < tail) {
+            head = tail - lanes;
+          } else if (loadMore()) {
+            nextOffset = head + lanes;
             if (nextOffset > tail) {
-              if (head < tail) {
-                head = tail - Long.BYTES;
-              } else if (loadMore()) {
-                nextOffset = head + Long.BYTES;
-                if (nextOffset > tail) {
-                  skipPastSingleByteEndQuote();
-                  return;
-                }
-              } else {
-                throw reportError("skipPastEndQuote", "incomplete string");
-              }
+              skipPastSingleByteEndQuote();
+              return;
             }
+          } else {
+            throw reportError("skipPastEndQuote", "incomplete string");
           }
         }
+      } else if (special != 0 && Long.numberOfTrailingZeros(special) < Long.numberOfTrailingZeros(quote)) {
+        skipPastMultiByteEndQuote();
+        return;
+      } else {
+        head += Long.numberOfTrailingZeros(quote) + 1;
+        return;
       }
     }
   }
@@ -269,32 +305,29 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   final byte[] parseBase64String() {
+    final int lanes = VectorSupport.BYTE_LANES;
     final int from = head;
-    int nextOffset = head + Long.BYTES;
+    int nextOffset = head + lanes;
     if (nextOffset > tail) {
       final int len = parse();
       return decodeBase64(buf, from, from + len);
-    } else {
-      long word, tmp;
-      for (int i = head; ; ) {
-        word = (long) TO_LONG.get(buf, i);
-        tmp = matchQuotePattern(word);
-        if (tmp != 0) {
-          i += (Long.numberOfTrailingZeros(tmp << 1) >>> 3);
-          final int to = i - 1;
-          final var data = decodeBase64(buf, head, to);
-          head = i;
-          return data;
+    }
+    for (int i = head; ; ) {
+      final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, i);
+      final long quote = chunk.eq(QUOTE).toLong();
+      if (quote != 0) {
+        i += Long.numberOfTrailingZeros(quote);
+        final var data = decodeBase64(buf, head, i);
+        head = i + 1;
+        return data;
+      }
+      i = nextOffset;
+      nextOffset += lanes;
+      if (nextOffset > tail) {
+        if (i < tail) {
+          i = tail - lanes; // push i back a bit to match the vector length.
         } else {
-          i = nextOffset;
-          nextOffset += Long.BYTES;
-          if (nextOffset > tail) {
-            if (i < tail) {
-              i = tail - Long.BYTES; // push i back a bit to match 8 byte pattern length.
-            } else {
-              throw reportError("decodeBase64String", "incomplete string");
-            }
-          }
+          throw reportError("decodeBase64String", "incomplete string");
         }
       }
     }
@@ -302,39 +335,41 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   @Override
   protected final String parseString() {
-    int nextOffset = head + Long.BYTES;
+    final int lanes = VectorSupport.BYTE_LANES;
+    int nextOffset = head + lanes;
     if (nextOffset > tail) {
       final int len = parse();
       return new String(charBuf, 0, len);
-    } else {
-      long word, tmp;
-      for (int i = head; ; ) {
-        word = (long) TO_LONG.get(buf, i);
-        if (containsMultiByteOrEscapePattern(word)) {
+    }
+    for (int i = head; ; ) {
+      final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, i);
+      final long special = chunk.eq(BACKSLASH).toLong() | chunk.compare(VectorOperators.LT, (byte) 0).toLong();
+      final long quote = chunk.eq(QUOTE).toLong();
+      if (quote == 0) {
+        if (special != 0) {
           final int len = parseMultiByteString(0);
           return new String(charBuf, 0, len);
-        } else {
-          tmp = matchQuotePattern(word);
-          if (tmp != 0) {
-            i += (Long.numberOfTrailingZeros(tmp << 1) >>> 3);
-            final var str = new String(buf, head, (i - 1) - head, StandardCharsets.US_ASCII);
-            head = i;
-            return str;
+        }
+        i = nextOffset;
+        nextOffset += lanes;
+        if (nextOffset > tail) {
+          if (i < tail) {
+            i = tail - lanes; // push i back a bit to match the vector length.
+          } else if (supportsMarkReset()) { // Hack to check if reading from stream or not.
+            throw reportError("parseString", "incomplete string");
           } else {
-            i = nextOffset;
-            nextOffset += Long.BYTES;
-            if (nextOffset > tail) {
-              if (i < tail) {
-                i = tail - Long.BYTES; // push i back a bit to match 8 byte pattern length.
-              } else if (supportsMarkReset()) { // Hack to check if reading from stream or not.
-                throw reportError("parseString", "incomplete string");
-              } else {
-                final int len = parseMultiByteString(0);
-                return new String(charBuf, 0, len);
-              }
-            }
+            final int len = parseMultiByteString(0);
+            return new String(charBuf, 0, len);
           }
         }
+      } else if (special != 0 && Long.numberOfTrailingZeros(special) < Long.numberOfTrailingZeros(quote)) {
+        final int len = parseMultiByteString(0);
+        return new String(charBuf, 0, len);
+      } else {
+        i += Long.numberOfTrailingZeros(quote);
+        final var str = new String(buf, head, i - head, StandardCharsets.US_ASCII);
+        head = i + 1;
+        return str;
       }
     }
   }
@@ -436,7 +471,33 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   private int parseMultiByteString(int j) {
     boolean isExpectingLowSurrogate = false;
+    final int lanes = VectorSupport.BYTE_LANES;
     for (int bc; head < tail || loadMore(); ) {
+      // Bulk-copy runs of clean ASCII between escapes / multi-byte characters.
+      while (head + lanes <= tail) {
+        final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
+        final long stop = chunk.eq(QUOTE).toLong()
+            | chunk.eq(BACKSLASH).toLong()
+            | chunk.compare(VectorOperators.LT, (byte) 0).toLong();
+        if (stop == 0) {
+          ensureCharBufCapacity(j + lanes);
+          widenToCharBuf(chunk, j);
+          j += lanes;
+          head += lanes;
+        } else {
+          final int n = Long.numberOfTrailingZeros(stop);
+          ensureCharBufCapacity(j + n);
+          for (int i = 0; i < n; ++i) {
+            charBuf[j + i] = (char) buf[head + i];
+          }
+          j += n;
+          head += n;
+          break;
+        }
+      }
+      if (head == tail && !loadMore()) {
+        break;
+      }
       bc = buf[head++];
       if (bc == '"') {
         return j;
@@ -670,6 +731,98 @@ class BytesJsonIterator extends BaseJsonIterator {
   @Override
   final <C> long parseNumber(final C context, final ContextCharBufferToLongFunction<C> applyChars, final int len) {
     return applyChars.applyAsLong(context, charBuf, 0, len);
+  }
+
+  @Override
+  final void skipContainer(final char open, final char close, int level) {
+    final int lanes = VectorSupport.BYTE_LANES;
+    final byte openByte = (byte) open;
+    final byte closeByte = (byte) close;
+    outer:
+    while (head + lanes <= tail) {
+      final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
+      long bits = chunk.eq(openByte).toLong() | chunk.eq(closeByte).toLong() | chunk.eq(QUOTE).toLong();
+      while (bits != 0) {
+        final int n = Long.numberOfTrailingZeros(bits);
+        final byte c = buf[head + n];
+        if (c == QUOTE) {
+          head += n + 1;
+          skipPastEndQuote();
+          continue outer;
+        } else if (c == openByte) {
+          ++level;
+        } else if (--level == 0) {
+          head += n + 1;
+          return;
+        }
+        bits &= bits - 1;
+      }
+      head += lanes;
+    }
+    super.skipContainer(open, close, level);
+  }
+
+  private static final VarHandle TO_LONG = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
+
+  /// SWAR conversion of eight ASCII digits at once, or -1 if any of the eight
+  /// bytes is not a digit. simdjson's parse_eight_digits trick; the digit test
+  /// is from Lemire, and the extraction folds pairs with three multiplies.
+  private static long convertEightDigits(final long word) {
+    if (((word & 0xF0F0F0F0F0F0F0F0L) | (((word + 0x0606060606060606L) & 0xF0F0F0F0F0F0F0F0L) >>> 4)) != 0x3030303030303030L) {
+      return -1;
+    }
+    long value = word & 0x0F0F0F0F0F0F0F0FL;
+    value = (value * 2561) >>> 8;
+    value = (value & 0x00FF00FF00FF00FFL) * 6553601 >>> 16;
+    return (value & 0x0000FFFF0000FFFFL) * 42949672960001L >>> 32;
+  }
+
+  @Override
+  final long readLong(final char c) {
+    final int ind = INT_DIGITS[c];
+    if (ind == 0) {
+      assertNotLeadingZero();
+      return 0;
+    } else if (ind == INVALID_CHAR_FOR_NUMBER) {
+      throw reportError("readLong", "expected 0~9");
+    }
+    long value = -ind; // accumulate negated to avoid a redundant Long.MIN_VALUE check per digit
+    while (head + Long.BYTES <= tail && value >= -92233720367L) { // appending 8 digits cannot overflow
+      final long digits = convertEightDigits((long) TO_LONG.get(buf, head));
+      if (digits < 0) {
+        break;
+      }
+      value = value * 100_000_000 - digits;
+      head += Long.BYTES;
+    }
+    return continueLong(value);
+  }
+
+  /// Scalar continuation of [#readLong(char)] with the same overflow contract
+  /// as BaseJsonIterator.readLongSlowPath.
+  private long continueLong(long value) {
+    for (int i = head, ind; ; i++) {
+      if (i == tail) {
+        if (loadMore()) {
+          i = head;
+        } else {
+          head = tail;
+          return -value;
+        }
+      }
+      ind = peekIntDigitChar(i);
+      if (ind == INVALID_CHAR_FOR_NUMBER) {
+        head = i;
+        return -value;
+      } else if (value < -922337203685477580L) { // limit / 10
+        throw reportError("readLongSlowPath", "value is too large for long");
+      } else {
+        value = (value << 3) + (value << 1) - ind;
+        if (value >= 0) {
+          throw reportError("readLongSlowPath", "value is too large for long");
+        }
+      }
+    }
   }
 
   @Override

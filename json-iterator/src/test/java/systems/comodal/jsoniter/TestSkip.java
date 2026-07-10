@@ -87,4 +87,28 @@ final class TestSkip {
     assertEquals(2, ji.readInt());
     assertFalse(ji.readArray());
   }
+
+  @Test
+  void test_skip_large_containers() {
+    // Brackets and escaped quotes inside strings must not confuse the
+    // vectorized container skipping.
+    final var inner = new StringBuilder("[");
+    for (int i = 0; i < 300; ++i) {
+      if (i > 0) {
+        inner.append(',');
+      }
+      inner.append("{\"k").append(i).append("\":\"v ] } [ { \\\" ").append(i).append("\",\"n\":[").append(i).append(",[7,8]]}");
+    }
+    inner.append(']');
+
+    var ji = factory.create("[" + inner + ",2]");
+    assertTrue(ji.readArray());
+    ji.skip();
+    assertTrue(ji.readArray());
+    assertEquals(2, ji.readInt());
+    assertFalse(ji.readArray());
+
+    ji = factory.create("{\"o\":" + inner + ",\"z\":3}");
+    assertEquals(3, ji.skipUntil("z").readInt());
+  }
 }

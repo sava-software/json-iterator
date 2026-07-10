@@ -1,9 +1,14 @@
 package systems.comodal.jsoniter;
 
+import jdk.incubator.vector.ShortVector;
+
 import java.io.InputStream;
 import java.math.BigDecimal;
 
 final class CharsJsonIterator extends BaseJsonIterator {
+
+  private static final short QUOTE = '"';
+  private static final short BACKSLASH = '\\';
 
   private char[] buf;
 
@@ -122,13 +127,31 @@ final class CharsJsonIterator extends BaseJsonIterator {
   private int numEscapes = 0;
 
   private int parse(final int from) {
-    char c;
     numEscapes = 0;
-    for (int i = from; ; i++) {
+    final int lanes = VectorSupport.SHORT_LANES;
+    int i = from;
+    for (; i + lanes <= tail; i += lanes) {
+      final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, i);
+      final long backslash = chunk.eq(BACKSLASH).toLong();
+      final long quote = chunk.eq(QUOTE).toLong();
+      if (quote != 0 && (backslash == 0 || Long.numberOfTrailingZeros(quote) < Long.numberOfTrailingZeros(backslash))) {
+        final int end = i + Long.numberOfTrailingZeros(quote);
+        head = end + 1;
+        return end - from;
+      } else if (backslash != 0) {
+        // Escape sequences need pairwise skipping and counting; continue scalar.
+        return parseScalar(from, i + Long.numberOfTrailingZeros(backslash));
+      }
+    }
+    return parseScalar(from, i);
+  }
+
+  private int parseScalar(final int from, int i) {
+    for (char c; ; i++) {
       if (i >= tail) {
         throw reportError("parse", "incomplete string");
       }
-      c = peekChar(i);
+      c = buf[i];
       if (c == '"') {
         head = i + 1;
         return i - from;
@@ -141,16 +164,62 @@ final class CharsJsonIterator extends BaseJsonIterator {
 
   @Override
   void skipPastEndQuote() {
+    final int lanes = VectorSupport.SHORT_LANES;
+    int i = head;
+    for (; i + lanes <= tail; i += lanes) {
+      final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, i);
+      final long backslash = chunk.eq(BACKSLASH).toLong();
+      final long quote = chunk.eq(QUOTE).toLong();
+      if (quote != 0 && (backslash == 0 || Long.numberOfTrailingZeros(quote) < Long.numberOfTrailingZeros(backslash))) {
+        head = i + Long.numberOfTrailingZeros(quote) + 1;
+        return;
+      } else if (backslash != 0) {
+        skipPastEndQuoteScalar(i + Long.numberOfTrailingZeros(backslash));
+        return;
+      }
+    }
+    skipPastEndQuoteScalar(i);
+  }
+
+  private void skipPastEndQuoteScalar(int i) {
     char c;
-    while (head < tail) {
-      c = buf[head++];
+    while (i < tail) {
+      c = buf[i++];
       if (c == '"') {
+        head = i;
         return;
       } else if (c == '\\') {
-        ++head;
+        ++i;
       }
     }
     throw reportError("skipPastEndQuote", "incomplete string");
+  }
+
+  @Override
+  void skipContainer(final char open, final char close, int level) {
+    final int lanes = VectorSupport.SHORT_LANES;
+    outer:
+    while (head + lanes <= tail) {
+      final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, head);
+      long bits = chunk.eq((short) open).toLong() | chunk.eq((short) close).toLong() | chunk.eq(QUOTE).toLong();
+      while (bits != 0) {
+        final int n = Long.numberOfTrailingZeros(bits);
+        final char c = buf[head + n];
+        if (c == '"') {
+          head += n + 1;
+          skipPastEndQuote();
+          continue outer;
+        } else if (c == open) {
+          ++level;
+        } else if (--level == 0) {
+          head += n + 1;
+          return;
+        }
+        bits &= bits - 1;
+      }
+      head += lanes;
+    }
+    super.skipContainer(open, close, level);
   }
 
   @Override
