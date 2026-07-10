@@ -18,11 +18,6 @@ final class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  public boolean supportsMarkReset() {
-    return true;
-  }
-
-  @Override
   public JsonIterator reset(final byte[] buf) {
     return JsonIterator.parse(buf);
   }
@@ -50,16 +45,12 @@ final class CharsJsonIterator extends BaseJsonIterator {
 
   @Override
   public JsonIterator reset(final InputStream in) {
-    return JsonIterator.parse(in, buf.length);
+    return JsonIterator.parse(in);
   }
 
   @Override
   public JsonIterator reset(final InputStream in, final int bufSize) {
-    return JsonIterator.parse(in, bufSize);
-  }
-
-  @Override
-  public void close() {
+    return JsonIterator.parse(in);
   }
 
   @Override
@@ -390,7 +381,10 @@ final class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  <C> boolean breakOut(final C context, final ContextFieldBufferPredicate<C> fieldBufferFunction, final int offset, final int len) {
+  <C> boolean breakOut(final C context,
+                       final ContextFieldBufferPredicate<C> fieldBufferFunction,
+                       final int offset,
+                       final int len) {
     if (numEscapes > 0) {
       final char[] chars = handleEscapes(offset, len);
       return !fieldBufferFunction.test(context, chars, 0, chars.length, this);
@@ -400,7 +394,11 @@ final class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  <C> long test(final C context, final long mask, final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction, final int offset, final int len) {
+  <C> long test(final C context,
+                final long mask,
+                final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction,
+                final int offset,
+                final int len) {
     if (numEscapes > 0) {
       final char[] chars = handleEscapes(offset, len);
       return fieldBufferFunction.test(context, mask, chars, 0, chars.length, this);
@@ -420,7 +418,10 @@ final class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  <C, R> R apply(final C context, final ContextFieldBufferFunction<C, R> fieldBufferFunction, final int offset, final int len) {
+  <C, R> R apply(final C context,
+                 final ContextFieldBufferFunction<C, R> fieldBufferFunction,
+                 final int offset,
+                 final int len) {
     if (numEscapes > 0) {
       final char[] chars = handleEscapes(offset, len);
       return fieldBufferFunction.apply(context, chars, 0, chars.length, this);

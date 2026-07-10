@@ -6,6 +6,7 @@ import jdk.incubator.vector.VectorOperators;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
@@ -14,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 
-class BytesJsonIterator extends BaseJsonIterator {
+final class BytesJsonIterator extends BaseJsonIterator {
 
   private static final byte QUOTE = '"';
   private static final byte BACKSLASH = '\\';
@@ -30,11 +31,6 @@ class BytesJsonIterator extends BaseJsonIterator {
     super(head, tail);
     this.buf = buf;
     this.charBuf = new char[charBufferLength];
-  }
-
-  @Override
-  public boolean supportsMarkReset() {
-    return true;
   }
 
   @Override
@@ -65,33 +61,29 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   @Override
   public JsonIterator reset(final InputStream in) {
-    return new BufferedStreamJsonIterator(in, buf, 0, 0);
+    try (in) {
+      return reset(in.readAllBytes());
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   @Override
   public JsonIterator reset(final InputStream in, final int bufSize) {
-    return new BufferedStreamJsonIterator(in, buf.length == bufSize ? buf : new byte[bufSize], 0, 0);
+    return reset(in);
   }
 
   @Override
-  public void close() throws IOException {
-  }
-
-  @Override
-  final String getBufferString(final int from, final int to) {
+  String getBufferString(final int from, final int to) {
     return new String(buf, from, Math.min(to, tail) - from);
   }
 
   @Override
-  final char nextToken() {
+  char nextToken() {
     byte c;
     for (int i = head; ; ) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          throw reportError("nextToken", "unexpected end");
-        }
+        throw reportError("nextToken", "unexpected end");
       }
       c = buf[i++];
       switch (c) {
@@ -106,15 +98,11 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  final char peekToken() {
+  char peekToken() {
     byte c;
     for (int i = head; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          throw reportError("peekToken", "unexpected end");
-        }
+        throw reportError("peekToken", "unexpected end");
       }
       c = buf[i];
       switch (c) {
@@ -133,22 +121,22 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  final char readChar() {
+  char readChar() {
     return (char) (read() & 0xff);
   }
 
   @Override
-  final char peekChar() {
+  char peekChar() {
     return (char) (buf[head] & 0xff);
   }
 
   @Override
-  final char peekChar(final int offset) {
+  char peekChar(final int offset) {
     return (char) (buf[offset] & 0xff);
   }
 
   @Override
-  final int peekIntDigitChar(final int offset) {
+  int peekIntDigitChar(final int offset) {
     return INT_DIGITS[buf[offset]];
   }
 
@@ -177,60 +165,56 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  final int parse() {
+  int parse() {
     final int lanes = VectorSupport.BYTE_LANES;
     int j = 0;
-    for (; ; ) {
-      while (head + lanes <= tail) {
-        final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
-        final long special = chunk.eq(BACKSLASH).toLong() | chunk.compare(VectorOperators.LT, (byte) 0).toLong();
-        final long quote = chunk.eq(QUOTE).toLong();
-        final long stop = special | quote;
-        if (stop == 0) {
-          ensureCharBufCapacity(j + lanes);
-          widenToCharBuf(chunk, j);
-          j += lanes;
-          head += lanes;
-        } else {
-          final int n = Long.numberOfTrailingZeros(stop);
-          ensureCharBufCapacity(j + n);
-          for (int i = 0; i < n; ++i) {
-            charBuf[j + i] = (char) buf[head + i];
-          }
-          j += n;
-          head += n;
-          if (((quote >>> n) & 1) != 0) {
-            ++head;
-            return j;
-          }
-          // An escape sequence or a UTF-8 multi-byte character requires the scalar decoder.
-          return parseMultiByteString(j);
+    while (head + lanes <= tail) {
+      final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
+      final long special = chunk.eq(BACKSLASH).toLong() | chunk.compare(VectorOperators.LT, (byte) 0).toLong();
+      final long quote = chunk.eq(QUOTE).toLong();
+      final long stop = special | quote;
+      if (stop == 0) {
+        ensureCharBufCapacity(j + lanes);
+        widenToCharBuf(chunk, j);
+        j += lanes;
+        head += lanes;
+      } else {
+        final int n = Long.numberOfTrailingZeros(stop);
+        ensureCharBufCapacity(j + n);
+        for (int i = 0; i < n; ++i) {
+          charBuf[j + i] = (char) buf[head + i];
         }
-      }
-      byte c;
-      while (head < tail) {
-        c = buf[head];
-        if (c == '"') {
-          head++;
+        j += n;
+        head += n;
+        if (((quote >>> n) & 1) != 0) {
+          ++head;
           return j;
-        } else if ((c ^ '\\') < 1) {
-          // Backslash (escape sequence) or high bit set (UTF-8 multi-byte character).
-          return parseMultiByteString(j);
         }
-        head++;
-        if (j == charBuf.length) {
-          doubleReusableCharBuffer();
-        }
-        charBuf[j++] = (char) (c & 0xff);
-      }
-      if (!loadMore()) {
-        throw reportError("parse", "incomplete string");
+        // An escape sequence or a UTF-8 multi-byte character requires the scalar decoder.
+        return parseMultiByteString(j);
       }
     }
+    byte c;
+    while (head < tail) {
+      c = buf[head];
+      if (c == '"') {
+        head++;
+        return j;
+      } else if ((c ^ '\\') < 1) {
+        // Backslash (escape sequence) or high bit set (UTF-8 multi-byte character).
+        return parseMultiByteString(j);
+      }
+      head++;
+      if (j == charBuf.length) {
+        doubleReusableCharBuffer();
+      }
+      charBuf[j++] = (char) (c & 0xff);
+    }
+    throw reportError("parse", "incomplete string");
   }
 
-  final void skipPastSingleByteEndQuote() {
-    for (byte c; head < tail || loadMore(); head++) {
+  void skipPastSingleByteEndQuote() {
+    for (byte c; head < tail; head++) {
       c = buf[head];
       if (c == '"') {
         head++;
@@ -244,7 +228,7 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  final void skipPastEndQuote() {
+  void skipPastEndQuote() {
     final int lanes = VectorSupport.BYTE_LANES;
     int nextOffset = head + lanes;
     if (nextOffset > tail) {
@@ -267,12 +251,6 @@ class BytesJsonIterator extends BaseJsonIterator {
         if (nextOffset > tail) {
           if (head < tail) {
             head = tail - lanes;
-          } else if (loadMore()) {
-            nextOffset = head + lanes;
-            if (nextOffset > tail) {
-              skipPastSingleByteEndQuote();
-              return;
-            }
           } else {
             throw reportError("skipPastEndQuote", "incomplete string");
           }
@@ -304,7 +282,7 @@ class BytesJsonIterator extends BaseJsonIterator {
     }
   }
 
-  final byte[] parseBase64String() {
+  byte[] parseBase64String() {
     final int lanes = VectorSupport.BYTE_LANES;
     final int from = head;
     int nextOffset = head + lanes;
@@ -334,7 +312,7 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  protected final String parseString() {
+  protected String parseString() {
     final int lanes = VectorSupport.BYTE_LANES;
     int nextOffset = head + lanes;
     if (nextOffset > tail) {
@@ -355,11 +333,8 @@ class BytesJsonIterator extends BaseJsonIterator {
         if (nextOffset > tail) {
           if (i < tail) {
             i = tail - lanes; // push i back a bit to match the vector length.
-          } else if (supportsMarkReset()) { // Hack to check if reading from stream or not.
-            throw reportError("parseString", "incomplete string");
           } else {
-            final int len = parseMultiByteString(0);
-            return new String(charBuf, 0, len);
+            throw reportError("parseString", "incomplete string");
           }
         }
       } else if (special != 0 && Long.numberOfTrailingZeros(special) < Long.numberOfTrailingZeros(quote)) {
@@ -375,104 +350,114 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  final <R> R parse(final CharBufferFunction<R> applyChars) {
+  <R> R parse(final CharBufferFunction<R> applyChars) {
     final int len = parse();
     return applyChars.apply(charBuf, 0, len);
   }
 
   @Override
-  final <C, R> R parse(final C context, final ContextCharBufferFunction<C, R> applyChars) {
+  <C, R> R parse(final C context, final ContextCharBufferFunction<C, R> applyChars) {
     final int len = parse();
     return applyChars.apply(context, charBuf, 0, len);
   }
 
   @Override
-  final int parse(final CharBufferToIntFunction applyChars) {
+  int parse(final CharBufferToIntFunction applyChars) {
     final int len = parse();
     return applyChars.applyAsInt(charBuf, 0, len);
   }
 
   @Override
-  final <C> int parse(final C context, final ContextCharBufferToIntFunction<C> applyChars) {
+  <C> int parse(final C context, final ContextCharBufferToIntFunction<C> applyChars) {
     final int len = parse();
     return applyChars.applyAsInt(context, charBuf, 0, len);
   }
 
   @Override
-  final long parse(final CharBufferToLongFunction applyChars) {
+  long parse(final CharBufferToLongFunction applyChars) {
     final int len = parse();
     return applyChars.applyAsLong(charBuf, 0, len);
   }
 
   @Override
-  final <C> long parse(final C context, final ContextCharBufferToLongFunction<C> applyChars) {
+  <C> long parse(final C context, final ContextCharBufferToLongFunction<C> applyChars) {
     final int len = parse();
     return applyChars.applyAsLong(context, charBuf, 0, len);
   }
 
   @Override
-  final boolean parse(final CharBufferPredicate testChars) {
+  boolean parse(final CharBufferPredicate testChars) {
     final int len = parse();
     return testChars.apply(charBuf, 0, len);
   }
 
   @Override
-  final <C> boolean parse(final C context, final ContextCharBufferPredicate<C> testChars) {
+  <C> boolean parse(final C context, final ContextCharBufferPredicate<C> testChars) {
     final int len = parse();
     return testChars.apply(context, charBuf, 0, len);
   }
 
   @Override
-  final void parse(final CharBufferConsumer testChars) {
+  void parse(final CharBufferConsumer testChars) {
     final int len = parse();
     testChars.accept(charBuf, 0, len);
   }
 
   @Override
-  final <C> void parse(final C context, final ContextCharBufferConsumer<C> testChars) {
+  <C> void parse(final C context, final ContextCharBufferConsumer<C> testChars) {
     final int len = parse();
     testChars.accept(context, charBuf, 0, len);
   }
 
   @Override
-  final boolean fieldEquals(final String field, final int offset, final int len) {
+  boolean fieldEquals(final String field, final int offset, final int len) {
     return JsonIterator.fieldEquals(field, charBuf, 0, len);
   }
 
   @Override
-  final boolean breakOut(final FieldBufferPredicate fieldBufferFunction, final int offset, final int len) {
+  boolean breakOut(final FieldBufferPredicate fieldBufferFunction, final int offset, final int len) {
     return !fieldBufferFunction.test(charBuf, 0, len, this);
   }
 
   @Override
-  final <C> boolean breakOut(final C context, final ContextFieldBufferPredicate<C> fieldBufferFunction, final int offset, final int len) {
+  <C> boolean breakOut(final C context,
+                       final ContextFieldBufferPredicate<C> fieldBufferFunction,
+                       final int offset,
+                       final int len) {
     return !fieldBufferFunction.test(context, charBuf, 0, len, this);
   }
 
   @Override
-  final <C> long test(final C context, final long mask, final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction, final int offset, final int len) {
+  <C> long test(final C context,
+                final long mask,
+                final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction,
+                final int offset,
+                final int len) {
     return fieldBufferFunction.test(context, mask, charBuf, 0, len, this);
   }
 
   @Override
-  final <R> R apply(final FieldBufferFunction<R> fieldBufferFunction, final int offset, final int len) {
+  <R> R apply(final FieldBufferFunction<R> fieldBufferFunction, final int offset, final int len) {
     return fieldBufferFunction.apply(charBuf, 0, len, this);
   }
 
   @Override
-  final <C, R> R apply(final C context, final ContextFieldBufferFunction<C, R> fieldBufferFunction, final int offset, final int len) {
+  <C, R> R apply(final C context,
+                 final ContextFieldBufferFunction<C, R> fieldBufferFunction,
+                 final int offset,
+                 final int len) {
     return fieldBufferFunction.apply(context, charBuf, 0, len, this);
   }
 
   @Override
-  final BigDecimal parseBigDecimal(final CharBufferFunction<BigDecimal> parseChars) {
+  BigDecimal parseBigDecimal(final CharBufferFunction<BigDecimal> parseChars) {
     return parseChars.apply(charBuf, 0, parseNumber());
   }
 
   private int parseMultiByteString(int j) {
     boolean isExpectingLowSurrogate = false;
     final int lanes = VectorSupport.BYTE_LANES;
-    for (int bc; head < tail || loadMore(); ) {
+    for (int bc; head < tail; ) {
       // Bulk-copy runs of clean ASCII between escapes / multi-byte characters.
       while (head + lanes <= tail) {
         final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
@@ -495,14 +480,14 @@ class BytesJsonIterator extends BaseJsonIterator {
           break;
         }
       }
-      if (head == tail && !loadMore()) {
+      if (head == tail) {
         break;
       }
       bc = buf[head++];
       if (bc == '"') {
         return j;
       } else if (bc == '\\') {
-        if (head == tail && !loadMore()) {
+        if (head == tail) {
           break;
         }
         bc = buf[head++];
@@ -527,19 +512,19 @@ class BytesJsonIterator extends BaseJsonIterator {
           case '\\':
             break;
           case 'u':
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               throw reportError("parseMultiByteString", "incomplete string");
             }
             bc = (JHex.decode(buf[head++]) << 12);
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               throw reportError("parseMultiByteString", "incomplete string");
             }
             bc += (JHex.decode(buf[head++]) << 8);
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               throw reportError("parseMultiByteString", "incomplete string");
             }
             bc += (JHex.decode(buf[head++]) << 4);
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               throw reportError("parseMultiByteString", "incomplete string");
             }
             bc += JHex.decode(buf[head++]);
@@ -559,21 +544,21 @@ class BytesJsonIterator extends BaseJsonIterator {
             throw reportError("parseMultiByteString", "invalid escape character: " + bc);
         }
       } else if ((bc & 0x80) != 0) {
-        if (head == tail && !loadMore()) {
+        if (head == tail) {
           break;
         }
         final int u2 = buf[head++];
         if ((bc & 0xE0) == 0xC0) {
           bc = ((bc & 0x1F) << 6) + (u2 & 0x3F);
         } else {
-          if (head == tail && !loadMore()) {
+          if (head == tail) {
             break;
           }
           final int u3 = buf[head++];
           if ((bc & 0xF0) == 0xE0) {
             bc = ((bc & 0x0F) << 12) + ((u2 & 0x3F) << 6) + (u3 & 0x3F);
           } else {
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               break;
             }
             final int u4 = buf[head++];
@@ -612,12 +597,12 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   private void skipPastMultiByteEndQuote() {
     boolean isExpectingLowSurrogate = false;
-    for (int bc; head < tail || loadMore(); ) {
+    for (int bc; head < tail; ) {
       bc = buf[head++];
       if (bc == '"') {
         return;
       } else if (bc == '\\') {
-        if (head == tail && !loadMore()) {
+        if (head == tail) {
           break;
         }
         bc = buf[head++];
@@ -632,19 +617,19 @@ class BytesJsonIterator extends BaseJsonIterator {
           case '\\':
             break;
           case 'u':
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               throw reportError("skipPastMultiByteEndQuote", "incomplete string");
             }
             bc = (JHex.decode(buf[head++]) << 12);
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               throw reportError("skipPastMultiByteEndQuote", "incomplete string");
             }
             bc += (JHex.decode(buf[head++]) << 8);
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               throw reportError("skipPastMultiByteEndQuote", "incomplete string");
             }
             bc += (JHex.decode(buf[head++]) << 4);
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               throw reportError("skipPastMultiByteEndQuote", "incomplete string");
             }
             bc += JHex.decode(buf[head++]);
@@ -664,17 +649,17 @@ class BytesJsonIterator extends BaseJsonIterator {
             throw reportError("skipPastMultiByteEndQuote", "invalid escape character: " + bc);
         }
       } else if ((bc & 0x80) != 0) {
-        if (head == tail && !loadMore()) {
+        if (head == tail) {
           break;
         }
         final int u2 = buf[head++];
         if ((bc & 0xE0) != 0xC0) {
-          if (head == tail && !loadMore()) {
+          if (head == tail) {
             break;
           }
           final int u3 = buf[head++];
           if ((bc & 0xF0) != 0xE0) {
-            if (head == tail && !loadMore()) {
+            if (head == tail) {
               break;
             }
             final int u4 = buf[head++];
@@ -697,44 +682,44 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  final String parsedNumberAsString(final int len) {
+  String parsedNumberAsString(final int len) {
     return new String(charBuf, 0, len);
   }
 
   @Override
-  final <R> R parseNumber(final CharBufferFunction<R> applyChars, final int len) {
+  <R> R parseNumber(final CharBufferFunction<R> applyChars, final int len) {
     return applyChars.apply(charBuf, 0, len);
   }
 
   @Override
-  final <C, R> R parseNumber(final C context,
-                             final ContextCharBufferFunction<C, R> applyChars,
-                             final int len) {
+  <C, R> R parseNumber(final C context,
+                       final ContextCharBufferFunction<C, R> applyChars,
+                       final int len) {
     return applyChars.apply(context, charBuf, 0, len);
   }
 
   @Override
-  final int parseNumber(final CharBufferToIntFunction applyChars, final int len) {
+  int parseNumber(final CharBufferToIntFunction applyChars, final int len) {
     return applyChars.applyAsInt(charBuf, 0, len);
   }
 
   @Override
-  final <C> int parseNumber(final C context, final ContextCharBufferToIntFunction<C> applyChars, final int len) {
+  <C> int parseNumber(final C context, final ContextCharBufferToIntFunction<C> applyChars, final int len) {
     return applyChars.applyAsInt(context, charBuf, 0, len);
   }
 
   @Override
-  final long parseNumber(final CharBufferToLongFunction applyChars, final int len) {
+  long parseNumber(final CharBufferToLongFunction applyChars, final int len) {
     return applyChars.applyAsLong(charBuf, 0, len);
   }
 
   @Override
-  final <C> long parseNumber(final C context, final ContextCharBufferToLongFunction<C> applyChars, final int len) {
+  <C> long parseNumber(final C context, final ContextCharBufferToLongFunction<C> applyChars, final int len) {
     return applyChars.applyAsLong(context, charBuf, 0, len);
   }
 
   @Override
-  final void skipContainer(final char open, final char close, int level) {
+  void skipContainer(final char open, final char close, int level) {
     final int lanes = VectorSupport.BYTE_LANES;
     final byte openByte = (byte) open;
     final byte closeByte = (byte) close;
@@ -778,7 +763,7 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  final long readLong(final char c) {
+  long readLong(final char c) {
     final int ind = INT_DIGITS[c];
     if (ind == 0) {
       assertNotLeadingZero();
@@ -803,12 +788,8 @@ class BytesJsonIterator extends BaseJsonIterator {
   private long continueLong(long value) {
     for (int i = head, ind; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          head = tail;
-          return -value;
-        }
+        head = tail;
+        return -value;
       }
       ind = peekIntDigitChar(i);
       if (ind == INVALID_CHAR_FOR_NUMBER) {
@@ -826,16 +807,12 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  final int parseNumber() {
+  int parseNumber() {
     char c;
     for (int i = head, len = 0; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          head = tail;
-          return len;
-        }
+        head = tail;
+        return len;
       }
       if (len == charBuf.length) {
         doubleReusableCharBuffer();

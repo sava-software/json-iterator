@@ -4,7 +4,7 @@ JSON Iterator is a minimal adaption of the [stream parsing features](http://json
 
 Functionality has been extended with inversion-of-control mechanics to help minimize object creation.
 
-Parsing supports String, byte[], char[] and InputStream data sources.
+Parsing supports String, byte[], char[] data sources.
 
 ## Basic Usage
 

@@ -1,19 +1,35 @@
 package systems.comodal.jsoniter;
 
-import java.io.Closeable;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 
-public interface JsonIterator extends Closeable {
+public interface JsonIterator {
 
-  static JsonIterator parse(final InputStream in, final int bufSize) {
-    return new BufferedStreamJsonIterator(in, new byte[bufSize], 0, 0);
+  /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
+  private static byte[] readFully(final InputStream in) {
+    try (in) {
+      return in.readAllBytes();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
+  static JsonIterator parse(final InputStream in) {
+    return parse(readFully(in));
+  }
+
+  /// @param bufSize ignored; the stream is always read fully.
+  static JsonIterator parse(final InputStream in, final int bufSize) {
+    return parse(readFully(in));
+  }
+
+  /// @param bufSize ignored; the stream is always read fully.
   static JsonIterator parse(final InputStream in, final int bufSize, final int charBufferLength) {
-    return new BufferedStreamJsonIterator(in, new byte[bufSize], 0, 0, charBufferLength);
+    return parse(readFully(in), charBufferLength);
   }
 
   static JsonIterator parse(final byte[] buf) {
@@ -164,13 +180,18 @@ public interface JsonIterator extends Closeable {
 
   JsonIterator reset(final InputStream in);
 
+  /// @param bufSize ignored; the stream is always read fully.
   JsonIterator reset(final InputStream in, final int bufSize);
 
   String currentBuffer();
 
   // Object Field & Navigation Methods
 
-  boolean supportsMarkReset();
+  /// All iterators support mark/reset now that InputStream sources are read fully upfront.
+  @Deprecated
+  default boolean supportsMarkReset() {
+    return true;
+  }
 
   int mark();
 
@@ -319,9 +340,13 @@ public interface JsonIterator extends Closeable {
 
   long applyObjFieldAsLong(final CharBufferToLongFunction applyChars, final long terminalSentinel);
 
-  <C> int applyObjFieldAsInt(final C context, final ContextCharBufferToIntFunction<C> applyChars, final int terminalSentinel);
+  <C> int applyObjFieldAsInt(final C context,
+                             final ContextCharBufferToIntFunction<C> applyChars,
+                             final int terminalSentinel);
 
-  <C> long applyObjFieldAsLong(final C context, final ContextCharBufferToLongFunction<C> applyChars, final long terminalSentinel);
+  <C> long applyObjFieldAsLong(final C context,
+                               final ContextCharBufferToLongFunction<C> applyChars,
+                               final long terminalSentinel);
 
   <R> R applyObject(final FieldBufferFunction<R> fieldBufferFunction);
 

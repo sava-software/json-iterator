@@ -93,23 +93,10 @@ abstract class BaseJsonIterator implements JsonIterator {
 
   abstract char peekToken();
 
-  boolean loadMore() {
-    return false;
-  }
-
   protected final void skip(final int n) {
     head += n;
-    if (head >= tail) {
-      final int more = head - tail;
-      if (!loadMore()) {
-        if (more == 0) {
-          head = tail;
-          return;
-        } else {
-          throw reportError("skip", "unexpected end");
-        }
-      }
-      head += more;
+    if (head > tail) {
+      throw reportError("skip", "unexpected end");
     }
   }
 
@@ -968,11 +955,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     for (int i = head, ind; ; i++) {
       if (i == tail) {
         head = tail;
-        if (loadMore()) {
-          i = head;
-        } else {
-          break;
-        }
+        break;
       }
       ind = peekIntDigitChar(i);
       if (ind == INVALID_CHAR_FOR_NUMBER) {
@@ -1006,13 +989,11 @@ abstract class BaseJsonIterator implements JsonIterator {
         final int exponent = readInt();
         if (exponent < 0) {
           return reduceScale(unscaled, exponent);
-        } else if (supportsMarkReset()) {
+        } else {
           final int mark2 = head;
           head = mark;
           unscaled = readLongSlowPath(integer, scale + exponent);
           head = mark2;
-        } else {
-          throw reportError("readUnscaledAsLong", "Requires mark/reset.");
         }
       }
     }
@@ -1143,12 +1124,8 @@ abstract class BaseJsonIterator implements JsonIterator {
   private void skipUntilBreak() {
     for (int i = head; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          head = tail;
-          return;
-        }
+        head = tail;
+        return;
       }
       switch (peekChar(i)) {
         case ' ', '\t', '\n', '\r', ',', '}', ']' -> {
@@ -1165,11 +1142,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     char c;
     for (int i = head; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          throw reportError("skipContainer", "incomplete " + (open == '{' ? "object" : "array"));
-        }
+        throw reportError("skipContainer", "incomplete " + (open == '{' ? "object" : "array"));
       }
       if ((c = peekChar(i)) == '"') { // If inside string, skip it
         head = i + 1;
@@ -1228,7 +1201,7 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   final void assertNotLeadingZero() {
-    if (head == tail && !loadMore()) {
+    if (head == tail) {
       return;
     }
     final int peek = peekChar();
@@ -1241,12 +1214,8 @@ abstract class BaseJsonIterator implements JsonIterator {
     value = -value; // add negatives to avoid redundant checks for Integer.MIN_VALUE on each iteration
     for (int i = head, ind; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          head = tail;
-          return -value;
-        }
+        head = tail;
+        return -value;
       }
       ind = peekIntDigitChar(i);
       if (ind == INVALID_CHAR_FOR_NUMBER) {
@@ -1353,12 +1322,8 @@ abstract class BaseJsonIterator implements JsonIterator {
     value = -value; // add negatives to avoid redundant checks for Long.MIN_VALUE on each iteration
     for (int i = head, ind; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          head = tail;
-          return -value;
-        }
+        head = tail;
+        return -value;
       }
       ind = peekIntDigitChar(i);
       if (ind == INVALID_CHAR_FOR_NUMBER) {
