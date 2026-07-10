@@ -19,13 +19,13 @@ pluginManagement {
       }
     }
   }
-  if (settingsDir.resolve("../sava-build").isDirectory) {
-    includeBuild("../sava-build")
-  }
+//  if (settingsDir.resolve("../sava-build").isDirectory) {
+//    includeBuild("../sava-build")
+//  }
 }
 
 plugins {
-  id("software.sava.build") version "21.4.0"
+  id("software.sava.build") version "21.5.0"
 }
 
 javaModules {
