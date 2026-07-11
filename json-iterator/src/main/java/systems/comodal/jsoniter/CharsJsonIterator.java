@@ -120,8 +120,13 @@ class CharsJsonIterator extends BaseJsonIterator {
     int i = from;
     for (; i + lanes <= tail; i += lanes) {
       final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, i);
-      final long backslash = chunk.eq(BACKSLASH).toLong();
-      final long quote = chunk.eq(QUOTE).toLong();
+      final var backslashMask = chunk.eq(BACKSLASH);
+      final var quoteMask = chunk.eq(QUOTE);
+      if (!quoteMask.or(backslashMask).anyTrue()) {
+        continue;
+      }
+      final long backslash = backslashMask.toLong();
+      final long quote = quoteMask.toLong();
       if (quote != 0 && (backslash == 0 || Long.numberOfTrailingZeros(quote) < Long.numberOfTrailingZeros(backslash))) {
         final int end = i + Long.numberOfTrailingZeros(quote);
         head = end + 1;
@@ -156,8 +161,13 @@ class CharsJsonIterator extends BaseJsonIterator {
     int i = head;
     for (; i + lanes <= tail; i += lanes) {
       final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, i);
-      final long backslash = chunk.eq(BACKSLASH).toLong();
-      final long quote = chunk.eq(QUOTE).toLong();
+      final var backslashMask = chunk.eq(BACKSLASH);
+      final var quoteMask = chunk.eq(QUOTE);
+      if (!quoteMask.or(backslashMask).anyTrue()) {
+        continue;
+      }
+      final long backslash = backslashMask.toLong();
+      final long quote = quoteMask.toLong();
       if (quote != 0 && (backslash == 0 || Long.numberOfTrailingZeros(quote) < Long.numberOfTrailingZeros(backslash))) {
         head = i + Long.numberOfTrailingZeros(quote) + 1;
         return;
