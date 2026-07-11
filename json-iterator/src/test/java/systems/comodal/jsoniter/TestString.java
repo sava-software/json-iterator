@@ -73,6 +73,16 @@ final class TestString {
       assertArrayEquals(data, factory.create(json).decodeBase64String(), "seed=" + seed + " len=" + len);
     }
 
+    // JSON-escaped '/' (e.g. PHP's json_encode escapes it by default; '/' is
+    // in the base64 alphabet) decodes on every source type, through both the
+    // short scalar path and the word-at-a-time path
+    final var slashes = new byte[]{-1, -1, -1, -1, -1, -1, -1, -1, -1}; // encodes to "////////////"
+    final var escaped = BASE64_ENCODER.encodeToString(slashes).replace("/", "\\/");
+    assertArrayEquals(slashes, factory.create('"' + escaped + '"').decodeBase64String());
+    assertArrayEquals(slashes, factory.create("{\"data\":\"" + escaped + "\"}").skipUntil("data").decodeBase64String());
+    final var shortSlash = new byte[]{-1}; // encodes to "/w=="
+    assertArrayEquals(shortSlash, factory.create("\"\\/w==\"").decodeBase64String());
+
     // illegal content throws on every source type
     assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab@cd\"").decodeBase64String());
     assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab\\ncd\"").decodeBase64String());
@@ -185,5 +195,41 @@ final class TestString {
   void test_long_string() {
     var ji = factory.create("\"[\\\"LL\\\",\\\"MM\\\\\\/LW\\\",\\\"JY\\\",\\\"S\\\",\\\"C\\\",\\\"IN\\\",\\\"ME \\\\\\/ LE\\\"]\"");
     assertEquals("[\"LL\",\"MM\\/LW\",\"JY\",\"S\",\"C\",\"IN\",\"ME \\/ LE\"]", ji.readString());
+  }
+
+  @Test
+  void test_escape_positions_across_vector_widths() {
+    // Sweep escapes, multi-byte characters, and long ascii runs across word
+    // boundaries, reading via readString and via applyChars, which exercise
+    // independent scan/copy paths.
+    for (int prefix = 0; prefix <= 70; prefix += 3) {
+      final var pad = "x".repeat(prefix);
+
+      var json = '"' + pad + "\\\"tail of the string 0123456789012345678901234567890123456789\"";
+      var expected = pad + "\"tail of the string 0123456789012345678901234567890123456789";
+      assertEquals(expected, factory.create(json).readString(), "prefix=" + prefix);
+      assertEquals(expected, factory.create(json).applyChars(String::new), "prefix=" + prefix);
+
+      json = '"' + pad + "中文 and more ascii after the multibyte section 01234567890123456789\"";
+      expected = pad + "中文 and more ascii after the multibyte section 01234567890123456789";
+      assertEquals(expected, factory.create(json).readString(), "prefix=" + prefix);
+      assertEquals(expected, factory.create(json).applyChars(String::new), "prefix=" + prefix);
+
+      json = '"' + pad + "y".repeat(150) + '"';
+      expected = pad + "y".repeat(150);
+      assertEquals(expected, factory.create(json).readString(), "prefix=" + prefix);
+      assertEquals(expected, factory.create(json).applyChars(String::new), "prefix=" + prefix);
+    }
+  }
+
+  @Test
+  void test_unicode_escape_positions() {
+    for (int prefix = 0; prefix <= 70; prefix += 3) {
+      final var pad = "x".repeat(prefix);
+      final var json = '"' + pad + "\\u4e2d\\ud83d\\udc4a tail with ascii run afterwards 0123456789\"";
+      final var expected = pad + "中👊 tail with ascii run afterwards 0123456789";
+      assertEquals(expected, factory.create(json).readString(), "prefix=" + prefix);
+      assertEquals(expected, factory.create(json).applyChars(String::new), "prefix=" + prefix);
+    }
   }
 }

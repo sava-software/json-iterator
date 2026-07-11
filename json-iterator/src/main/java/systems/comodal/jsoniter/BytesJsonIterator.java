@@ -277,16 +277,29 @@ class BytesJsonIterator extends BaseJsonIterator {
     }
   }
 
+  /// Fallback when the value may contain escapes (e.g. "\/" — '/' is in the
+  /// base64 alphabet and some encoders escape it): parse() unescapes into
+  /// charBuf, then the chars narrow to the ascii the decoder needs.
+  private byte[] parseEscapedBase64String() {
+    final int len = parse();
+    final byte[] ascii = new byte[len];
+    for (int i = 0; i < len; ++i) {
+      ascii[i] = (byte) charBuf[i];
+    }
+    return Base64.getDecoder().decode(ascii);
+  }
+
   final byte[] parseBase64String() {
-    final int from = head;
     int nextOffset = head + Long.BYTES;
     if (nextOffset > tail) {
-      final int len = parse();
-      return decodeBase64(buf, from, from + len);
+      return parseEscapedBase64String();
     } else {
       long word, tmp;
       for (int i = head; ; ) {
         word = (long) TO_LONG.get(buf, i);
+        if (containsMultiByteOrEscapePattern(word)) {
+          return parseEscapedBase64String();
+        }
         tmp = matchQuotePattern(word);
         if (tmp != 0) {
           i += (Long.numberOfTrailingZeros(tmp << 1) >>> 3);

@@ -59,4 +59,12 @@ final class TestIO {
     ji = JsonIterator.parse(bytes);
     assertEquals("中", ji.readString());
   }
+
+  @Test
+  void test_reset_with_stream() {
+    final var ji = JsonIterator.parse(new ByteArrayInputStream("1".getBytes()), 64);
+    assertEquals(1, ji.readInt());
+    final var reset = ji.reset(new ByteArrayInputStream("2".getBytes()));
+    assertEquals(2, reset.readInt());
+  }
 }
