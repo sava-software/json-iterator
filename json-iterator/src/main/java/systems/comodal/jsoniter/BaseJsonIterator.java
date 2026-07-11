@@ -914,23 +914,46 @@ abstract class BaseJsonIterator implements JsonIterator {
 
   abstract <C, R> R apply(final C context, final ContextFieldBufferFunction<C, R> fieldBufferFunction, final int offset, final int len);
 
+  private static final CharBufferToDoubleFunction READ_DOUBLE_FUNCTION = DoubleParser::parse;
+
   @Override
   public final double readDouble() {
     try {
-      return Double.parseDouble(readNumberOrNumberString());
+      return readAsDouble("readDouble", READ_DOUBLE_FUNCTION);
     } catch (final NumberFormatException e) {
       throw reportError("readDouble", e.toString());
     }
   }
 
+  // A float widens to double losslessly, so readFloat shares the double-valued
+  // plumbing; the parse itself is binary32-parameterized because narrowing a
+  // parsed double would double-round.
+  private static final CharBufferToDoubleFunction READ_FLOAT_FUNCTION = DoubleParser::parseFloat;
+
   @Override
   public final float readFloat() {
     try {
-      return Float.parseFloat(readNumberOrNumberString());
+      return (float) readAsDouble("readFloat", READ_FLOAT_FUNCTION);
     } catch (final NumberFormatException e) {
       throw reportError("readFloat", e.toString());
     }
   }
+
+  private double readAsDouble(final String op, final CharBufferToDoubleFunction parseChars) {
+    final var valueType = whatIsNext();
+    if (valueType == NUMBER) {
+      return parseNumber(parseChars, parseNumber());
+    } else if (valueType == STRING) {
+      nextToken();
+      return parse(parseChars);
+    } else {
+      throw reportError(op, "Must be a number or string but found " + valueType);
+    }
+  }
+
+  abstract double parse(final CharBufferToDoubleFunction applyChars);
+
+  abstract double parseNumber(final CharBufferToDoubleFunction applyChars, final int len);
 
   @Override
   public final BigDecimal readBigDecimal() {
