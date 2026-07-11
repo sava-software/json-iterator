@@ -35,9 +35,9 @@ final class StructuralIndex {
   private static final byte QUOTE = '"';
   private static final byte BACKSLASH = '\\';
   private static final byte LOW_NIBBLE_MASK = 0x0f;
-  private static final long EVEN_BITS = 0x5555555555555555L;
+  static final long EVEN_BITS = 0x5555555555555555L;
   // WHITESPACE_TABLE[c & 0x0f] == c only when c is one of ' ', '\t', '\n', '\r'.
-  private static final ByteVector WHITESPACE_TABLE = repeat(new byte[]{' ', 100, 100, 100, 17, 100, 113, 2, 100, '\t', '\n', 112, 100, '\r', 100, 100});
+  static final ByteVector WHITESPACE_TABLE = repeat(new byte[]{' ', 100, 100, 100, 17, 100, 113, 2, 100, '\t', '\n', 112, 100, '\r', 100, 100});
   // OP_TABLE[c & 0x0f] == (c | 0x20) only when c is one of ':', ',', '{', '}', '[', ']'.
   private static final ByteVector OP_TABLE = repeat(new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ':', '{', ',', '}', 0, 0});
 
@@ -220,7 +220,7 @@ final class StructuralIndex {
   }
 
   /// Carry-less multiply by ~0: flips the running in-string state at every quote.
-  private static long prefixXor(long bitmask) {
+  static long prefixXor(long bitmask) {
     bitmask ^= bitmask << 1;
     bitmask ^= bitmask << 2;
     bitmask ^= bitmask << 4;

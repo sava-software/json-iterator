@@ -21,6 +21,19 @@ public final class JIUtil {
     return DoubleParser.parseFloat(buf, offset, len);
   }
 
+  /// Minifies the JSON document: removes whitespace outside of strings using
+  /// vectorized compress-stores (see [JsonMinifier]). String contents,
+  /// including escaped quotes, are preserved byte for byte.
+  ///
+  /// @throws JsonException if the document contains an unclosed string
+  public static byte[] minify(final byte[] json) {
+    return JsonMinifier.minify(json, 0, json.length);
+  }
+
+  public static byte[] minify(final byte[] json, final int offset, final int len) {
+    return JsonMinifier.minify(json, offset, len);
+  }
+
   public static String escapeQuotesChecked(final String str) {
     final int len = str.length();
     int from = 0;
