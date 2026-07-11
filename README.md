@@ -75,30 +75,29 @@ Benchmarks cross-check that all implementations produce identical results during
 
 ### Results
 
-Historical snapshot: Apple M-series (128-bit NEON), JDK 27 EA, µs/op, measured against the `21.0.12` baseline before
-the hybrid SWAR-prefix scan changes — re-run the suite for current numbers. Relative results will differ on x86: NEON
-makes vector-mask extraction expensive, which penalizes the scanning loops here and is cheap on AVX2/AVX-512.
+Apple M-series (128-bit NEON), JDK 27 EA, µs/op — lower is better. `21.1.0` is the published scalar (Java 21)
+release; `JsonIterator`/`IndexedJsonIterator` are this branch, including the hybrid SWAR-prefix string scans.
+simdjson-java is omitted: it requires 256/512-bit species and runs emulated (~100-200× slower) on this hardware.
 
-| Workload | 21.0.12 | `JsonIterator` | `IndexedJsonIterator` |
+| Workload | 21.1.0 | `JsonIterator` | `IndexedJsonIterator` |
 |---|---:|---:|---:|
-| twitter.json (617 KiB) full walk | 737 | 1,043 | 1,289 |
-| twitter.json selective (screen names) | n/a¹ | 594 | **462** |
-| Solana block (4.7 MiB) full walk | 7,996 | **6,505** | 9,082 |
-| Solana block selective (fees) | **2,591**² | 4,100 | 3,146 |
-| Solana block DTO parse (IOC) | **2,734**² | 4,217 | 3,532 |
-| skip 1 MiB container | **112**² | 203 | 142 |
-| long strings, `readString` | 30.6 | **14.9** | 52.8 |
-| long strings, `applyChars` (IOC) | 147.5 | **14.8** | — |
-| 19-digit longs | **47.5** | 53.4 | 71.0 |
-| doubles | 107.9 | **52.4** | 65.0 |
-| RFC-1123 timestamps | 137.7 | **53.8** | — |
-| ISO-8601 timestamps | 129.6 | **73.3** | — |
-| minify 4.7 MiB (vs 3,392 scalar) | — | **1,895** | — |
+| twitter.json (617 KiB) full walk | **516** | 1,073 | 1,272 |
+| twitter.json selective (screen names) | **406** | 493 | 456 |
+| Solana block (4.7 MiB) full walk | 5,773 | **5,498** | 7,980 |
+| Solana block selective (fees) | **2,339** | 3,720 | 3,091 |
+| Solana block DTO parse (IOC) | **2,446** | 4,169 | 3,365 |
+| skip 1 MiB container | **101** | 194 | 144 |
+| long strings, `readString` | 29.0 | **17.5** | 55.7 |
+| long strings, `applyChars` (IOC) | 38.0 | **18.5** | — |
+| 19-digit longs | **46.0** | 52.8 | 71.5 |
+| doubles | 52.1 | 52.4 | 64.2 |
+| RFC-1123 timestamps | 66.8 | 70.9 | — |
+| ISO-8601 timestamps | **77.4** | 89.4 | — |
+| minify 4.7 MiB (vs 3,503 scalar) | — | **1,847** | — |
 
-¹ 21.0.12 cannot parse twitter.json: its word-at-a-time scanning desyncs on multi-byte content (fixed after 21.0.12).
-That bug is also why its string skipping is fast — it hops 8-byte words through strings with almost no per-byte checks.
-
-² Skip-dominated workloads on ASCII-heavy documents. On this NEON hardware the vectorized scans pay mask-extraction
-costs that the old 8-byte SWAR loops avoid, so 21.0.12 leads where skipping dominates; value decoding (strings,
-numbers, dates) is where the current version wins, roughly 2× across the board. `parseOnly` stage-1 indexing
-for the 4.7 MiB block is 2,400 (2,504 with UTF-8 validation).
+On this 128-bit NEON hardware the scalar 21.1.0 release leads wherever short strings or skipping dominate: the
+vector scan loops pay an expensive mask-extraction on every hit, which real documents trigger constantly, while
+21.1.0's 8-byte SWAR loops make hits nearly free. This branch wins on long uniform runs (long strings, minify),
+where wide chunks amortize. The balance is expected to shift on AVX2/AVX-512, where mask extraction is a single
+instruction — treat these numbers as one point on that curve, not a verdict. `parseOnly` stage-1 indexing for the
+4.7 MiB block is 2,357 (2,480 with UTF-8 validation) and 275 for twitter.json.
