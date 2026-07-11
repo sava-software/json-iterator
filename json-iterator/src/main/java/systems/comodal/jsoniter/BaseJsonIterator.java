@@ -93,30 +93,9 @@ abstract class BaseJsonIterator implements JsonIterator {
 
   abstract char peekToken();
 
-  boolean loadMore() {
-    return false;
-  }
-
-  protected final void skip(final int n) {
-    head += n;
-    if (head >= tail) {
-      final int more = head - tail;
-      if (!loadMore()) {
-        if (more == 0) {
-          head = tail;
-          return;
-        } else {
-          throw reportError("skip", "unexpected end");
-        }
-      }
-      head += more;
-    }
-  }
-
   // Validated literal skips: the leading character has already been consumed
   // and dispatched on, so these verify the remainder instead of blindly
   // advancing past whatever follows.
-
   final void skipNull() {
     if (head + 3 <= tail) {
       if (peekChar(head) != 'u' || peekChar(head + 1) != 'l' || peekChar(head + 2) != 'l') {
@@ -154,7 +133,7 @@ abstract class BaseJsonIterator implements JsonIterator {
   /// at a time so truncation is reported as the invalid literal it is.
   private void skipLiteral(final String remaining, final String context, final String expected) {
     for (int i = 0, len = remaining.length(); i < len; ++i) {
-      if ((head == tail && !loadMore()) || peekChar(head) != remaining.charAt(i)) {
+      if (head == tail || peekChar(head) != remaining.charAt(i)) {
         throw reportError(context, expected);
       }
       ++head;
@@ -1052,11 +1031,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     for (int i = head, ind; ; i++) {
       if (i == tail) {
         head = tail;
-        if (loadMore()) {
-          i = head;
-        } else {
-          break;
-        }
+        break;
       }
       ind = peekIntDigitChar(i);
       if (ind == INVALID_CHAR_FOR_NUMBER) {
@@ -1090,13 +1065,13 @@ abstract class BaseJsonIterator implements JsonIterator {
         final int exponent = readInt();
         if (exponent < 0) {
           return reduceScale(unscaled, exponent);
-        } else if (supportsMarkReset()) {
+        } else {
+          // Re-parse the digits with the widened scale, then restore the
+          // cursor to the end of the exponent.
           final int mark2 = head;
           head = mark;
           unscaled = readLongSlowPath(integer, scale + exponent);
           head = mark2;
-        } else {
-          throw reportError("readUnscaledAsLong", "Requires mark/reset.");
         }
       }
     }
@@ -1227,12 +1202,8 @@ abstract class BaseJsonIterator implements JsonIterator {
   private void skipUntilBreak() {
     for (int i = head; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          head = tail;
-          return;
-        }
+        head = tail;
+        return;
       }
       switch (peekChar(i)) {
         case ' ', '\t', '\n', '\r', ',', '}', ']' -> {
@@ -1247,11 +1218,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     char c;
     for (int i = head, level = 1; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          throw reportError("skipArray", "incomplete array");
-        }
+        throw reportError("skipArray", "incomplete array");
       }
       if ((c = peekChar(i)) == '"') { // If inside string, skip it
         head = i + 1;
@@ -1274,11 +1241,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     char c;
     for (int i = head, level = 1; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          throw reportError("skipObject", "incomplete object");
-        }
+        throw reportError("skipObject", "incomplete object");
       }
       if ((c = peekChar(i)) == '"') { // If inside string, skip it
         head = i + 1;
@@ -1340,7 +1303,7 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   private void assertNotLeadingZero() {
-    if (head == tail && !loadMore()) {
+    if (head == tail) {
       return;
     }
     final int peek = peekChar();
@@ -1353,12 +1316,8 @@ abstract class BaseJsonIterator implements JsonIterator {
     value = -value; // add negatives to avoid redundant checks for Integer.MIN_VALUE on each iteration
     for (int i = head, ind; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          head = tail;
-          return -value;
-        }
+        head = tail;
+        return -value;
       }
       ind = peekIntDigitChar(i);
       if (ind == INVALID_CHAR_FOR_NUMBER) {
@@ -1465,12 +1424,8 @@ abstract class BaseJsonIterator implements JsonIterator {
     value = -value; // add negatives to avoid redundant checks for Long.MIN_VALUE on each iteration
     for (int i = head, ind; ; i++) {
       if (i == tail) {
-        if (loadMore()) {
-          i = head;
-        } else {
-          head = tail;
-          return -value;
-        }
+        head = tail;
+        return -value;
       }
       ind = peekIntDigitChar(i);
       if (ind == INVALID_CHAR_FOR_NUMBER) {
