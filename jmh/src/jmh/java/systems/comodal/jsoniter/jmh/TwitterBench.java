@@ -36,6 +36,7 @@ public class TwitterBench {
 
   private byte[] json;
   private JsonIterator jsonIterator;
+  private jsoniter.v21.JsonIterator jsonIterator21;
   private IndexedJsonIterator jsonIndexed;
   private SimdJsonParser simdParser;
 
@@ -47,11 +48,22 @@ public class TwitterBench {
       throw new UncheckedIOException(e);
     }
     jsonIterator = JsonIterator.parse(json);
+    jsonIterator21 = jsoniter.v21.JsonIterator.parse(json);
     jsonIndexed = IndexedJsonIterator.parse(json);
     simdParser = new SimdJsonParser(json.length + 1_024, 1_024);
 
     check(fullWalk_jsonIterator(), fullWalk_jsonIndexed(), fullWalk_simdjson());
     check(screenNames_jsonIterator(), screenNames_jsonIndexed(), screenNames_simdjson());
+    try {
+      check(fullWalk_jsonIterator21(), fullWalk_jsonIterator(), fullWalk_jsonIterator());
+      check(screenNames_jsonIterator21(), screenNames_jsonIterator(), screenNames_jsonIterator());
+    } catch (final RuntimeException e) {
+      // 21.0.12 cannot parse twitter.json: its word-at-a-time multi-byte
+      // detection matched only bytes exactly 0x80 and desyncs on the first
+      // Japanese status. Fixed on main; drop this guard once the fixed
+      // version is published and the oldJsonIterator dependency is bumped.
+      System.err.println("json-iterator 21.0.12 failed on twitter.json (known multi-byte bug): " + e.getMessage());
+    }
   }
 
   private static void check(final long a, final long b, final long c) {
@@ -80,6 +92,11 @@ public class TwitterBench {
   }
 
   @Benchmark
+  public long fullWalk_jsonIterator21() {
+    return Walks21.walk(jsonIterator21.reset(json));
+  }
+
+  @Benchmark
   public long fullWalk_jsonIndexed() {
     return Walks.walk(jsonIndexed.reset(json));
   }
@@ -94,6 +111,19 @@ public class TwitterBench {
   @Benchmark
   public long screenNames_jsonIterator() {
     final var ji = jsonIterator.reset(json);
+    long sum = 0;
+    ji.skipUntil("statuses");
+    while (ji.readArray()) {
+      ji.skipUntil("user").skipUntil("screen_name");
+      sum += ji.readString().length();
+      ji.skipRestOfObject().skipRestOfObject();
+    }
+    return sum;
+  }
+
+  @Benchmark
+  public long screenNames_jsonIterator21() {
+    final var ji = jsonIterator21.reset(json);
     long sum = 0;
     ji.skipUntil("statuses");
     while (ji.readArray()) {

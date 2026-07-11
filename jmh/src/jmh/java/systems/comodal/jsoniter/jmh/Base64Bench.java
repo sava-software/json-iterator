@@ -41,6 +41,8 @@ public class Base64Bench {
   private int contentTo;
   private JsonIterator bytesIter;
   private JsonIterator charsIter;
+  private jsoniter.v21.JsonIterator bytesIter21;
+  private jsoniter.v21.JsonIterator charsIter21;
 
   @Setup
   public void setup() {
@@ -54,12 +56,16 @@ public class Base64Bench {
     contentTo = contentFrom + base64.length();
     bytesIter = JsonIterator.parse(json);
     charsIter = JsonIterator.parse(jsonChars);
+    bytesIter21 = jsoniter.v21.JsonIterator.parse(json);
+    charsIter21 = jsoniter.v21.JsonIterator.parse(jsonChars);
 
     check(decoder_copyOfRange_old());
     check(decoder_byteBuffer_new());
     check(decoder_viaString_old());
     check(iterator_bytes());
     check(iterator_chars());
+    check(iterator_bytes_jsonIterator21());
+    check(iterator_chars_jsonIterator21());
   }
 
   private void check(final byte[] decoded) {
@@ -101,5 +107,17 @@ public class Base64Bench {
   @Benchmark
   public byte[] iterator_chars() {
     return charsIter.reset(jsonChars).skipUntil("data").decodeBase64String();
+  }
+
+  // The published 21.0.12 implementations end-to-end.
+
+  @Benchmark
+  public byte[] iterator_bytes_jsonIterator21() {
+    return bytesIter21.reset(json).skipUntil("data").decodeBase64String();
+  }
+
+  @Benchmark
+  public byte[] iterator_chars_jsonIterator21() {
+    return charsIter21.reset(jsonChars).skipUntil("data").decodeBase64String();
   }
 }
