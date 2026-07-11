@@ -15,7 +15,7 @@ class BytesJsonIterator extends BaseJsonIterator {
   private static final VarHandle TO_LONG = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
   private static final long QUOTE_PATTERN = JIUtil.compileReplacePattern((byte) '"');
   private static final long ESCAPE_PATTERN = JIUtil.compileReplacePattern((byte) ('\\' & 0xFF));
-  private static final long MULTI_BYTE_CHAR_PATTERN = JIUtil.compileReplacePattern((byte) 0b1000_0000);
+  private static final long HIGH_BITS = 0x8080808080808080L;
 
   byte[] buf;
   private char[] charBuf;
@@ -45,7 +45,11 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   private static boolean containsMultiByteOrEscapePattern(final long word) {
-    return containsPattern(word ^ MULTI_BYTE_CHAR_PATTERN) || containsPattern(word ^ ESCAPE_PATTERN);
+    // A multi-byte UTF-8 byte is any byte with its high bit set, not the exact
+    // byte 0x80: an XOR/zero-byte match here let the word loops in parseString
+    // and skipPastEndQuote hop through multi-byte content and hand off to the
+    // byte-accurate parsers mid-character.
+    return (word & HIGH_BITS) != 0 || containsPattern(word ^ ESCAPE_PATTERN);
   }
 
   @Override

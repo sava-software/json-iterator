@@ -86,6 +86,24 @@ final class TestString {
   }
 
   @Test
+  void test_long_utf8_strings() {
+    final var values = new String[]{
+        "日本語テスト日本語テスト", // no 0x80 / 0x5C bytes at all
+        "元野球部マネージャー❤︎…最高の夏をありがとう…", // 0x80 first appears mid-word (twitter.json)
+        "中文👊中文👊中文👊", // 4-byte sequences
+        "❤︎…" // short enough for the scalar path
+    };
+    for (final var value : values) {
+      for (int pad = 0; pad < 9; ++pad) {
+        final var padded = "a".repeat(pad) + value;
+        final var json = "{\"data\":\"" + padded + "\",\"want\":42}";
+        assertEquals(padded, factory.create(json).skipUntil("data").readString());
+        assertEquals(42, factory.create(json).skipUntil("want").readInt());
+      }
+    }
+  }
+
+  @Test
   void test_incomplete_escape() {
     var ji = factory.create("\"\\");
     assertThrows(JsonException.class, ji::readString);
