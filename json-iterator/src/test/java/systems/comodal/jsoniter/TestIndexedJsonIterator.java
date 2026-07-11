@@ -131,6 +131,32 @@ final class TestIndexedJsonIterator {
   }
 
   @Test
+  void test_find_field_unordered() {
+    final var json = "{\"a\":1,\"b\":{\"x\":9},\"c\":3}";
+
+    // forward hit, then a hit requiring wraparound
+    var ji = IndexedJsonIterator.parse(json);
+    assertEquals(3, ji.findField("c").readInt());
+    assertEquals(1, ji.findField("a").readInt());
+
+    // wraparound past a nested object, then descend into it
+    ji = IndexedJsonIterator.parse(json);
+    assertEquals(3, ji.findField("c").readInt());
+    assertEquals(9, ji.findField("b").skipUntil("x").readInt());
+
+    // absent field restores the cursor
+    ji = IndexedJsonIterator.parse(json);
+    assertEquals(1, ji.findField("a").readInt());
+    assertNull(ji.findField("zzz"));
+    assertEquals(3, ji.findField("c").readInt());
+
+    // char sourced
+    final var cj = IndexedJsonIterator.parse(json.toCharArray());
+    assertEquals(3, cj.findField("c").readInt());
+    assertEquals(9, cj.findField("b").skipUntil("x").readInt());
+  }
+
+  @Test
   void test_escaped_and_multibyte_field_names() {
     final var ji = IndexedJsonIterator.parse("{\"a\\tb\":1,\"c\":2}");
     assertEquals("a\tb", ji.readObjField());

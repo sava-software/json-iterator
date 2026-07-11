@@ -51,6 +51,38 @@ final class IndexedBytesJsonIterator extends BytesJsonIterator implements Indexe
 
   // reset(InputStream) is inherited: it dispatches to reset(byte[]), which re-indexes.
 
+
+  @Override
+  public JsonIterator findField(final String field) {
+    final int mark = head;
+    if (skipUntil(field) != null) {
+      return this;
+    }
+    // The cursor is just past the enclosing '}': rewind to its matching '{'
+    // (safe on tokens: string contents are never structural) and rescan,
+    // covering the fields before the original entry point.
+    int p = syncTokens() - 1; // the consumed '}'
+    for (int depth = 1; depth != 0; ) {
+      if (--p < 0) {
+        head = mark;
+        return null; // no enclosing object
+      }
+      final char c = (char) (buf[tokens[p]] & 0xff);
+      if (c == '}' || c == ']') {
+        ++depth;
+      } else if (c == '{' || c == '[') {
+        --depth;
+      }
+    }
+    pos = p;
+    head = tokens[p];
+    if (skipUntil(field) != null) {
+      return this;
+    }
+    head = mark;
+    return null;
+  }
+
   /// Moves the token cursor to the first structural token at or after `head`.
   /// `head` is the source of truth: scalar reads advance it without touching
   /// the cursor, and both directions of drift are reconciled here.

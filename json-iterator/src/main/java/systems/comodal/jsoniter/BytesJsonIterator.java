@@ -280,7 +280,7 @@ class BytesJsonIterator extends BaseJsonIterator {
     if (c == '"') {
       return parseBase64String();
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return null;
     } else {
       throw reportError("decodeBase64String", "expected string or null, but " + c);

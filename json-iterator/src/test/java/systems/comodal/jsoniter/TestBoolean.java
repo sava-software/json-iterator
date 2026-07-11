@@ -47,4 +47,17 @@ final class TestBoolean {
     assertFalse(factory.create("true").readNull());
     assertFalse(factory.create("false").readNull());
   }
+
+  @Test
+  void test_invalid_literals() {
+    assertThrows(JsonException.class, () -> factory.create("trux").readBoolean());
+    assertThrows(JsonException.class, () -> factory.create("tru").readBoolean());
+    assertThrows(JsonException.class, () -> factory.create("falsy").readBoolean());
+    assertThrows(JsonException.class, () -> factory.create("fals").readBoolean());
+    assertThrows(JsonException.class, () -> factory.create("nul").readNull());
+    assertThrows(JsonException.class, () -> factory.create("nulL").readString());
+    assertThrows(JsonException.class, () -> factory.create("[tru]").openArray().skip());
+    assertThrows(JsonException.class, () -> factory.create("[nell]").openArray().skip());
+    assertThrows(JsonException.class, () -> factory.create("[folse]").openArray().skip());
+  }
 }

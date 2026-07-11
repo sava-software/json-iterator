@@ -80,4 +80,18 @@ final class TestObject {
     var ji = factory.create("null");
     assertTrue(ji.readNull());
   }
+
+  @Test
+  void test_json_pointer() {
+    final var json = "{\"a\":{\"b\":[10,{\"c\":42},30]},\"x~y\":1,\"s/t\":2}";
+    assertEquals(42, factory.create(json).at("/a/b/1/c").readInt());
+    assertEquals(10, factory.create(json).at("/a/b/0").readInt());
+    assertEquals(30, factory.create(json).at("/a/b/2").readInt());
+    assertEquals(1, factory.create(json).at("/x~0y").readInt());
+    assertEquals(2, factory.create(json).at("/s~1t").readInt());
+    assertNull(factory.create(json).at("/a/missing"));
+    assertNull(factory.create(json).at("/a/b/9"));
+    assertEquals(ValueType.OBJECT, factory.create(json).at("").whatIsNext());
+    assertThrows(JsonException.class, () -> factory.create(json).at("a/b"));
+  }
 }

@@ -52,6 +52,16 @@ public interface IndexedJsonIterator extends JsonIterator {
     return new IndexedBytesJsonIterator(json, head, tail, true);
   }
 
+  /// Like [JsonIterator#skipUntil(String)], but order-independent, after
+  /// simdjson's find_field_unordered: if the field is not found between the
+  /// cursor and the end of the enclosing object, the search wraps to the
+  /// object's start and covers the fields before the entry point. Returns
+  /// null and restores the cursor when the field is absent entirely.
+  ///
+  /// Fields can therefore be extracted in any order without manual mark/reset
+  /// bookkeeping, paying one extra object scan only when wrapping.
+  JsonIterator findField(final String field);
+
   /// Already indexed; returns this iterator.
   @Override
   IndexedJsonIterator index();

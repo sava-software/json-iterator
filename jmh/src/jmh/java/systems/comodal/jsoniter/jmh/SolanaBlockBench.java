@@ -61,6 +61,7 @@ public class SolanaBlockBench {
     check(fullWalk_jsonIterator(), fullWalk_jsonIndexed(), fullWalk_simdjson());
     check(fees_jsonIterator(), fees_jsonIndexed(), fees_simdjson());
     check(blockParse_jsonIterator(), blockParse_jsonIndexed(), blockParse_simdjson());
+    check(feesAndUnitsUnordered_jsonIndexed(), feesAndUnitsOrdered(), feesAndUnitsOrdered());
   }
 
   private static void check(final long a, final long b, final long c) {
@@ -134,6 +135,40 @@ public class SolanaBlockBench {
       fees += it.next().get("meta").get("fee").asLong();
     }
     return fees;
+  }
+
+  /// Accesses meta.fee before meta.computeUnitsConsumed, which precedes it in
+  /// the document — every transaction forces a findField wraparound.
+  @Benchmark
+  public long feesAndUnitsUnordered_jsonIndexed() {
+    final var ji = jsonIndexed;
+    ji.reset(json);
+    long sum = 0;
+    ji.skipUntil("result").skipUntil("transactions");
+    while (ji.readArray()) {
+      ji.skipUntil("meta");
+      ji.findField("fee");
+      sum += ji.readLong();
+      ji.findField("computeUnitsConsumed");
+      sum += ji.readLong();
+      ji.skipRestOfObject().skipRestOfObject();
+    }
+    return sum;
+  }
+
+  /// The document-order equivalent, used as the setup cross-check oracle.
+  private long feesAndUnitsOrdered() {
+    final var ji = jsonIndexed.reset(json);
+    long sum = 0;
+    ji.skipUntil("result").skipUntil("transactions");
+    while (ji.readArray()) {
+      ji.skipUntil("meta").skipUntil("computeUnitsConsumed");
+      sum += ji.readLong();
+      ji.skipUntil("fee");
+      sum += ji.readLong();
+      ji.skipRestOfObject().skipRestOfObject();
+    }
+    return sum;
   }
 
   // blockParse: sava-style inversion-of-control DTO parse

@@ -234,6 +234,43 @@ public interface JsonIterator {
 
   JsonIterator skipUntil(final String field);
 
+  /// Navigates to the value referenced by the [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901)
+  /// JSON Pointer — e.g. `/statuses/0/user/screen_name` — leaving the cursor
+  /// on it. Array segments must be numeric indices; `~1` and `~0` unescape to
+  /// `/` and `~`. The empty pointer refers to the current value. Returns null
+  /// if any segment is absent.
+  default JsonIterator at(final String pointer) {
+    if (pointer.isEmpty()) {
+      return this;
+    } else if (pointer.charAt(0) != '/') {
+      throw new JsonException("A JSON Pointer must start with '/': " + pointer);
+    }
+    for (int from = 1, slash; from <= pointer.length(); from = slash + 1) {
+      slash = pointer.indexOf('/', from);
+      if (slash < 0) {
+        slash = pointer.length();
+      }
+      var segment = pointer.substring(from, slash);
+      if (segment.indexOf('~') >= 0) {
+        segment = segment.replace("~1", "/").replace("~0", "~");
+      }
+      if (whatIsNext() == ValueType.ARRAY) {
+        if (!readArray()) {
+          return null; // empty array
+        }
+        for (int i = Integer.parseInt(segment); i > 0; --i) {
+          skip();
+          if (!readArray()) {
+            return null;
+          }
+        }
+      } else if (skipUntil(segment) == null) {
+        return null;
+      }
+    }
+    return this;
+  }
+
   JsonIterator closeObj();
 
   // Value Methods
