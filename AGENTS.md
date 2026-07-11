@@ -61,7 +61,8 @@ ideas measured negative: SWAR container skipping on main, two-block stage 1, vec
 ISO-date validation, disabling SWAR readLong). One noisy fork is not a result — rerun with
 `-f 2`/`-f 3` when Error exceeds a few percent; this machine (Apple M-series) gets noisy
 under sustained benching. JMH reports Score ± Error (99.9% CI): compare Scores, use Error
-for overlap.
+for overlap. A local win is still hardware-conditional — see "Hardware strategy" below for
+what qualifies it to be committed.
 
 ## Performance truths (measured on 128-bit NEON, Apple M-series)
 
@@ -95,6 +96,29 @@ These will shift on AVX2/AVX-512 — an open task is easy benchmarking on 256/51
   uniform runs (long strings ~1.5×, minify ~1.9×) and is at parity on Solana full walks,
   doubles, and dates. `IndexedJsonIterator` wins selective access over large documents but
   its stage-1 fixed cost (≈2.4ms for 4.7MiB) makes it lose read-everything workloads.
+
+## Hardware strategy: experiment locally, commit generally
+
+- **Tuning against the local machine is explicitly allowed — even encouraged — as a
+  temporary research tactic.** "Prematurely" optimizing for 128-bit NEON to see what the
+  hardware rewards is how every idiom above was discovered. Do it freely in the working
+  tree, measure, learn.
+- **But NEON is one point in the design space, not the target.** Idioms that win here can
+  lose on AVX2/AVX-512/SVE and vice versa — mask extraction is a single `movmsk`-class
+  instruction on x86, `compress()` is native on AVX-512-VBMI2/SVE, and wider lanes shrink
+  per-chunk fixed costs. Treat every local result as hardware-conditional until measured
+  on wide lanes.
+- **What gets committed to this branch should stay general.** Prefer strategies defensible
+  across lane widths; put hardware-sensitive choices behind named, re-sweepable knobs
+  (`SWAR_PREFIX`, `VectorSupport.BYTE_SPECIES`) rather than baking them into loop
+  structure; and label each measured decision with the hardware it was measured on
+  (comments here and in code). Runtime strategy selection by species width (128-bit →
+  SWAR-leaning, ≥256-bit → wide-vector) is the eventual general mechanism.
+- **For aggressive hardware-specific tuning, cut a target branch** off this one (e.g.
+  `vectorize-neon`, `vectorize-avx512`, `vectorize-sve`) instead of committing
+  machine-specific tuning to the shared research line. Same base, one variable — that
+  keeps cross-hardware A/B comparisons honest, and a winning strategy gets promoted back
+  only once it's measured on more than one target (or gated behind a species check).
 
 ## Correctness landmines (each has bitten)
 
