@@ -14,11 +14,6 @@ final class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  public boolean supportsMarkReset() {
-    return true;
-  }
-
-  @Override
   public JsonIterator reset(final byte[] buf) {
     return JsonIterator.parse(buf);
   }
@@ -46,16 +41,12 @@ final class CharsJsonIterator extends BaseJsonIterator {
 
   @Override
   public JsonIterator reset(final InputStream in) {
-    return JsonIterator.parse(in, buf.length);
+    return JsonIterator.parse(in);
   }
 
   @Override
   public JsonIterator reset(final InputStream in, final int bufSize) {
-    return JsonIterator.parse(in, bufSize);
-  }
-
-  @Override
-  public void close() {
+    return JsonIterator.parse(in);
   }
 
   @Override

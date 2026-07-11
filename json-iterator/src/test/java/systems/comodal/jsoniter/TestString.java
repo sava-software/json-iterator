@@ -88,7 +88,7 @@ final class TestString {
     assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab\\ncd\"").decodeBase64String());
     assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab\\\"cd\"").decodeBase64String());
 
-    // a buffered stream that must refill mid-value
+    // an InputStream source, read fully upfront
     final var big = new byte[4_096];
     random.nextBytes(big);
     final var doc = format("{\"data\":\"%s\"}", BASE64_ENCODER.encodeToString(big)).getBytes(StandardCharsets.US_ASCII);

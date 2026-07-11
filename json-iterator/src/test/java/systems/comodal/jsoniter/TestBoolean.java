@@ -66,8 +66,8 @@ final class TestBoolean {
 
   @Test
   void test_literals_across_buffer_boundaries() {
-    // walks the stream refill boundary across every position, so each literal
-    // is split at every point, both when read and when skipped over
+    // InputStream sources are read fully upfront, so the bufSize sweep just
+    // re-verifies literal reads and skips through the deprecated entry points
     final var bytes = "{\"a\":true,\"b\":false,\"c\":null,\"want\":1}".getBytes(StandardCharsets.US_ASCII);
     for (int bufSize = 4; bufSize <= bytes.length; ++bufSize) {
       var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), bufSize);

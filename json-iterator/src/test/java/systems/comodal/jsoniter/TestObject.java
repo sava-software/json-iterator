@@ -101,9 +101,8 @@ final class TestObject {
 
   @Test
   void test_skip_until_across_buffer_boundaries() {
-    // walks the stream refill boundary across every position in the document,
-    // including landing exactly between a matched name prefix and its closing
-    // quote, where the comparison must force a refill before deciding
+    // InputStream sources are read fully upfront, so the bufSize sweep just
+    // re-verifies field matching through the deprecated entry points
     final var bytes = TRICKY_FIELDS_JSON.getBytes(StandardCharsets.UTF_8);
     for (int bufSize = 4; bufSize <= bytes.length; ++bufSize) {
       final var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), bufSize);

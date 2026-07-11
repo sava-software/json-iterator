@@ -150,8 +150,8 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
-  /// The literal may straddle a buffered stream refill, so consume and
-  /// validate one character at a time.
+  /// The buffer ends inside the literal: consume and validate one character
+  /// at a time so truncation is reported as the invalid literal it is.
   private void skipLiteral(final String remaining, final String context, final String expected) {
     for (int i = 0, len = remaining.length(); i < len; ++i) {
       if ((head == tail && !loadMore()) || peekChar(head) != remaining.charAt(i)) {

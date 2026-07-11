@@ -2,6 +2,7 @@ package systems.comodal.jsoniter;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
@@ -54,11 +55,6 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  public boolean supportsMarkReset() {
-    return true;
-  }
-
-  @Override
   public JsonIterator reset(final byte[] buf) {
     this.buf = buf;
     this.head = 0;
@@ -86,16 +82,16 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   @Override
   public JsonIterator reset(final InputStream in) {
-    return new BufferedStreamJsonIterator(in, buf, 0, 0);
+    try (in) {
+      return reset(in.readAllBytes());
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   @Override
   public JsonIterator reset(final InputStream in, final int bufSize) {
-    return new BufferedStreamJsonIterator(in, buf.length == bufSize ? buf : new byte[bufSize], 0, 0);
-  }
-
-  @Override
-  public void close() throws IOException {
+    return reset(in);
   }
 
   @Override
@@ -348,11 +344,8 @@ class BytesJsonIterator extends BaseJsonIterator {
             if (nextOffset > tail) {
               if (i < tail) {
                 i = tail - Long.BYTES; // push i back a bit to match 8 byte pattern length.
-              } else if (supportsMarkReset()) { // Hack to check if reading from stream or not.
-                throw reportError("parseString", "incomplete string");
               } else {
-                final int len = parseMultiByteString(0);
-                return new String(charBuf, 0, len);
+                throw reportError("parseString", "incomplete string");
               }
             }
           }
@@ -433,7 +426,7 @@ class BytesJsonIterator extends BaseJsonIterator {
     int i = head;
     for (int f = 0; f < fieldLength; ++f, ++i) {
       if (i >= tail) {
-        return parseFieldEqualsSlow(field); // refills from a stream, or reports the incomplete string
+        return parseFieldEqualsSlow(field); // reports the incomplete string
       }
       final byte b = buf[i];
       if (b == '\\' || b < 0) {
@@ -445,8 +438,8 @@ class BytesJsonIterator extends BaseJsonIterator {
       }
     }
     if (i == tail) {
-      // The buffer ended exactly after the matched prefix: a stream may not
-      // have loaded the closing quote yet, so parse to force a refill.
+      // The buffer ended exactly after the matched prefix: parse to report
+      // the incomplete string.
       return parseFieldEqualsSlow(field);
     }
     if (buf[i] == '"') {

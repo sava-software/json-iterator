@@ -5,8 +5,7 @@ import org.junit.jupiter.api.TestReporter;
 
 import java.io.ByteArrayInputStream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 final class TestIO {
 
@@ -17,17 +16,39 @@ final class TestIO {
 
   @Test
   void test_read_byte() {
-    final var ji = (BufferedStreamJsonIterator) JsonIterator.parse(new ByteArrayInputStream("1".getBytes()), 64);
+    final var ji = (BytesJsonIterator) JsonIterator.parse(new ByteArrayInputStream("1".getBytes()), 64);
     assertEquals('1', ji.read());
-    assertThrows(JsonException.class, ji::read);
+    assertThrows(JsonException.class, ji::nextToken);
   }
 
   @Test
   void test_read_bytes() {
-    final var ji = (BufferedStreamJsonIterator) JsonIterator.parse(new ByteArrayInputStream("12".getBytes()), 64);
+    final var ji = (BytesJsonIterator) JsonIterator.parse(new ByteArrayInputStream("12".getBytes()), 64);
     assertEquals('1', ji.read());
     assertEquals('2', ji.read());
-    assertThrows(JsonException.class, ji::read);
+    assertThrows(JsonException.class, ji::nextToken);
+  }
+
+  @Test
+  void test_stream_read_fully_and_closed() {
+    final boolean[] closed = {false};
+    final var in = new ByteArrayInputStream("[1,2]".getBytes()) {
+      @Override
+      public void close() {
+        closed[0] = true;
+      }
+    };
+    final var ji = JsonIterator.parse(in);
+    assertTrue(closed[0]);
+    final int mark = ji.mark();
+    assertTrue(ji.readArray());
+    assertEquals(1, ji.readInt());
+    assertTrue(ji.readArray());
+    assertEquals(2, ji.readInt());
+    assertFalse(ji.readArray());
+    ji.reset(mark);
+    assertTrue(ji.readArray());
+    assertEquals(1, ji.readInt());
   }
 
   @Test

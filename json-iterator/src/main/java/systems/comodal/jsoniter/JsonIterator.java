@@ -1,19 +1,48 @@
 package systems.comodal.jsoniter;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 
 public interface JsonIterator extends Closeable {
 
-  static JsonIterator parse(final InputStream in, final int bufSize) {
-    return new BufferedStreamJsonIterator(in, new byte[bufSize], 0, 0);
+  /// Iterators hold no closeable resource: InputStream sources are read to
+  /// EOF and closed inside parse/reset.
+  ///
+  /// @deprecated no-op; JsonIterator will stop extending [Closeable] in the
+  /// next major version.
+  @Deprecated(forRemoval = true)
+  @Override
+  default void close() {
   }
 
+  /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
+  private static byte[] readFully(final InputStream in) {
+    try (in) {
+      return in.readAllBytes();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  static JsonIterator parse(final InputStream in) {
+    return parse(readFully(in));
+  }
+
+  /// @param bufSize ignored; the stream is always read fully.
+  @Deprecated
+  static JsonIterator parse(final InputStream in, final int bufSize) {
+    return parse(readFully(in));
+  }
+
+  /// @param bufSize ignored; the stream is always read fully.
+  @Deprecated
   static JsonIterator parse(final InputStream in, final int bufSize, final int charBufferLength) {
-    return new BufferedStreamJsonIterator(in, new byte[bufSize], 0, 0, charBufferLength);
+    return parse(readFully(in), charBufferLength);
   }
 
   static JsonIterator parse(final byte[] buf) {
@@ -162,15 +191,22 @@ public interface JsonIterator extends Closeable {
 
   JsonIterator reset(final char[] buf, final int head, final int tail);
 
+  /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
   JsonIterator reset(final InputStream in);
 
+  /// @param bufSize ignored; the stream is always read fully.
+  @Deprecated
   JsonIterator reset(final InputStream in, final int bufSize);
 
   String currentBuffer();
 
   // Object Field & Navigation Methods
 
-  boolean supportsMarkReset();
+  /// All iterators support mark/reset now that InputStream sources are read fully upfront.
+  @Deprecated
+  default boolean supportsMarkReset() {
+    return true;
+  }
 
   int mark();
 
