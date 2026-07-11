@@ -66,19 +66,18 @@ Suites:
   `getBlock` response (~4.7 MiB, stored gzipped in resources), including a sava-style inversion-of-control DTO parse.
 - [SyntheticBench](jmh/src/jmh/java/systems/comodal/jsoniter/jmh/SyntheticBench.java): targeted workloads — large
   container skips, long strings, 19-digit longs, doubles, and RFC-1123/ISO timestamps.
-- [Base64Bench](jmh/src/jmh/java/systems/comodal/jsoniter/jmh/Base64Bench.java): `decodeBase64String` strategies across
-  payload sizes.
 - [MinifyBench](jmh/src/jmh/java/systems/comodal/jsoniter/jmh/MinifyBench.java): `JIUtil.minify` versus a scalar
   baseline on pretty-printed and compact documents.
 
 Benchmarks cross-check that all implementations produce identical results during setup. The published release
-(currently `21.0.12`, shade-relocated so both versions share the classpath) is included as a baseline for the
+(currently `21.1.0`, shade-relocated so both versions share the classpath) is included as a baseline for the
 `JsonIterator` workloads.
 
 ### Results
 
-Apple M-series (128-bit NEON), JDK 27 EA, µs/op — lower is better. Relative results will differ on x86: NEON makes
-vector-mask extraction expensive, which penalizes the scanning loops here and is cheap on AVX2/AVX-512.
+Historical snapshot: Apple M-series (128-bit NEON), JDK 27 EA, µs/op, measured against the `21.0.12` baseline before
+the hybrid SWAR-prefix scan changes — re-run the suite for current numbers. Relative results will differ on x86: NEON
+makes vector-mask extraction expensive, which penalizes the scanning loops here and is cheap on AVX2/AVX-512.
 
 | Workload | 21.0.12 | `JsonIterator` | `IndexedJsonIterator` |
 |---|---:|---:|---:|
@@ -94,8 +93,6 @@ vector-mask extraction expensive, which penalizes the scanning loops here and is
 | doubles | 107.9 | **52.4** | 65.0 |
 | RFC-1123 timestamps | 137.7 | **53.8** | — |
 | ISO-8601 timestamps | 129.6 | **73.3** | — |
-| base64, 256 KiB value (bytes) | 89.6 | **50.8** | — |
-| base64, 256 KiB value (chars) | 188.7 | **116.5** | — |
 | minify 4.7 MiB (vs 3,392 scalar) | — | **1,895** | — |
 
 ¹ 21.0.12 cannot parse twitter.json: its word-at-a-time scanning desyncs on multi-byte content (fixed after 21.0.12).
@@ -103,5 +100,5 @@ That bug is also why its string skipping is fast — it hops 8-byte words throug
 
 ² Skip-dominated workloads on ASCII-heavy documents. On this NEON hardware the vectorized scans pay mask-extraction
 costs that the old 8-byte SWAR loops avoid, so 21.0.12 leads where skipping dominates; value decoding (strings,
-numbers, dates, base64) is where the current version wins, roughly 2× across the board. `parseOnly` stage-1 indexing
+numbers, dates) is where the current version wins, roughly 2× across the board. `parseOnly` stage-1 indexing
 for the 4.7 MiB block is 2,400 (2,504 with UTF-8 validation).

@@ -21,6 +21,26 @@ class BytesJsonIterator extends BaseJsonIterator {
   private static final byte QUOTE = '"';
   private static final byte BACKSLASH = '\\';
 
+  // Real documents are dominated by short strings, and on hardware where
+  // vector-mask extraction is expensive (e.g. 128-bit NEON) the vector scan
+  // loops pay that cost on the very first chunk of every short string. The
+  // string scans below therefore SWAR the first few words and only switch to
+  // vector chunks for longer runs.
+  private static final int SWAR_PREFIX = 16;
+  private static final long QUOTE_PATTERN = 0x2222222222222222L;
+  private static final long ESCAPE_PATTERN = 0x5C5C5C5C5C5C5C5CL;
+  private static final long HIGH_BITS = 0x8080808080808080L;
+
+  /// Marks zero bytes; Hacker's Delight ch. 6.
+  private static long matchPattern(final long input) {
+    return ~(((input & 0x7F7F7F7F7F7F7F7FL) + 0x7F7F7F7F7F7F7F7FL) | input | 0x7F7F7F7F7F7F7F7FL);
+  }
+
+  /// An escape or a multi-byte UTF-8 byte, either of which needs the scalar decoder.
+  private static boolean containsSpecialPattern(final long word) {
+    return (word & HIGH_BITS) != 0 || matchPattern(word ^ ESCAPE_PATTERN) != 0;
+  }
+
   byte[] buf;
   private char[] charBuf;
 
@@ -165,10 +185,37 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   @Override
   int parse() {
-    final int lanes = VectorSupport.BYTE_LANES;
     int j = 0;
     int h = head;
-    while (h + lanes <= tail) {
+    boolean special = false;
+    for (final int prefixEnd = h + SWAR_PREFIX; h + Long.BYTES <= tail && h < prefixEnd; ) {
+      final long word = (long) TO_LONG.get(buf, h);
+      if (containsSpecialPattern(word)) {
+        special = true;
+        break;
+      }
+      final long quote = matchPattern(word ^ QUOTE_PATTERN);
+      if (quote != 0) {
+        final int pos = h + (Long.numberOfTrailingZeros(quote) >>> 3);
+        final int len = pos - head;
+        ensureCharBufCapacity(len);
+        for (int k = 0, from = head; k < len; ++k) {
+          charBuf[k] = (char) (buf[from + k] & 0xff);
+        }
+        head = pos + 1;
+        return len;
+      }
+      h += Long.BYTES;
+    }
+    if (h > head) {
+      j = h - head;
+      ensureCharBufCapacity(j);
+      for (int k = 0, from = head; k < j; ++k) {
+        charBuf[k] = (char) (buf[from + k] & 0xff);
+      }
+    }
+    final int lanes = VectorSupport.BYTE_LANES;
+    while (!special && h + lanes <= tail) {
       final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, h);
       final var quoteMask = chunk.eq(QUOTE);
       final var stopMask = chunk.eq(BACKSLASH).or(chunk.compare(VectorOperators.LT, (byte) 0)).or(quoteMask);
@@ -233,6 +280,19 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   @Override
   void skipPastEndQuote() {
+    for (final int prefixEnd = head + SWAR_PREFIX; head + Long.BYTES <= tail && head < prefixEnd; ) {
+      final long word = (long) TO_LONG.get(buf, head);
+      if (containsSpecialPattern(word)) {
+        skipPastMultiByteEndQuote();
+        return;
+      }
+      final long quote = matchPattern(word ^ QUOTE_PATTERN);
+      if (quote != 0) {
+        head += (Long.numberOfTrailingZeros(quote) >>> 3) + 1;
+        return;
+      }
+      head += Long.BYTES;
+    }
     final int lanes = VectorSupport.BYTE_LANES;
     int nextOffset = head + lanes;
     if (nextOffset > tail) {
@@ -320,13 +380,29 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   @Override
   protected String parseString() {
+    int h = head;
+    for (final int prefixEnd = h + SWAR_PREFIX; h + Long.BYTES <= tail && h < prefixEnd; ) {
+      final long word = (long) TO_LONG.get(buf, h);
+      if (containsSpecialPattern(word)) {
+        final int len = parseMultiByteString(0);
+        return new String(charBuf, 0, len);
+      }
+      final long quote = matchPattern(word ^ QUOTE_PATTERN);
+      if (quote != 0) {
+        final int pos = h + (Long.numberOfTrailingZeros(quote) >>> 3);
+        final var str = new String(buf, head, pos - head, StandardCharsets.US_ASCII);
+        head = pos + 1;
+        return str;
+      }
+      h += Long.BYTES;
+    }
     final int lanes = VectorSupport.BYTE_LANES;
-    int nextOffset = head + lanes;
+    int nextOffset = h + lanes;
     if (nextOffset > tail) {
       final int len = parse();
       return new String(charBuf, 0, len);
     }
-    for (int i = head; ; ) {
+    for (int i = h; ; ) {
       final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, i);
       final var quoteMask = chunk.eq(QUOTE);
       final var specialMask = chunk.eq(BACKSLASH).or(chunk.compare(VectorOperators.LT, (byte) 0));

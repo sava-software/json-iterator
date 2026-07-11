@@ -54,16 +54,8 @@ public class TwitterBench {
 
     check(fullWalk_jsonIterator(), fullWalk_jsonIndexed(), fullWalk_simdjson());
     check(screenNames_jsonIterator(), screenNames_jsonIndexed(), screenNames_simdjson());
-    try {
-      check(fullWalk_jsonIterator21(), fullWalk_jsonIterator(), fullWalk_jsonIterator());
-      check(screenNames_jsonIterator21(), screenNames_jsonIterator(), screenNames_jsonIterator());
-    } catch (final RuntimeException e) {
-      // 21.0.12 cannot parse twitter.json: its word-at-a-time multi-byte
-      // detection matched only bytes exactly 0x80 and desyncs on the first
-      // Japanese status. Fixed on main; drop this guard once the fixed
-      // version is published and the oldJsonIterator dependency is bumped.
-      System.err.println("json-iterator 21.0.12 failed on twitter.json (known multi-byte bug): " + e.getMessage());
-    }
+    check(fullWalk_jsonIterator21(), fullWalk_jsonIterator(), fullWalk_jsonIterator());
+    check(screenNames_jsonIterator21(), screenNames_jsonIterator(), screenNames_jsonIterator());
   }
 
   private static void check(final long a, final long b, final long c) {

@@ -7,7 +7,7 @@ import jsoniter.v21.JsonIterator;
 import static jsoniter.v21.JsonIterator.fieldEquals;
 
 /// [SolanaBlockBench] selective workloads duplicated against the relocated
-/// published 21.0.12 baseline (package jsoniter.v21); bodies are identical to
+/// published 21.1.0 baseline (package jsoniter.v21); bodies are identical to
 /// the current-version equivalents in [SolanaBlockBench].
 final class SolanaV21 {
 

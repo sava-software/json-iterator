@@ -102,13 +102,9 @@ public class SyntheticBench {
     check(bigLongs_jsonIterator21(), bigLongs_jsonIterator());
     check(dates_rfc1123_jsonIterator21(), dates_rfc1123());
     check(dates_iso_jsonIterator21(), dates_iso());
-    // the 21.0.12 readDouble is not guaranteed correctly rounded, so compare
-    // with a relative tolerance instead of bit equality
-    final double current = doubles_jsonIterator();
-    final double v21 = doubles_jsonIterator21();
-    if (Math.abs(current - v21) > Math.abs(current) * 1e-12) {
-      throw new IllegalStateException(current + " != " + v21);
-    }
+    // 21.1.0 shares the correctly-rounded Eisel-Lemire parser, so the sums
+    // must agree bit for bit
+    check(Double.doubleToLongBits(doubles_jsonIterator21()), Double.doubleToLongBits(doubles_jsonIterator()));
   }
 
   private static void check(final long a, final long b) {

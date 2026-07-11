@@ -16,19 +16,7 @@ java {
   }
 }
 
-// simdjson-java is compiled from its local source checkout: the Maven Central
-// artifact (0.3.0) was built against an older incubating Vector API and fails
-// on JDK 27 with NoSuchFieldError: VectorOperators.UNSIGNED_LE.
-val simdjsonJavaSrc = providers.gradleProperty("simdjsonJavaSrc")
-  .getOrElse("/Users/jim/src/symlinks/vector/simdjson-java/src/main/java")
-
-sourceSets {
-  create("simdjson") {
-    java.srcDir(simdjsonJavaSrc)
-  }
-}
-
-// The published 21.0.12 release is the pre-vectorization baseline. It shares
+// The published 21.1.0 release is the pre-vectorization (Java 21) baseline. It shares
 // this project's package names, so it is relocated to jsoniter.v21 before
 // joining the benchmark classpath; its configuration also opts out of the
 // includeBuild substitution that maps software.sava:json-iterator to the
@@ -43,13 +31,13 @@ val relocateOldJsonIterator = tasks.register<ShadowJar>("relocateOldJsonIterator
   exclude("module-info.class")
   archiveBaseName = "json-iterator-relocated"
   archiveClassifier = ""
-  archiveVersion = "21.0.12"
+  archiveVersion = "21.1.0"
 }
 
 dependencies {
   jmhImplementation("software.sava:json-iterator")
-  jmhImplementation(sourceSets["simdjson"].output)
-  oldJsonIterator("software.sava:json-iterator:21.0.12")
+  jmhImplementation("org.simdjson:simdjson-java:0.4.0")
+  oldJsonIterator("software.sava:json-iterator:21.1.0")
   jmhImplementation(files(relocateOldJsonIterator.flatMap { it.archiveFile }))
 }
 

@@ -7,7 +7,7 @@ import jsoniter.v21.JsonIterator;
 import systems.comodal.jsoniter.JIUtil;
 
 /// [Walks#walk(systems.comodal.jsoniter.JsonIterator)] duplicated against the
-/// relocated published 21.0.12 baseline (package jsoniter.v21). The checksum
+/// relocated published 21.1.0 baseline (package jsoniter.v21). The checksum
 /// lambdas share the same bodies — including the current [JIUtil#parseDouble]
 /// helper — so the comparison isolates the iterator, not the user code.
 final class Walks21 {
