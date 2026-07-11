@@ -36,9 +36,11 @@ tasks.withType<JavaCompile>().configureEach {
 
 jmh {
   fork = 1
-  warmupIterations = 4
+  warmupIterations = 5
   warmup = "1s"
-  iterations = 5
+  // Enough measurement iterations that a single noisy iteration (thermal or
+  // background activity) cannot dominate the reported confidence interval.
+  iterations = 8
   timeOnIteration = "1s"
   // simdjson-java only supports 256/512-bit species; on 128-bit NEON hardware
   // it must be forced to an emulated 256-bit shape.

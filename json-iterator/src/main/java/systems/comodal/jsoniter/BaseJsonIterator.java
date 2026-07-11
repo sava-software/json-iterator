@@ -1,5 +1,9 @@
 package systems.comodal.jsoniter;
 
+import jdk.incubator.vector.ByteVector;
+import jdk.incubator.vector.ShortVector;
+import jdk.incubator.vector.VectorOperators;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
@@ -146,9 +150,20 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   private static final CharBufferFunction<byte[]> DECODE_BASE64 = (chars, offset, len) -> {
-    // Narrow the base64 alphabet chars without an intermediate String.
+    // Narrow the base64 alphabet chars without an intermediate String: two
+    // short vectors fill one byte vector, mirroring the widening copies.
     final byte[] ascii = new byte[len];
-    for (int i = 0; i < len; ++i) {
+    final int byteLanes = VectorSupport.BYTE_LANES;
+    final int shortLanes = VectorSupport.SHORT_LANES;
+    int i = 0;
+    for (; i + byteLanes <= len; i += byteLanes) {
+      final var low = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, chars, offset + i);
+      final var high = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, chars, offset + i + shortLanes);
+      ((ByteVector) low.convertShape(VectorOperators.S2B, VectorSupport.BYTE_SPECIES, 0))
+          .or(high.convertShape(VectorOperators.S2B, VectorSupport.BYTE_SPECIES, -1))
+          .intoArray(ascii, i);
+    }
+    for (; i < len; ++i) {
       ascii[i] = (byte) chars[offset + i];
     }
     return Base64.getDecoder().decode(ascii);
@@ -479,7 +494,9 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   @Override
-  public final <C> int applyObjFieldAsInt(final C context, final ContextCharBufferToIntFunction<C> applyChars, final int terminalSentinel) {
+  public final <C> int applyObjFieldAsInt(final C context,
+                                          final ContextCharBufferToIntFunction<C> applyChars,
+                                          final int terminalSentinel) {
     char c = nextToken();
     if (c == ',') {
       c = nextToken();
@@ -559,7 +576,9 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   @Override
-  public final <C> long applyObjFieldAsLong(final C context, final ContextCharBufferToLongFunction<C> applyChars, final long terminalSentinel) {
+  public final <C> long applyObjFieldAsLong(final C context,
+                                            final ContextCharBufferToLongFunction<C> applyChars,
+                                            final long terminalSentinel) {
     char c = nextToken();
     if (c == ',') {
       c = nextToken();
@@ -912,7 +931,10 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
-  abstract <C, R> R apply(final C context, final ContextFieldBufferFunction<C, R> fieldBufferFunction, final int offset, final int len);
+  abstract <C, R> R apply(final C context,
+                          final ContextFieldBufferFunction<C, R> fieldBufferFunction,
+                          final int offset,
+                          final int len);
 
   @Override
   public final double applyCharsAsDouble(final CharBufferToDoubleFunction applyChars) {
