@@ -92,10 +92,8 @@ class BytesJsonIterator extends BaseJsonIterator {
         throw reportError("nextToken", "unexpected end");
       }
       c = buf[i++];
-      // Tokens are almost always > ' ', so the common case is a single branch;
-      // the exact whitespace check only runs for bytes <= ' ' (multi-byte
-      // UTF-8 bytes are negative and fall through as tokens, as before).
-      if (c > ' ' || (c != ' ' && c != '\n' && c != '\t' && c != '\r')) {
+      // Multibyte UTF-8 bytes are negative and fall through as tokens.
+      if (c != ' ' && c != '\n' && c != '\t' && c != '\r') {
         head = i;
         return (char) (c & 0xff);
       }
@@ -110,7 +108,7 @@ class BytesJsonIterator extends BaseJsonIterator {
         throw reportError("peekToken", "unexpected end");
       }
       c = buf[i];
-      if (c > ' ' || (c != ' ' && c != '\n' && c != '\t' && c != '\r')) {
+      if (c != ' ' && c != '\n' && c != '\t' && c != '\r') {
         head = i;
         return (char) (c & 0xff);
       }

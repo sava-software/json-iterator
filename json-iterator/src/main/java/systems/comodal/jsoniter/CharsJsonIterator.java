@@ -68,8 +68,7 @@ class CharsJsonIterator extends BaseJsonIterator {
     char c;
     for (int i = head; ; ) {
       c = buf[i++];
-      // Tokens are almost always > ' ', so the common case is a single branch.
-      if (c > ' ' || (c != ' ' && c != '\n' && c != '\t' && c != '\r')) {
+      if (c != ' ' && c != '\n' && c != '\t' && c != '\r') {
         head = i;
         return c;
       }
@@ -81,7 +80,7 @@ class CharsJsonIterator extends BaseJsonIterator {
     char c;
     for (int i = head; ; i++) {
       c = buf[i];
-      if (c > ' ' || (c != ' ' && c != '\n' && c != '\t' && c != '\r')) {
+      if (c != ' ' && c != '\n' && c != '\t' && c != '\r') {
         head = i;
         return c;
       }
