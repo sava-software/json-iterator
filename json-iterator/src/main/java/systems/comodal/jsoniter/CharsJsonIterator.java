@@ -121,21 +121,18 @@ class CharsJsonIterator extends BaseJsonIterator {
     int i = from;
     for (; i + lanes <= tail; i += lanes) {
       final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, i);
-      final var backslashMask = chunk.eq(BACKSLASH);
-      final var quoteMask = chunk.eq(QUOTE);
-      if (!quoteMask.or(backslashMask).anyTrue()) {
+      final var stopMask = chunk.eq(QUOTE).or(chunk.eq(BACKSLASH));
+      if (!stopMask.anyTrue()) {
         continue;
       }
-      final long backslash = backslashMask.toLong();
-      final long quote = quoteMask.toLong();
-      if (quote != 0 && (backslash == 0 || Long.numberOfTrailingZeros(quote) < Long.numberOfTrailingZeros(backslash))) {
-        final int end = i + Long.numberOfTrailingZeros(quote);
+      final int n = stopMask.firstTrue();
+      if (buf[i + n] == '"') {
+        final int end = i + n;
         head = end + 1;
         return end - from;
-      } else if (backslash != 0) {
-        // Escape sequences need pairwise skipping and counting; continue scalar.
-        return parseScalar(from, i + Long.numberOfTrailingZeros(backslash));
       }
+      // Escape sequences need pairwise skipping and counting; continue scalar.
+      return parseScalar(from, i + n);
     }
     return parseScalar(from, i);
   }
@@ -162,20 +159,17 @@ class CharsJsonIterator extends BaseJsonIterator {
     int i = head;
     for (; i + lanes <= tail; i += lanes) {
       final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, i);
-      final var backslashMask = chunk.eq(BACKSLASH);
-      final var quoteMask = chunk.eq(QUOTE);
-      if (!quoteMask.or(backslashMask).anyTrue()) {
+      final var stopMask = chunk.eq(QUOTE).or(chunk.eq(BACKSLASH));
+      if (!stopMask.anyTrue()) {
         continue;
       }
-      final long backslash = backslashMask.toLong();
-      final long quote = quoteMask.toLong();
-      if (quote != 0 && (backslash == 0 || Long.numberOfTrailingZeros(quote) < Long.numberOfTrailingZeros(backslash))) {
-        head = i + Long.numberOfTrailingZeros(quote) + 1;
-        return;
-      } else if (backslash != 0) {
-        skipPastEndQuoteScalar(i + Long.numberOfTrailingZeros(backslash));
-        return;
+      final int n = stopMask.firstTrue();
+      if (buf[i + n] == '"') {
+        head = i + n + 1;
+      } else {
+        skipPastEndQuoteScalar(i + n);
       }
+      return;
     }
     skipPastEndQuoteScalar(i);
   }
@@ -201,7 +195,9 @@ class CharsJsonIterator extends BaseJsonIterator {
     outer:
     while (h + lanes <= tail) {
       final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, h);
-      long bits = chunk.eq((short) open).toLong() | chunk.eq((short) close).toLong() | chunk.eq(QUOTE).toLong();
+      // One combined extraction: the char at each marked position identifies
+      // which of the three markers it is, so per-marker masks are unnecessary.
+      long bits = chunk.eq((short) open).or(chunk.eq((short) close)).or(chunk.eq(QUOTE)).toLong();
       while (bits != 0) {
         final int n = Long.numberOfTrailingZeros(bits);
         final char c = buf[h + n];

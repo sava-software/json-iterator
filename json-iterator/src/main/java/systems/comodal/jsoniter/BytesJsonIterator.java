@@ -26,7 +26,7 @@ class BytesJsonIterator extends BaseJsonIterator {
   // loops pay that cost on the very first chunk of every short string. The
   // string scans below therefore SWAR the first few words and only switch to
   // vector chunks for longer runs.
-  private static final int SWAR_PREFIX = 16;
+  private static final int SWAR_PREFIX = 32;
   private static final long QUOTE_PATTERN = 0x2222222222222222L;
   private static final long ESCAPE_PATTERN = 0x5C5C5C5C5C5C5C5CL;
   private static final long HIGH_BITS = 0x8080808080808080L;
@@ -217,25 +217,23 @@ class BytesJsonIterator extends BaseJsonIterator {
     final int lanes = VectorSupport.BYTE_LANES;
     while (!special && h + lanes <= tail) {
       final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, h);
-      final var quoteMask = chunk.eq(QUOTE);
-      final var stopMask = chunk.eq(BACKSLASH).or(chunk.compare(VectorOperators.LT, (byte) 0)).or(quoteMask);
-      // anyTrue is much cheaper than mask.toLong bit extraction on NEON, so
-      // clean chunks (the common case) skip the extraction entirely.
+      final var stopMask = chunk.eq(QUOTE).or(chunk.eq(BACKSLASH)).or(chunk.compare(VectorOperators.LT, (byte) 0));
+      // Lane reductions (anyTrue/firstTrue) are much cheaper than mask.toLong
+      // bit extraction on NEON; the byte at the first marked lane identifies
+      // which stop was hit, so the bitset is never needed.
       if (!stopMask.anyTrue()) {
         ensureCharBufCapacity(j + lanes);
         widenToCharBuf(chunk, j);
         j += lanes;
         h += lanes;
       } else {
-        final long quote = quoteMask.toLong();
-        final long stop = stopMask.toLong();
-        final int n = Long.numberOfTrailingZeros(stop);
+        final int n = stopMask.firstTrue();
         ensureCharBufCapacity(j + n);
         for (int i = 0; i < n; ++i) {
           charBuf[j + i] = (char) buf[h + i];
         }
         j += n;
-        if (((quote >>> n) & 1) != 0) {
+        if (buf[h + n] == QUOTE) {
           head = h + n + 1;
           return j;
         }
@@ -303,9 +301,8 @@ class BytesJsonIterator extends BaseJsonIterator {
       final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, head);
       // Escapes need validation and multi-byte characters need decoding awareness,
       // so either defers to the scalar path when encountered before the end quote.
-      final var quoteMask = chunk.eq(QUOTE);
-      final var specialMask = chunk.eq(BACKSLASH).or(chunk.compare(VectorOperators.LT, (byte) 0));
-      if (!quoteMask.or(specialMask).anyTrue()) {
+      final var stopMask = chunk.eq(QUOTE).or(chunk.eq(BACKSLASH)).or(chunk.compare(VectorOperators.LT, (byte) 0));
+      if (!stopMask.anyTrue()) {
         head = nextOffset;
         nextOffset += lanes;
         if (nextOffset > tail) {
@@ -316,13 +313,12 @@ class BytesJsonIterator extends BaseJsonIterator {
           }
         }
       } else {
-        final long quote = quoteMask.toLong();
-        final long special = specialMask.toLong();
-        if (special != 0 && (quote == 0 || Long.numberOfTrailingZeros(special) < Long.numberOfTrailingZeros(quote))) {
+        final int n = stopMask.firstTrue();
+        if (buf[head + n] == QUOTE) {
+          head += n + 1;
+        } else {
           skipPastMultiByteEndQuote();
-          return;
         }
-        head += Long.numberOfTrailingZeros(quote) + 1;
         return;
       }
     }
@@ -417,22 +413,8 @@ class BytesJsonIterator extends BaseJsonIterator {
     }
     for (int i = h; ; ) {
       final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, i);
-      final var quoteMask = chunk.eq(QUOTE);
-      final var specialMask = chunk.eq(BACKSLASH).or(chunk.compare(VectorOperators.LT, (byte) 0));
-      final long quote;
-      final long special;
-      if (quoteMask.or(specialMask).anyTrue()) {
-        quote = quoteMask.toLong();
-        special = specialMask.toLong();
-      } else {
-        quote = 0;
-        special = 0;
-      }
-      if (quote == 0) {
-        if (special != 0) {
-          final int len = parseMultiByteString(0);
-          return new String(charBuf, 0, len);
-        }
+      final var stopMask = chunk.eq(QUOTE).or(chunk.eq(BACKSLASH)).or(chunk.compare(VectorOperators.LT, (byte) 0));
+      if (!stopMask.anyTrue()) {
         i = nextOffset;
         nextOffset += lanes;
         if (nextOffset > tail) {
@@ -442,14 +424,16 @@ class BytesJsonIterator extends BaseJsonIterator {
             throw reportError("parseString", "incomplete string");
           }
         }
-      } else if (special != 0 && Long.numberOfTrailingZeros(special) < Long.numberOfTrailingZeros(quote)) {
+      } else {
+        final int n = stopMask.firstTrue();
+        if (buf[i + n] == QUOTE) {
+          final var str = new String(buf, head, (i + n) - head, StandardCharsets.US_ASCII);
+          head = i + n + 1;
+          return str;
+        }
+        // An escape sequence or a UTF-8 multi-byte character requires the scalar decoder.
         final int len = parseMultiByteString(0);
         return new String(charBuf, 0, len);
-      } else {
-        i += Long.numberOfTrailingZeros(quote);
-        final var str = new String(buf, head, i - head, StandardCharsets.US_ASCII);
-        head = i + 1;
-        return str;
       }
     }
   }
@@ -875,7 +859,9 @@ class BytesJsonIterator extends BaseJsonIterator {
     outer:
     while (h + lanes <= tail) {
       final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, h);
-      long bits = chunk.eq(openByte).toLong() | chunk.eq(closeByte).toLong() | chunk.eq(QUOTE).toLong();
+      // One combined extraction: the byte at each marked position identifies
+      // which of the three markers it is, so per-marker masks are unnecessary.
+      long bits = chunk.eq(openByte).or(chunk.eq(closeByte)).or(chunk.eq(QUOTE)).toLong();
       while (bits != 0) {
         final int n = Long.numberOfTrailingZeros(bits);
         final byte c = buf[h + n];
