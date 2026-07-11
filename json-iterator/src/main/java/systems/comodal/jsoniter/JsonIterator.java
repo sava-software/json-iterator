@@ -254,12 +254,21 @@ public interface JsonIterator extends Closeable {
 
   BigInteger readBigInteger();
 
-  /// Parses ISO-like or RFC_1123_DATE_TIME formats such as:
+  /// Parses ISO-like or RFC-1123 formats such as:
   /// - `YYYY*MM*DD*HH*MM*SS.?\d{0,9}Z?`
   /// - `YYYY*MM*DD*HH*MM*SS[+-]HH*MM`
-  /// - `Tue, 3 Jun 2008 11:05:30 GMT`
+  /// - `Fri, 04 Oct 2019 16:06:36 GMT`
+  /// - `Fri, 04 Oct 2019 16:06:36 +0200`
   ///
-  /// Defaults to UTC if no offset is provided.
+  /// For the ISO-like forms, `*` may be any single separator character —
+  /// separators are not validated — and UTC is assumed if no offset is
+  /// provided. For the RFC-1123 form, the day must be two digits (unlike
+  /// [java.time.format.DateTimeFormatter#RFC_1123_DATE_TIME], `04`, never
+  /// `4`), the day-of-week prefix is not validated against the date, `GMT`
+  /// is computed directly, and any other zone is resolved via
+  /// [java.time.ZoneId#of(String)].
+  ///
+  /// Field values are used arithmetically without range validation.
   ///
   /// @return the parsed Instant
   /// @throws java.time.DateTimeException on any unexpected character or length

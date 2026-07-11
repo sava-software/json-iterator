@@ -206,7 +206,14 @@ public final class InstantParser {
     }
     second = (second << 3) + (second << 1) + ind;
     i += 2;
-    final var zone = ZoneId.of(new String(buf, i, (offset + len) - i));
+    final int zoneLength = (offset + len) - i;
+    if (zoneLength == 3 && buf[i] == 'G' && buf[i + 1] == 'M' && buf[i + 2] == 'T') {
+      // The overwhelmingly common RFC-1123 zone: compute the epoch directly,
+      // exactly as the ISO path does, instead of allocating the zone String
+      // and going through ZoneId resolution and ZonedDateTime construction.
+      return ofEpochSecond(toEpochSecond(year, month, day, hour, minute, second), 0);
+    }
+    final var zone = ZoneId.of(new String(buf, i, zoneLength));
     return ZonedDateTime.of(year, month, day, hour, minute, second, 0, zone).toInstant();
   };
 
