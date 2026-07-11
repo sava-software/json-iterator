@@ -318,8 +318,39 @@ final class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  boolean fieldEquals(final String field, final int offset, final int len) {
-    return JsonIterator.fieldEquals(field, buf, offset, len);
+  boolean parseFieldEquals(final String field) {
+    final int fieldLength = field.length();
+    int i = head;
+    for (int f = 0; f < fieldLength; ++f, ++i) {
+      if (i >= tail) {
+        return parseFieldEqualsSlow(field); // reports the incomplete string
+      }
+      final char c = buf[i];
+      if (c == '\\') {
+        // Escaped field names take the unescaping slow path.
+        return parseFieldEqualsSlow(field);
+      } else if (c != field.charAt(f)) {
+        skipPastEndQuote();
+        return false;
+      }
+    }
+    if (i < tail && buf[i] == '"') {
+      head = i + 1;
+      return true;
+    }
+    // The name continues past the compared prefix, or the buffer ended.
+    skipPastEndQuote();
+    return false;
+  }
+
+  private boolean parseFieldEqualsSlow(final String field) {
+    final int from = head;
+    final int len = parse(from);
+    if (numEscapes > 0) {
+      final char[] chars = handleEscapes(from, len);
+      return JsonIterator.fieldEquals(field, chars, 0, chars.length);
+    }
+    return JsonIterator.fieldEquals(field, buf, from, len);
   }
 
   @Override

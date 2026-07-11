@@ -5,6 +5,9 @@ import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
 import static org.junit.jupiter.api.Assertions.*;
@@ -73,6 +76,43 @@ final class TestObject {
   void test_skip_until() {
     var ji = factory.create("{ \"field1\" : \"hello\" , \"field2\": {\"nested1\" : \"blah\", \"nested2\": \"world\"} }");
     assertEquals("world", ji.skipUntil("field2").skipUntil("nested2").readString());
+  }
+
+  private static final String TRICKY_FIELDS_JSON = "{\"wan\":1,\"wanted\":2,\"a\\\"b\":3,\"中文\":4,\"want\":42}";
+
+  @Test
+  void test_skip_until_tricky_field_names() {
+    // shorter and longer names sharing a prefix with the target, escaped
+    // names, and multi-byte names — the mismatch, name-longer, and slow
+    // paths of the in-place field comparison
+    assertEquals(42, factory.create(TRICKY_FIELDS_JSON).skipUntil("want").readInt());
+    assertEquals(1, factory.create(TRICKY_FIELDS_JSON).skipUntil("wan").readInt());
+    assertEquals(2, factory.create(TRICKY_FIELDS_JSON).skipUntil("wanted").readInt());
+    assertEquals(3, factory.create(TRICKY_FIELDS_JSON).skipUntil("a\"b").readInt());
+    assertEquals(4, factory.create(TRICKY_FIELDS_JSON).skipUntil("中文").readInt());
+    assertNull(factory.create(TRICKY_FIELDS_JSON).skipUntil("wa"));
+    assertNull(factory.create(TRICKY_FIELDS_JSON).skipUntil("wants"));
+
+    // Escape codes are decoded on byte sources; the char[] path only strips
+    // the backslash (pre-existing: "\t" unescapes to 't', not a tab), so
+    // code-escaped names only match on byte sources.
+    final var tabJson = "{\"a\\tb\":1,\"c\":2}";
+    if (factory != systems.comodal.jsoniter.factories.CharArray.INSTANCE) {
+      assertEquals(1, factory.create(tabJson).skipUntil("a\tb").readInt());
+    }
+    assertEquals(2, factory.create(tabJson).skipUntil("c").readInt());
+  }
+
+  @Test
+  void test_skip_until_across_buffer_boundaries() {
+    // walks the stream refill boundary across every position in the document,
+    // including landing exactly between a matched name prefix and its closing
+    // quote, where the comparison must force a refill before deciding
+    final var bytes = TRICKY_FIELDS_JSON.getBytes(StandardCharsets.UTF_8);
+    for (int bufSize = 4; bufSize <= bytes.length; ++bufSize) {
+      final var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), bufSize);
+      assertEquals(42, ji.skipUntil("want").readInt(), "bufSize=" + bufSize);
+    }
   }
 
   @Test
