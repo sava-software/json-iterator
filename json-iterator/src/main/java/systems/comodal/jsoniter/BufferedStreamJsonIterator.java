@@ -99,6 +99,7 @@ final class BufferedStreamJsonIterator extends BytesJsonIterator {
 
   @Override
   public byte[] decodeBase64String() {
-    return Base64.getDecoder().decode(readString());
+    final var base64 = readString();
+    return base64 == null ? null : Base64.getDecoder().decode(base64);
   }
 }

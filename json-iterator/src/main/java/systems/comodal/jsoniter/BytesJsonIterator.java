@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -256,7 +257,11 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   private static byte[] decodeBase64(final byte[] buf, final int from, final int to) {
-    return Base64.getDecoder().decode(Arrays.copyOfRange(buf, from, to));
+    // Decode directly from the source buffer. The decoder sizes its output
+    // exactly for valid padded input, so the trimming copy is rare.
+    final var decoded = Base64.getDecoder().decode(ByteBuffer.wrap(buf, from, to - from));
+    final byte[] data = decoded.array();
+    return decoded.limit() == data.length ? data : Arrays.copyOf(data, decoded.limit());
   }
 
   @Override

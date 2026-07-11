@@ -5,6 +5,8 @@ import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Random;
 
@@ -52,6 +54,36 @@ final class TestString {
       ji = factory.create(format("{\"data\":\"%s\"}", BASE64_ENCODER.encodeToString(data)));
       assertArrayEquals(data, ji.skipUntil("data").decodeBase64String(), "seed=" + seed);
     }
+  }
+
+  @Test
+  void testDecodeBase64Robustness() {
+    // a JSON null decodes to null on every source type
+    assertNull(factory.create("{\"data\":null}").skipUntil("data").decodeBase64String());
+
+    // Bare documents, so nothing follows the string: the closing quote walks
+    // across every position relative to the byte path's 8-byte scan words and
+    // the end of the buffer.
+    final long seed = new Random().nextLong();
+    final var random = new Random(seed);
+    for (int len = 0; len <= 18; ++len) {
+      final var data = new byte[len];
+      random.nextBytes(data);
+      final var json = '"' + BASE64_ENCODER.encodeToString(data) + '"';
+      assertArrayEquals(data, factory.create(json).decodeBase64String(), "seed=" + seed + " len=" + len);
+    }
+
+    // illegal content throws on every source type
+    assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab@cd\"").decodeBase64String());
+    assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab\\ncd\"").decodeBase64String());
+    assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab\\\"cd\"").decodeBase64String());
+
+    // a buffered stream that must refill mid-value
+    final var big = new byte[4_096];
+    random.nextBytes(big);
+    final var doc = format("{\"data\":\"%s\"}", BASE64_ENCODER.encodeToString(big)).getBytes(StandardCharsets.US_ASCII);
+    final var ji = JsonIterator.parse(new ByteArrayInputStream(doc), 64);
+    assertArrayEquals(big, ji.skipUntil("data").decodeBase64String(), "seed=" + seed);
   }
 
   @Test

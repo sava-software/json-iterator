@@ -156,9 +156,20 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
+  private static final CharBufferFunction<byte[]> DECODE_BASE64 = (chars, offset, len) -> {
+    // Narrow the base64 alphabet chars without an intermediate String, which
+    // would copy them twice: once into the String and again into the byte[]
+    // the decoder extracts from it.
+    final byte[] ascii = new byte[len];
+    for (int i = 0; i < len; ++i) {
+      ascii[i] = (byte) chars[offset + i];
+    }
+    return Base64.getDecoder().decode(ascii);
+  };
+
   @Override
   public byte[] decodeBase64String() {
-    return Base64.getDecoder().decode(readString());
+    return applyChars(DECODE_BASE64);
   }
 
   abstract int parse();
