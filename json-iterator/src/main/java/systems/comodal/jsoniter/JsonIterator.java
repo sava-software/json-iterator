@@ -10,7 +10,37 @@ import java.time.Instant;
 
 public interface JsonIterator extends Closeable {
 
-  /// Iterators hold no closeable resource: InputStream sources are read to
+  static JsonIterator parse(final byte[] buf) {
+    return new BytesJsonIterator(buf, 0, buf.length);
+  }
+
+  static JsonIterator parse(final byte[] buf, final int charBufferLength) {
+    return new BytesJsonIterator(buf, 0, buf.length, charBufferLength);
+  }
+
+  static JsonIterator parse(final byte[] buf, final int head, final int tail) {
+    return new BytesJsonIterator(buf, head, tail);
+  }
+
+  static JsonIterator parse(final byte[] buf, final int head, final int tail, final int charBufferLength) {
+    return new BytesJsonIterator(buf, head, tail, charBufferLength);
+  }
+
+  static JsonIterator parse(final char[] buf) {
+    return new CharsJsonIterator(buf, 0, buf.length);
+  }
+
+  static JsonIterator parse(final char[] buf, final int head, final int tail) {
+    return new CharsJsonIterator(buf, head, tail);
+  }
+
+  static JsonIterator parse(final String field) {
+    return parse(field.getBytes());
+  }
+
+  static JsonIterator parse(final String field, final int charBufferLength) {
+    return parse(field.getBytes(), charBufferLength);
+  }  /// Iterators hold no closeable resource: InputStream sources are read to
   /// EOF and closed inside parse/reset.
   ///
   /// @deprecated no-op; JsonIterator will stop extending [Closeable] in the
@@ -43,38 +73,6 @@ public interface JsonIterator extends Closeable {
   @Deprecated
   static JsonIterator parse(final InputStream in, final int bufSize, final int charBufferLength) {
     return parse(readFully(in), charBufferLength);
-  }
-
-  static JsonIterator parse(final byte[] buf) {
-    return new BytesJsonIterator(buf, 0, buf.length);
-  }
-
-  static JsonIterator parse(final byte[] buf, final int charBufferLength) {
-    return new BytesJsonIterator(buf, 0, buf.length, charBufferLength);
-  }
-
-  static JsonIterator parse(final byte[] buf, final int head, final int tail) {
-    return new BytesJsonIterator(buf, head, tail);
-  }
-
-  static JsonIterator parse(final byte[] buf, final int head, final int tail, final int charBufferLength) {
-    return new BytesJsonIterator(buf, head, tail, charBufferLength);
-  }
-
-  static JsonIterator parse(final char[] buf) {
-    return new CharsJsonIterator(buf, 0, buf.length);
-  }
-
-  static JsonIterator parse(final char[] buf, final int head, final int tail) {
-    return new CharsJsonIterator(buf, head, tail);
-  }
-
-  static JsonIterator parse(final String field) {
-    return parse(field.getBytes());
-  }
-
-  static JsonIterator parse(final String field, final int charBufferLength) {
-    return parse(field.getBytes(), charBufferLength);
   }
 
   static boolean fieldEquals(final String field, final char[] buf) {
