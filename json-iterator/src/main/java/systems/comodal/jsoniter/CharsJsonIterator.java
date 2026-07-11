@@ -4,6 +4,7 @@ import jdk.incubator.vector.ShortVector;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.util.Arrays;
 
 class CharsJsonIterator extends BaseJsonIterator {
 
@@ -243,16 +244,48 @@ class CharsJsonIterator extends BaseJsonIterator {
   }
 
   private char[] handleEscapes(final int from, final int len) {
+    // Each simple escape shrinks the output by one char and each unicode
+    // escape by five, so this is an upper bound; trimmed below when unicode
+    // escapes occurred. Escape semantics mirror BytesJsonIterator#parseMultiByteString.
     final char[] chars = new char[len - numEscapes];
     char c;
-    for (int i = 0, j = from; i < chars.length; i++, j++) {
+    int i = 0;
+    boolean expectingLowSurrogate = false;
+    for (int j = from, to = from + len; j < to; ++j, ++i) {
       c = buf[j];
       if (c == '\\') {
         c = buf[++j];
+        switch (c) {
+          case 'b' -> c = '\b';
+          case 't' -> c = '\t';
+          case 'n' -> c = '\n';
+          case 'f' -> c = '\f';
+          case 'r' -> c = '\r';
+          case '"', '/', '\\' -> {
+          }
+          case 'u' -> {
+            c = (char) ((JHex.decode(buf[++j]) << 12)
+                + (JHex.decode(buf[++j]) << 8)
+                + (JHex.decode(buf[++j]) << 4)
+                + JHex.decode(buf[++j]));
+            if (expectingLowSurrogate) {
+              if (Character.isLowSurrogate(c)) {
+                expectingLowSurrogate = false;
+              } else {
+                throw new JsonException("invalid surrogate");
+              }
+            } else if (Character.isHighSurrogate(c)) {
+              expectingLowSurrogate = true;
+            } else if (Character.isLowSurrogate(c)) {
+              throw new JsonException("invalid surrogate");
+            }
+          }
+          default -> throw reportError("handleEscapes", "invalid escape character: " + c);
+        }
       }
       chars[i] = c;
     }
-    return chars;
+    return i == chars.length ? chars : Arrays.copyOf(chars, i);
   }
 
   @Override

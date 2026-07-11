@@ -73,6 +73,19 @@ final class TestInstant {
   }
 
   @Test
+  void test_fraction_digits() {
+    // nine digits is full nanosecond precision
+    assertEquals(Instant.parse("2019-10-04T16:06:36.123456789Z"),
+        factory.create("\"2019-10-04T16:06:36.123456789Z\"").readDateTime());
+    // more than nine silently rolled the excess into the seconds
+    assertThrows(DateTimeParseException.class,
+        () -> factory.create("\"2019-10-04T16:06:36.1234567891Z\"").readDateTime());
+    // enough digits to overflow the int accumulator entirely
+    assertThrows(DateTimeParseException.class,
+        () -> factory.create("\"2019-10-04T16:06:36.12345678901234Z\"").readDateTime());
+  }
+
+  @Test
   void testInvalidInstants() {
     assertThrows(DateTimeParseException.class, () -> factory.create("\"201x-03-15T01:23:44Z\"").readDateTime());
     assertThrows(DateTimeParseException.class, () -> factory.create("\"2018-0x-15T01:23:44Z\"").readDateTime());

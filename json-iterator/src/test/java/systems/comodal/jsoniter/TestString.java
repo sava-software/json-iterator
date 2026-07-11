@@ -3,16 +3,15 @@ package systems.comodal.jsoniter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.FieldSource;
-import systems.comodal.jsoniter.factories.CharArray;
-import systems.comodal.jsoniter.factories.IndexedCharArray;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Random;
 
 import static java.lang.String.format;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @ParameterizedClass
 @FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
@@ -58,6 +57,46 @@ final class TestString {
   }
 
   @Test
+  void testDecodeBase64Robustness() {
+    // a JSON null decodes to null on every source type
+    assertNull(factory.create("{\"data\":null}").skipUntil("data").decodeBase64String());
+
+    // Bare documents, so nothing follows the string: the closing quote walks
+    // across every position relative to the byte path's 8-byte scan words and
+    // the end of the buffer.
+    final long seed = new Random().nextLong();
+    final var random = new Random(seed);
+    for (int len = 0; len <= 18; ++len) {
+      final var data = new byte[len];
+      random.nextBytes(data);
+      final var json = '"' + BASE64_ENCODER.encodeToString(data) + '"';
+      assertArrayEquals(data, factory.create(json).decodeBase64String(), "seed=" + seed + " len=" + len);
+    }
+
+    // JSON-escaped '/' (e.g. PHP's json_encode escapes it by default; '/' is
+    // in the base64 alphabet) decodes on every source type, through both the
+    // short scalar path and the word-at-a-time path
+    final var slashes = new byte[]{-1, -1, -1, -1, -1, -1, -1, -1, -1}; // encodes to "////////////"
+    final var escaped = BASE64_ENCODER.encodeToString(slashes).replace("/", "\\/");
+    assertArrayEquals(slashes, factory.create('"' + escaped + '"').decodeBase64String());
+    assertArrayEquals(slashes, factory.create("{\"data\":\"" + escaped + "\"}").skipUntil("data").decodeBase64String());
+    final var shortSlash = new byte[]{-1}; // encodes to "/w=="
+    assertArrayEquals(shortSlash, factory.create("\"\\/w==\"").decodeBase64String());
+
+    // illegal content throws on every source type
+    assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab@cd\"").decodeBase64String());
+    assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab\\ncd\"").decodeBase64String());
+    assertThrows(IllegalArgumentException.class, () -> factory.create("\"ab\\\"cd\"").decodeBase64String());
+
+    // an InputStream source, read fully upfront
+    final var big = new byte[4_096];
+    random.nextBytes(big);
+    final var doc = format("{\"data\":\"%s\"}", BASE64_ENCODER.encodeToString(big)).getBytes(StandardCharsets.US_ASCII);
+    final var ji = JsonIterator.parse(new ByteArrayInputStream(doc), 64);
+    assertArrayEquals(big, ji.skipUntil("data").decodeBase64String(), "seed=" + seed);
+  }
+
+  @Test
   void test_escapes_string() {
     var ji = factory.create("\"even" + "\\".repeat(42) + '"');
     assertEquals("even" + "\\".repeat(21), ji.readString());
@@ -73,6 +112,21 @@ final class TestString {
 
     ji = factory.create("\"odd\\\"\"");
     assertEquals("odd\"", ji.readString());
+
+    // escape codes are decoded, not just backslash-stripped
+    ji = factory.create("\"a\\tb\\nc\\rd\\fe\\bf\\/g\"");
+    assertEquals("a\tb\nc\rd\fe\bf/g", ji.readString());
+
+    // unicode escapes, including a surrogate pair
+    ji = factory.create("\"\\u4e2d\\u6587 \\ud83d\\ude0a \\u0041\"");
+    assertEquals("中文 😊 A", ji.readString());
+
+    // escapes reach the IOC char buffer identically
+    assertEquals("a\tb", factory.create("\"a\\tb\"").applyChars(String::new));
+
+    // a lone low surrogate and an unknown escape are rejected
+    assertThrows(JsonException.class, () -> factory.create("\"\\ude0a\"").readString());
+    assertThrows(RuntimeException.class, () -> factory.create("\"a\\xb\"").readString());
   }
 
   @Test
@@ -86,6 +140,24 @@ final class TestString {
   void test_utf8_string() {
     var ji = factory.create("\"中文\"");
     assertEquals("中文", ji.readString());
+  }
+
+  @Test
+  void test_long_utf8_strings() {
+    final var values = new String[]{
+        "日本語テスト日本語テスト", // no 0x80 / 0x5C bytes at all
+        "元野球部マネージャー❤︎…最高の夏をありがとう…", // 0x80 first appears mid-word (twitter.json)
+        "中文👊中文👊中文👊", // 4-byte sequences
+        "❤︎…" // short enough for the scalar path
+    };
+    for (final var value : values) {
+      for (int pad = 0; pad < 9; ++pad) {
+        final var padded = "a".repeat(pad) + value;
+        final var json = "{\"data\":\"" + padded + "\",\"want\":42}";
+        assertEquals(padded, factory.create(json).skipUntil("data").readString());
+        assertEquals(42, factory.create(json).skipUntil("want").readInt());
+      }
+    }
   }
 
   @Test
@@ -153,10 +225,6 @@ final class TestString {
 
   @Test
   void test_unicode_escape_positions() {
-    // CharsJsonIterator has never decoded \\uXXXX escapes; its escape handling
-    // only strips backslashes.
-    assumeTrue(factory != CharArray.INSTANCE && factory != IndexedCharArray.INSTANCE,
-        "CharsJsonIterator does not decode unicode escapes");
     for (int prefix = 0; prefix <= 70; prefix += 3) {
       final var pad = "x".repeat(prefix);
       final var json = '"' + pad + "\\u4e2d\\ud83d\\udc4a tail with ascii run afterwards 0123456789\"";

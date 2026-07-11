@@ -341,6 +341,11 @@ public final class InstantParser {
       nano = (nano << 3) + (nano << 1) + ind;
       nanoDigitCount++;
     }
+    if (nanoDigitCount > 9) {
+      // More digits than nanosecond precision would silently roll the excess
+      // into the seconds (or overflow the accumulator entirely).
+      throw throwDateTimeParseException("Invalid fraction ", buf, offset, len, i - offset);
+    }
     while (nanoDigitCount++ < 9) {
       nano = (nano << 3) + (nano << 1);
     }

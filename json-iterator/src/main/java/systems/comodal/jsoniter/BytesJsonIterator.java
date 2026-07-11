@@ -349,16 +349,29 @@ class BytesJsonIterator extends BaseJsonIterator {
     }
   }
 
+  /// Fallback when the value may contain escapes (e.g. "\/" — '/' is in the
+  /// base64 alphabet and some encoders escape it): parse() unescapes into
+  /// charBuf, then the chars narrow to the ascii the decoder needs.
+  private byte[] parseEscapedBase64String() {
+    final int len = parse();
+    final byte[] ascii = new byte[len];
+    for (int i = 0; i < len; ++i) {
+      ascii[i] = (byte) charBuf[i];
+    }
+    return Base64.getDecoder().decode(ascii);
+  }
+
   byte[] parseBase64String() {
     final int lanes = VectorSupport.BYTE_LANES;
-    final int from = head;
     int nextOffset = head + lanes;
     if (nextOffset > tail) {
-      final int len = parse();
-      return decodeBase64(buf, from, from + len);
+      return parseEscapedBase64String();
     }
     for (int i = head; ; ) {
       final var chunk = ByteVector.fromArray(VectorSupport.BYTE_SPECIES, buf, i);
+      if (chunk.eq(BACKSLASH).or(chunk.compare(VectorOperators.LT, (byte) 0)).anyTrue()) {
+        return parseEscapedBase64String();
+      }
       final var quoteMask = chunk.eq(QUOTE);
       if (quoteMask.anyTrue()) {
         i += Long.numberOfTrailingZeros(quoteMask.toLong());
@@ -529,11 +542,16 @@ class BytesJsonIterator extends BaseJsonIterator {
         return false;
       }
     }
-    if (i < tail && buf[i] == '"') {
+    if (i == tail) {
+      // The buffer ended exactly after the matched prefix: parse to report
+      // the incomplete string.
+      return parseFieldEqualsSlow(field);
+    }
+    if (buf[i] == '"') {
       head = i + 1;
       return true;
     }
-    // The name continues past the compared prefix, or the buffer ended.
+    // The name continues past the compared prefix.
     skipPastEndQuote();
     return false;
   }

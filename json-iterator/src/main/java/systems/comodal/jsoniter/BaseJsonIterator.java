@@ -106,25 +106,51 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
+  // Validated literal skips: the leading character has already been consumed
+  // and dispatched on, so these verify the remainder instead of blindly
+  // advancing past whatever follows.
   final void skipNull() {
-    if (head + 3 > tail || peekChar(head) != 'u' || peekChar(head + 1) != 'l' || peekChar(head + 2) != 'l') {
-      throw reportError("skipNull", "expected null");
+    if (head + 3 <= tail) {
+      if (peekChar(head) != 'u' || peekChar(head + 1) != 'l' || peekChar(head + 2) != 'l') {
+        throw reportError("skipNull", "expected null");
+      }
+      head += 3;
+    } else {
+      skipLiteral("ull", "skipNull", "expected null");
     }
-    head += 3;
   }
 
   final void skipTrue() {
-    if (head + 3 > tail || peekChar(head) != 'r' || peekChar(head + 1) != 'u' || peekChar(head + 2) != 'e') {
-      throw reportError("skipTrue", "expected true");
+    if (head + 3 <= tail) {
+      if (peekChar(head) != 'r' || peekChar(head + 1) != 'u' || peekChar(head + 2) != 'e') {
+        throw reportError("skipTrue", "expected true");
+      }
+      head += 3;
+    } else {
+      skipLiteral("rue", "skipTrue", "expected true");
     }
-    head += 3;
   }
 
   final void skipFalse() {
-    if (head + 4 > tail || peekChar(head) != 'a' || peekChar(head + 1) != 'l' || peekChar(head + 2) != 's' || peekChar(head + 3) != 'e') {
-      throw reportError("skipFalse", "expected false");
+    if (head + 4 <= tail) {
+      if (peekChar(head) != 'a' || peekChar(head + 1) != 'l' || peekChar(head + 2) != 's' || peekChar(head + 3) != 'e') {
+        throw reportError("skipFalse", "expected false");
+      }
+      head += 4;
+    } else {
+      skipLiteral("alse", "skipFalse", "expected false");
     }
-    head += 4;
+  }
+
+  /// The buffer ends inside the literal: consume and validate one character
+  /// at a time so truncation is reported as the invalid literal it is.
+  private void skipLiteral(final String remaining, final String context, final String expected) {
+    for (int i = 0, len = remaining.length(); i < len; ++i) {
+      if (head == tail || peekChar(head) != remaining.charAt(i)) {
+        throw reportError(context, expected);
+      }
+      ++head;
+    }
   }
 
   @Override
@@ -1089,6 +1115,8 @@ abstract class BaseJsonIterator implements JsonIterator {
         if (exponent < 0) {
           return reduceScale(unscaled, exponent);
         } else {
+          // Re-parse the digits with the widened scale, then restore the
+          // cursor to the end of the exponent.
           final int mark2 = head;
           head = mark;
           unscaled = readLongSlowPath(integer, scale + exponent);
