@@ -27,6 +27,8 @@ public class SyntheticBench {
   private byte[] stringsDoc;
   private byte[] longsDoc;
   private byte[] doublesDoc;
+  private byte[] rfcDatesDoc;
+  private byte[] isoDatesDoc;
   private JsonIterator jsonIterator;
   private IndexedJsonIterator jsonIter;
 
@@ -69,6 +71,19 @@ public class SyntheticBench {
       doubles.append(i).append('.').append(1 + (i % 997)).append("e-").append(i % 31);
     }
     doublesDoc = doubles.append(']').toString().getBytes(StandardCharsets.UTF_8);
+
+    final var rfcDates = new StringBuilder(1 << 17).append('[');
+    final var isoDates = new StringBuilder(1 << 17).append('[');
+    for (int i = 0; i < 2_000; ++i) {
+      if (i > 0) {
+        rfcDates.append(',');
+        isoDates.append(',');
+      }
+      rfcDates.append("\"Fri, 04 Oct 2019 16:2").append(i % 10).append(":36 GMT\"");
+      isoDates.append("\"2019-10-04T16:2").append(i % 10).append(":36.123456789Z\"");
+    }
+    rfcDatesDoc = rfcDates.append(']').toString().getBytes(StandardCharsets.UTF_8);
+    isoDatesDoc = isoDates.append(']').toString().getBytes(StandardCharsets.UTF_8);
 
     jsonIterator = JsonIterator.parse(skipDoc);
     jsonIter = IndexedJsonIterator.parse(skipDoc);
@@ -164,6 +179,26 @@ public class SyntheticBench {
     double sum = 0;
     while (ji.readArray()) {
       sum += ji.readDouble();
+    }
+    return sum;
+  }
+
+  @Benchmark
+  public long dates_rfc1123() {
+    final var ji = jsonIterator.reset(rfcDatesDoc);
+    long sum = 0;
+    while (ji.readArray()) {
+      sum += ji.readDateTime().getEpochSecond();
+    }
+    return sum;
+  }
+
+  @Benchmark
+  public long dates_iso() {
+    final var ji = jsonIterator.reset(isoDatesDoc);
+    long sum = 0;
+    while (ji.readArray()) {
+      sum += ji.readDateTime().getEpochSecond();
     }
     return sum;
   }

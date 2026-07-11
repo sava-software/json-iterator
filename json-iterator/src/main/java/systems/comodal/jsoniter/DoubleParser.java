@@ -11,10 +11,9 @@ import static systems.comodal.jsoniter.PowersOfFive.POWERS_OF_FIVE;
 
 /// Allocation-free decimal to binary64/binary32 conversion: the Clinger fast
 /// path for small exact values, otherwise the Eisel-Lemire algorithm described
-/// by Daniel Lemire in "Number Parsing at a Gigabyte per Second"
-/// (https://arxiv.org/abs/2101.11408). Per Mushtak & Lemire, "Fast Number
-/// Parsing Without Fallback" (https://arxiv.org/abs/2212.06644), the
-/// algorithm's product is always sufficiently accurate, so no correctness
+/// by Daniel Lemire in [Number Parsing at a Gigabyte per Second](https://arxiv.org/abs/2101.11408).
+/// Per Mushtak & Lemire, [Fast Number Parsing Without Fallback](https://arxiv.org/abs/2212.06644),
+/// the algorithm's product is always accurate enough, so no correctness
 /// fallback is required for the covered grammar.
 ///
 /// Floats are parsed with binary32-parameterized arithmetic rather than by
