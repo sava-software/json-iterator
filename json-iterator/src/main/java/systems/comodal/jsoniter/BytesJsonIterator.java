@@ -387,6 +387,17 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
+  double parse(final CharBufferToDoubleFunction applyChars) {
+    final int len = parse();
+    return applyChars.applyAsDouble(charBuf, 0, len);
+  }
+
+  @Override
+  double parseNumber(final CharBufferToDoubleFunction applyChars, final int len) {
+    return applyChars.applyAsDouble(charBuf, 0, len);
+  }
+
+  @Override
   <C> long parse(final C context, final ContextCharBufferToLongFunction<C> applyChars) {
     final int len = parse();
     return applyChars.applyAsLong(context, charBuf, 0, len);

@@ -5,6 +5,22 @@ public final class JIUtil {
   private JIUtil() {
   }
 
+  /// Parses a decimal number from the char buffer, matching
+  /// [Double#parseDouble(String)] exactly — including thrown
+  /// NumberFormatExceptions — but without allocating for the common JSON
+  /// number grammar (Eisel-Lemire; see [DoubleParser]).
+  public static double parseDouble(final char[] buf, final int offset, final int len) {
+    return DoubleParser.parse(buf, offset, len);
+  }
+
+  /// Parses a decimal number from the char buffer, matching
+  /// [Float#parseFloat(String)] exactly — including thrown
+  /// NumberFormatExceptions — but without allocating for the common JSON
+  /// number grammar (binary32-parameterized Eisel-Lemire; see [DoubleParser]).
+  public static float parseFloat(final char[] buf, final int offset, final int len) {
+    return DoubleParser.parseFloat(buf, offset, len);
+  }
+
   public static int fieldHashCode(final char[] value, int from, final int to) {
     int h = 0;
     while (from < to) {

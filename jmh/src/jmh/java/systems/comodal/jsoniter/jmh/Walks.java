@@ -2,7 +2,9 @@ package systems.comodal.jsoniter.jmh;
 
 import org.simdjson.JsonValue;
 import systems.comodal.jsoniter.CharBufferToIntFunction;
+import systems.comodal.jsoniter.CharBufferToLongFunction;
 import systems.comodal.jsoniter.ContextFieldBufferPredicate;
+import systems.comodal.jsoniter.JIUtil;
 import systems.comodal.jsoniter.JsonIterator;
 
 /// Shared exhaustive-walk workloads: touch every field name and value,
@@ -15,6 +17,25 @@ import systems.comodal.jsoniter.JsonIterator;
 final class Walks {
 
   private static final CharBufferToIntFunction LENGTH = (buf, offset, len) -> len;
+
+  private static final CharBufferToLongFunction NUMBER_CHECKSUM = (buf, offset, len) -> {
+    for (int i = offset, to = offset + len; i < to; ++i) {
+      final char c = buf[i];
+      if (c == '.' || c == 'e' || c == 'E') {
+        return (long) JIUtil.parseDouble(buf, offset, len);
+      }
+    }
+    int i = offset;
+    final boolean negative = buf[i] == '-';
+    if (negative) {
+      ++i;
+    }
+    long value = 0;
+    for (final int to = offset + len; i < to; ++i) {
+      value = value * 10 + (buf[i] - '0');
+    }
+    return negative ? -value : value;
+  };
 
   private static final ContextFieldBufferPredicate<long[]> FIELD_WALKER = (sum, buf, offset, len, ji) -> {
     sum[0] += len + walk(ji);
@@ -39,7 +60,7 @@ final class Walks {
         yield sum;
       }
       case STRING -> ji.applyCharsAsInt(LENGTH);
-      case NUMBER -> number(ji.readNumberAsString());
+      case NUMBER -> ji.applyNumberCharsAsLong(NUMBER_CHECKSUM);
       case BOOLEAN -> ji.readBoolean() ? 1 : 0;
       case NULL -> {
         ji.skip();
@@ -76,13 +97,4 @@ final class Walks {
     }
   }
 
-  static long number(final String number) {
-    for (int i = 0; i < number.length(); ++i) {
-      final char c = number.charAt(i);
-      if (c == '.' || c == 'e' || c == 'E') {
-        return (long) Double.parseDouble(number);
-      }
-    }
-    return Long.parseLong(number);
-  }
 }

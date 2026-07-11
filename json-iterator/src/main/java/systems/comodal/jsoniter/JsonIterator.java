@@ -330,6 +330,10 @@ public interface JsonIterator {
 
   long applyCharsAsLong(final CharBufferToLongFunction applyChars);
 
+  double applyCharsAsDouble(final CharBufferToDoubleFunction applyChars);
+
+  double applyNumberCharsAsDouble(final CharBufferToDoubleFunction applyChars);
+
   <C> long applyCharsAsLong(final C context, final ContextCharBufferToLongFunction<C> applyChars);
 
   long applyNumberCharsAsLong(final CharBufferToLongFunction applyChars);

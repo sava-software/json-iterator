@@ -26,6 +26,7 @@ public class SyntheticBench {
   private byte[] skipDoc;
   private byte[] stringsDoc;
   private byte[] longsDoc;
+  private byte[] doublesDoc;
   private JsonIterator jsonIterator;
   private IndexedJsonIterator jsonIter;
 
@@ -60,6 +61,15 @@ public class SyntheticBench {
     }
     longsDoc = longs.append(']').toString().getBytes(StandardCharsets.UTF_8);
 
+    final var doubles = new StringBuilder(1 << 16).append('[');
+    for (int i = 0; i < 2_000; ++i) {
+      if (i > 0) {
+        doubles.append(',');
+      }
+      doubles.append(i).append('.').append(1 + (i % 997)).append("e-").append(i % 31);
+    }
+    doublesDoc = doubles.append(']').toString().getBytes(StandardCharsets.UTF_8);
+
     jsonIterator = JsonIterator.parse(skipDoc);
     jsonIter = IndexedJsonIterator.parse(skipDoc);
 
@@ -67,6 +77,7 @@ public class SyntheticBench {
     check(longStrings_read_jsonIterator(), longStrings_read_jsonIter());
     check(longStrings_apply_jsonIterator(), longStrings_read_jsonIter());
     check(bigLongs_jsonIterator(), bigLongs_jsonIter());
+    check(Double.doubleToLongBits(doubles_jsonIterator()), Double.doubleToLongBits(doubles_indexed()));
   }
 
   private static void check(final long a, final long b) {
@@ -133,6 +144,26 @@ public class SyntheticBench {
     long sum = 0;
     while (ji.readArray()) {
       sum += ji.readLong();
+    }
+    return sum;
+  }
+
+  @Benchmark
+  public double doubles_jsonIterator() {
+    final var ji = jsonIterator.reset(doublesDoc);
+    double sum = 0;
+    while (ji.readArray()) {
+      sum += ji.readDouble();
+    }
+    return sum;
+  }
+
+  @Benchmark
+  public double doubles_indexed() {
+    final var ji = jsonIter.reset(doublesDoc);
+    double sum = 0;
+    while (ji.readArray()) {
+      sum += ji.readDouble();
     }
     return sum;
   }

@@ -915,18 +915,61 @@ abstract class BaseJsonIterator implements JsonIterator {
   abstract <C, R> R apply(final C context, final ContextFieldBufferFunction<C, R> fieldBufferFunction, final int offset, final int len);
 
   @Override
+  public final double applyCharsAsDouble(final CharBufferToDoubleFunction applyChars) {
+    final char c = nextToken();
+    if (c == '"') {
+      return parse(applyChars);
+    } else if (c == 'n') {
+      skip(3);
+      return applyChars.applyAsDouble(EMPTY_CHARS, 0, 0);
+    } else {
+      throw reportError("applyCharsAsDouble", "expected string or null, but " + c);
+    }
+  }
+
+  abstract double parse(final CharBufferToDoubleFunction applyChars);
+
+  @Override
+  public final double applyNumberCharsAsDouble(final CharBufferToDoubleFunction applyChars) {
+    return parseNumber(applyChars, parseNumber());
+  }
+
+  abstract double parseNumber(final CharBufferToDoubleFunction applyChars, final int len);
+
+  private static final CharBufferToDoubleFunction READ_DOUBLE_FUNCTION = DoubleParser::parse;
+
+  @Override
   public final double readDouble() {
     try {
-      return Double.parseDouble(readNumberOrNumberString());
+      final var valueType = whatIsNext();
+      if (valueType == NUMBER) {
+        return applyNumberCharsAsDouble(READ_DOUBLE_FUNCTION);
+      } else if (valueType == STRING) {
+        return applyCharsAsDouble(READ_DOUBLE_FUNCTION);
+      } else {
+        throw reportError("readDouble", "Must be a number or string but found " + valueType);
+      }
     } catch (final NumberFormatException e) {
       throw reportError("readDouble", e.toString());
     }
   }
 
+  // A float widens to double losslessly, so readFloat shares the double-valued
+  // IOC plumbing; the parse itself is binary32-parameterized because narrowing
+  // a parsed double would double-round.
+  private static final CharBufferToDoubleFunction READ_FLOAT_FUNCTION = DoubleParser::parseFloat;
+
   @Override
   public final float readFloat() {
     try {
-      return Float.parseFloat(readNumberOrNumberString());
+      final var valueType = whatIsNext();
+      if (valueType == NUMBER) {
+        return (float) applyNumberCharsAsDouble(READ_FLOAT_FUNCTION);
+      } else if (valueType == STRING) {
+        return (float) applyCharsAsDouble(READ_FLOAT_FUNCTION);
+      } else {
+        throw reportError("readFloat", "Must be a number or string but found " + valueType);
+      }
     } catch (final NumberFormatException e) {
       throw reportError("readFloat", e.toString());
     }
