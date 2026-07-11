@@ -3,22 +3,19 @@ package systems.comodal.jsoniter;
 final class IndexedBytesJsonIterator extends BytesJsonIterator implements IndexedJsonIterator {
 
   private final StructuralIndex index;
-  private final boolean validateUtf8;
+  private final Utf8Validator utf8;
   private int[] tokens;
   private int pos;
 
   IndexedBytesJsonIterator(final byte[] buf, final int head, final int tail, final boolean validateUtf8) {
     super(buf, head, tail);
     this.index = new StructuralIndex();
-    this.validateUtf8 = validateUtf8;
+    this.utf8 = validateUtf8 ? new Utf8Validator() : null;
     index(buf, head, tail);
   }
 
   private void index(final byte[] buf, final int from, final int to) {
-    if (validateUtf8) {
-      Utf8Validator.validate(buf, from, to);
-    }
-    index.index(buf, from, to);
+    index.index(buf, from, to, utf8);
     this.tokens = index.indexes();
     this.pos = 0;
   }

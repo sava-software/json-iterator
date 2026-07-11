@@ -43,6 +43,7 @@ public class SolanaBlockBench {
   private byte[] json;
   private JsonIterator jsonIterator;
   private IndexedJsonIterator jsonIndexed;
+  private IndexedJsonIterator jsonIndexedValidating;
   private SimdJsonParser simdParser;
 
   @Setup
@@ -54,6 +55,7 @@ public class SolanaBlockBench {
     }
     jsonIterator = JsonIterator.parse(json);
     jsonIndexed = IndexedJsonIterator.parse(json);
+    jsonIndexedValidating = IndexedJsonIterator.parseValidating(json);
     simdParser = new SimdJsonParser(json.length + 1_024, 1_024);
 
     check(fullWalk_jsonIterator(), fullWalk_jsonIndexed(), fullWalk_simdjson());
@@ -72,6 +74,11 @@ public class SolanaBlockBench {
   @Benchmark
   public Object parseOnly_jsonIndexed() {
     return jsonIndexed.reset(json);
+  }
+
+  @Benchmark
+  public Object parseOnlyValidating_jsonIndexed() {
+    return jsonIndexedValidating.reset(json);
   }
 
   @Benchmark

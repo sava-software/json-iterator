@@ -18,9 +18,11 @@ import static systems.comodal.jsoniter.VectorSupport.*;
 /// sequences are then cross-checked by comparing bytes two and three back
 /// against the minimum leading byte values.
 ///
-/// The tail is loaded with a range mask, zero-filling the unused lanes; the
-/// ASCII zeros terminate any trailing incomplete sequence, which is then
-/// reported through the incomplete-check accumulator.
+/// Stateful, one instance per iterator: [#check(ByteVector)] is invoked by
+/// [StructuralIndex] on each chunk it has already loaded, fusing validation
+/// into stage 1 in a single pass, as simdjson's json_structural_indexer does.
+/// The indexer's space-padded final block terminates any trailing incomplete
+/// sequence, which [#finish()] then reports via the incomplete accumulator.
 final class Utf8Validator {
 
   // The leading byte isn't followed by a continuation byte, e.g. 11______ 0_______.
@@ -53,67 +55,68 @@ final class Utf8Validator {
   private static final ByteVector INCOMPLETE_CHECK = createIncompleteCheck();
   private static final VectorShuffle<Integer> FOUR_BYTES_FORWARD_SHIFT = VectorShuffle.iota(INT_SPECIES, INT_SPECIES.length() - 1, 1, true);
 
-  private Utf8Validator() {
+  private long incomplete;
+  private long errors;
+  private int previousFourUtf8Bytes;
+
+  Utf8Validator() {
   }
 
-  /// Validates `buf[from, to)`.
-  static void validate(final byte[] buf, final int from, final int to) {
-    long previousIncomplete = 0;
-    long errors = 0;
-    int previousFourUtf8Bytes = 0;
-    // The final iteration loads with a range mask (zero-filling past `to`), and
-    // always runs so trailing incomplete sequences surface via previousIncomplete.
-    final int loopBound = from + BYTE_SPECIES.loopBound(to - from);
-    for (int offset = from; offset <= loopBound; offset += BYTE_LANES) {
-      final var chunk = offset < loopBound
-          ? ByteVector.fromArray(BYTE_SPECIES, buf, offset)
-          : ByteVector.fromArray(BYTE_SPECIES, buf, offset, BYTE_SPECIES.indexInRange(offset, to));
-      final var chunkAsInts = chunk.reinterpretAsInts();
-      // The ASCII fast path bypasses the multibyte classification.
-      if (chunk.and(ALL_ASCII_MASK).compare(EQ, 0).allTrue()) {
-        errors |= previousIncomplete;
-      } else {
-        previousIncomplete = chunk.compare(UGE, INCOMPLETE_CHECK).toLong();
-        // Rotate the int lanes forward by one and pull in the previous chunk's
-        // last int, giving access to the previous four bytes via int shifts,
-        // which are cheaper than byte-wise slice/shuffle operations.
-        final var chunkWithPreviousFourBytes = chunkAsInts
-            .rearrange(FOUR_BYTES_FORWARD_SHIFT)
-            .withLane(0, previousFourUtf8Bytes);
-        final var previousOneByte = chunkAsInts
-            .lanewise(LSHL, Byte.SIZE)
-            .or(chunkWithPreviousFourBytes.lanewise(LSHR, THREE_BYTES_SIZE))
-            .reinterpretAsBytes();
-        final var byte2HighNibbles = chunkAsInts.lanewise(LSHR, 4)
-            .reinterpretAsBytes()
-            .and(LOW_NIBBLE_MASK);
-        final var byte1HighNibbles = previousOneByte.reinterpretAsInts()
-            .lanewise(LSHR, 4)
-            .reinterpretAsBytes()
-            .and(LOW_NIBBLE_MASK);
-        final var byte1LowNibbles = previousOneByte.and(LOW_NIBBLE_MASK);
-        final var firstCheck = byte1HighNibbles.selectFrom(BYTE_1_HIGH_LOOKUP)
-            .and(byte1LowNibbles.selectFrom(BYTE_1_LOW_LOOKUP))
-            .and(byte2HighNibbles.selectFrom(BYTE_2_HIGH_LOOKUP));
-        // The remaining checks validate 3 and 4-byte sequences: firstCheck holds
-        // 0x80 at continuation positions, which the leading bytes of 3 and
-        // 4-byte sequences must zero out.
-        final var previousTwoBytes = chunkAsInts
-            .lanewise(LSHL, TWO_BYTES_SIZE)
-            .or(chunkWithPreviousFourBytes.lanewise(LSHR, TWO_BYTES_SIZE))
-            .reinterpretAsBytes();
-        final var is3ByteLead = previousTwoBytes.compare(UGT, MAX_2_LEADING_BYTE);
-        final var previousThreeBytes = chunkAsInts
-            .lanewise(LSHL, THREE_BYTES_SIZE)
-            .or(chunkWithPreviousFourBytes.lanewise(LSHR, Byte.SIZE))
-            .reinterpretAsBytes();
-        final var is4ByteLead = previousThreeBytes.compare(UGT, MAX_3_LEADING_BYTE);
-        final var secondCheck = firstCheck.add((byte) 0x80, is3ByteLead.or(is4ByteLead));
-        errors |= secondCheck.compare(NE, 0).toLong();
-      }
-      previousFourUtf8Bytes = chunkAsInts.lane(INT_SPECIES.length() - 1);
+  void reset() {
+    incomplete = 0;
+    errors = 0;
+    previousFourUtf8Bytes = 0;
+  }
+
+  void check(final ByteVector chunk) {
+    final var chunkAsInts = chunk.reinterpretAsInts();
+    // The ASCII fast path bypasses the multibyte classification.
+    if (chunk.and(ALL_ASCII_MASK).compare(EQ, 0).allTrue()) {
+      errors |= incomplete;
+    } else {
+      incomplete = chunk.compare(UGE, INCOMPLETE_CHECK).toLong();
+      // Rotate the int lanes forward by one and pull in the previous chunk's
+      // last int, giving access to the previous four bytes via int shifts,
+      // which are cheaper than byte-wise slice/shuffle operations.
+      final var chunkWithPreviousFourBytes = chunkAsInts
+          .rearrange(FOUR_BYTES_FORWARD_SHIFT)
+          .withLane(0, previousFourUtf8Bytes);
+      final var previousOneByte = chunkAsInts
+          .lanewise(LSHL, Byte.SIZE)
+          .or(chunkWithPreviousFourBytes.lanewise(LSHR, THREE_BYTES_SIZE))
+          .reinterpretAsBytes();
+      final var byte2HighNibbles = chunkAsInts.lanewise(LSHR, 4)
+          .reinterpretAsBytes()
+          .and(LOW_NIBBLE_MASK);
+      final var byte1HighNibbles = previousOneByte.reinterpretAsInts()
+          .lanewise(LSHR, 4)
+          .reinterpretAsBytes()
+          .and(LOW_NIBBLE_MASK);
+      final var byte1LowNibbles = previousOneByte.and(LOW_NIBBLE_MASK);
+      final var firstCheck = byte1HighNibbles.selectFrom(BYTE_1_HIGH_LOOKUP)
+          .and(byte1LowNibbles.selectFrom(BYTE_1_LOW_LOOKUP))
+          .and(byte2HighNibbles.selectFrom(BYTE_2_HIGH_LOOKUP));
+      // The remaining checks validate 3 and 4-byte sequences: firstCheck holds
+      // 0x80 at continuation positions, which the leading bytes of 3 and
+      // 4-byte sequences must zero out.
+      final var previousTwoBytes = chunkAsInts
+          .lanewise(LSHL, TWO_BYTES_SIZE)
+          .or(chunkWithPreviousFourBytes.lanewise(LSHR, TWO_BYTES_SIZE))
+          .reinterpretAsBytes();
+      final var is3ByteLead = previousTwoBytes.compare(UGT, MAX_2_LEADING_BYTE);
+      final var previousThreeBytes = chunkAsInts
+          .lanewise(LSHL, THREE_BYTES_SIZE)
+          .or(chunkWithPreviousFourBytes.lanewise(LSHR, Byte.SIZE))
+          .reinterpretAsBytes();
+      final var is4ByteLead = previousThreeBytes.compare(UGT, MAX_3_LEADING_BYTE);
+      final var secondCheck = firstCheck.add((byte) 0x80, is3ByteLead.or(is4ByteLead));
+      errors |= secondCheck.compare(NE, 0).toLong();
     }
-    if ((errors | previousIncomplete) != 0) {
+    previousFourUtf8Bytes = chunkAsInts.lane(INT_SPECIES.length() - 1);
+  }
+
+  void finish() {
+    if ((errors | incomplete) != 0) {
       throw new JsonException("Invalid UTF-8 input.");
     }
   }

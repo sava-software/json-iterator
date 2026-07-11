@@ -52,6 +52,8 @@ final class StructuralIndex {
   private final byte[] lastByteBlock = new byte[BLOCK];
   private final char[] lastCharBlock = new char[BLOCK];
 
+  private Utf8Validator utf8;
+
   private int[] indexes = new int[256];
   private int count;
   // carries across blocks
@@ -64,23 +66,45 @@ final class StructuralIndex {
     return indexes;
   }
 
-  int count() {
-    return count;
+  void index(final byte[] buf, final int from, final int to) {
+    index(buf, from, to, null);
   }
 
-  void index(final byte[] buf, final int from, final int to) {
+  /// When `utf8` is non-null, UTF-8 validation is fused into this single pass:
+  /// the checker sees every chunk the scan loads, and the space-padded final
+  /// block terminates any trailing incomplete sequence.
+  void index(final byte[] buf, final int from, final int to, final Utf8Validator utf8) {
+    this.utf8 = utf8;
     begin(to - from);
+    final boolean validate = utf8 != null;
+    if (validate) {
+      utf8.reset();
+    }
     int offset = from;
     int last = from;
-    for (; offset + BLOCK <= to; offset += BLOCK) {
-      byteBlock(buf, offset, offset);
-      last = offset;
+    if (validate) {
+      for (; offset + BLOCK <= to; offset += BLOCK) {
+        byteBlockValidating(buf, offset, offset);
+        last = offset;
+      }
+    } else {
+      for (; offset + BLOCK <= to; offset += BLOCK) {
+        byteBlock(buf, offset, offset);
+        last = offset;
+      }
     }
     if (offset < to) {
       Arrays.fill(lastByteBlock, (byte) ' ');
       System.arraycopy(buf, offset, lastByteBlock, 0, to - offset);
-      byteBlock(lastByteBlock, 0, offset);
+      if (validate) {
+        byteBlockValidating(lastByteBlock, 0, offset);
+      } else {
+        byteBlock(lastByteBlock, 0, offset);
+      }
       last = offset;
+    }
+    if (validate) {
+      utf8.finish();
     }
     finish(last, to);
   }
@@ -121,6 +145,24 @@ final class StructuralIndex {
     long backslash = 0, quote = 0, whitespace = 0, op = 0;
     for (int o = srcOffset, shift = 0; shift < BLOCK; o += lanes, shift += lanes) {
       final var chunk = ByteVector.fromArray(species, src, o);
+      backslash |= chunk.eq(BACKSLASH).toLong() << shift;
+      quote |= chunk.eq(QUOTE).toLong() << shift;
+      final VectorShuffle<Byte> lowNibbles = chunk.and(LOW_NIBBLE_MASK).toShuffle();
+      whitespace |= chunk.eq(WHITESPACE_TABLE.rearrange(lowNibbles)).toLong() << shift;
+      op |= chunk.or((byte) 0x20).eq(OP_TABLE.rearrange(lowNibbles)).toLong() << shift;
+    }
+    block(blockStart, backslash, quote, whitespace, op);
+  }
+
+  /// [#byteBlock(byte[],int,int)] with the UTF-8 checker fused in; kept as a
+  /// separate loop so the non-validating scan pays nothing for the feature.
+  private void byteBlockValidating(final byte[] src, final int srcOffset, final int blockStart) {
+    final var species = VectorSupport.BYTE_SPECIES;
+    final int lanes = VectorSupport.BYTE_LANES;
+    long backslash = 0, quote = 0, whitespace = 0, op = 0;
+    for (int o = srcOffset, shift = 0; shift < BLOCK; o += lanes, shift += lanes) {
+      final var chunk = ByteVector.fromArray(species, src, o);
+      utf8.check(chunk);
       backslash |= chunk.eq(BACKSLASH).toLong() << shift;
       quote |= chunk.eq(QUOTE).toLong() << shift;
       final VectorShuffle<Byte> lowNibbles = chunk.and(LOW_NIBBLE_MASK).toShuffle();

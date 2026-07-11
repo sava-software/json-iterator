@@ -106,6 +106,11 @@ final class TestIndexedJsonIterator {
     assertThrows(JsonException.class, () -> IndexedJsonIterator.parseValidating(utf8Doc((byte) 0xE4, (byte) 0xB8)));
     // truncated sequence at the very end of the input
     assertThrows(JsonException.class, () -> IndexedJsonIterator.parseValidating(new byte[]{'"', 'x', '"', ' ', (byte) 0xE4, (byte) 0xB8}));
+    // truncated sequence ending exactly on a 64-byte block boundary
+    final var exactBlock = ("\"" + "x".repeat(60) + "\" ").getBytes(); // 63 bytes
+    final var truncated = java.util.Arrays.copyOf(exactBlock, 64);
+    truncated[63] = (byte) 0xE4;
+    assertThrows(JsonException.class, () -> IndexedJsonIterator.parseValidating(truncated));
     // validation persists across reuse
     final var ji = IndexedJsonIterator.parseValidating("{\"a\":1}".getBytes());
     assertThrows(JsonException.class, () -> ji.reset(utf8Doc((byte) 0x80)));
