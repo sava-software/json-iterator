@@ -113,6 +113,54 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
+  // Validated literal skips: the leading character has already been consumed
+  // and dispatched on, so these verify the remainder instead of blindly
+  // advancing past whatever follows.
+
+  final void skipNull() {
+    if (head + 3 <= tail) {
+      if (peekChar(head) != 'u' || peekChar(head + 1) != 'l' || peekChar(head + 2) != 'l') {
+        throw reportError("skipNull", "expected null");
+      }
+      head += 3;
+    } else {
+      skipLiteral("ull", "skipNull", "expected null");
+    }
+  }
+
+  final void skipTrue() {
+    if (head + 3 <= tail) {
+      if (peekChar(head) != 'r' || peekChar(head + 1) != 'u' || peekChar(head + 2) != 'e') {
+        throw reportError("skipTrue", "expected true");
+      }
+      head += 3;
+    } else {
+      skipLiteral("rue", "skipTrue", "expected true");
+    }
+  }
+
+  final void skipFalse() {
+    if (head + 4 <= tail) {
+      if (peekChar(head) != 'a' || peekChar(head + 1) != 'l' || peekChar(head + 2) != 's' || peekChar(head + 3) != 'e') {
+        throw reportError("skipFalse", "expected false");
+      }
+      head += 4;
+    } else {
+      skipLiteral("alse", "skipFalse", "expected false");
+    }
+  }
+
+  /// The literal may straddle a buffered stream refill, so consume and
+  /// validate one character at a time.
+  private void skipLiteral(final String remaining, final String context, final String expected) {
+    for (int i = 0, len = remaining.length(); i < len; ++i) {
+      if ((head == tail && !loadMore()) || peekChar(head) != remaining.charAt(i)) {
+        throw reportError(context, expected);
+      }
+      ++head;
+    }
+  }
+
   @Override
   public final JsonIterator openArray() {
     final char c = nextToken();
@@ -149,7 +197,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       return parseString();
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return null;
     } else {
       throw reportError("readString", "expected string or null, but " + c);
@@ -182,7 +230,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       return parse(applyChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return null;
     } else {
       throw reportError("applyChars", "expected string or null, but " + c);
@@ -197,7 +245,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       return parse(context, applyChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return null;
     } else {
       throw reportError("applyChars", "expected string or null, but " + c);
@@ -212,7 +260,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       return parse(applyChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return applyChars.applyAsInt(new char[0], 0, 0);
     } else {
       throw reportError("applyCharsAsInt", "expected string or null, but " + c);
@@ -227,7 +275,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       return parse(context, applyChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return applyChars.applyAsInt(context, new char[0], 0, 0);
     } else {
       throw reportError("applyCharsAsInt", "expected string or null, but " + c);
@@ -242,7 +290,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       return parse(applyChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return applyChars.applyAsLong(new char[0], 0, 0);
     } else {
       throw reportError("applyCharsAsLong", "expected string or null, but " + c);
@@ -257,7 +305,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       return parse(context, applyChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return applyChars.applyAsLong(context, new char[0], 0, 0);
     } else {
       throw reportError("applyCharsAsLong", "expected string or null, but " + c);
@@ -272,7 +320,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       return parse(testChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return false;
     } else {
       throw reportError("testChars", "expected string or null, but " + c);
@@ -287,7 +335,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       return parse(context, testChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return false;
     } else {
       throw reportError("testChars", "expected string or null, but " + c);
@@ -302,7 +350,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       parse(testChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
     } else {
       throw reportError("consumeChars", "expected string or null, but " + c);
     }
@@ -316,7 +364,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     if (c == '"') {
       parse(context, testChars);
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
     } else {
       throw reportError("consumeChars", "expected string or null, but " + c);
     }
@@ -404,7 +452,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') {
       return false; // end of object
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return false;
     } else {
       throw reportError("testObjField", "expected [\\{\\}n], but found: " + c);
@@ -444,7 +492,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return null; // end of object
     } else if (c == 'n') {
       final var result = applyChars.apply(new char[0], 0, 0);
-      skip(3);
+      skipNull();
       return result;
     } else {
       throw reportError("applyObjField", "expected [\\{\\}n], but found: " + c);
@@ -484,7 +532,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return terminalSentinel; // end of object
     } else if (c == 'n') {
       final var result = applyChars.applyAsInt(new char[0], 0, 0);
-      skip(3); // null
+      skipNull();
       return result;
     } else {
       throw reportError("applyObjFieldAsInt", "expected [\\{\\}n], but found: " + c);
@@ -524,7 +572,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return terminalSentinel; // end of object
     } else if (c == 'n') {
       final var result = applyChars.applyAsInt(context, new char[0], 0, 0);
-      skip(3); // null
+      skipNull();
       return result;
     } else {
       throw reportError("applyObjFieldAsInt", "expected [\\{\\}n], but found: " + c);
@@ -564,7 +612,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return terminalSentinel; // end of object
     } else if (c == 'n') {
       final var result = applyChars.applyAsLong(new char[0], 0, 0);
-      skip(3); // null
+      skipNull();
       return result;
     } else {
       throw reportError("applyObjFieldAsLong", "expected [\\{\\}n], but found: " + c);
@@ -604,7 +652,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return terminalSentinel; // end of object
     } else if (c == 'n') {
       final var result = applyChars.applyAsLong(context, new char[0], 0, 0);
-      skip(3); // null
+      skipNull();
       return result;
     } else {
       throw reportError("applyObjFieldAsLong", "expected [\\{\\}n], but found: " + c);
@@ -647,7 +695,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') {
       return null; // end of object
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return null;
     } else {
       throw reportError("readObjField", "expected [\\{\\}n], but found: " + c);
@@ -685,7 +733,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') { // end of object
       return null;
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return null;
     } else {
       throw reportError("skipObjField", "expected [,{}n], but found: " + c);
@@ -737,7 +785,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       } else if (c == '}') {
         return;
       } else if (c == 'n') {
-        skip(3);
+        skipNull();
         return;
       } else {
         throw reportError("testObject", "expected [,{}n], but found: " + c);
@@ -781,7 +829,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       } else if (c == '}') {
         return context;
       } else if (c == 'n') {
-        skip(3);
+        skipNull();
         return context;
       } else {
         throw reportError("testObject", "expected [,{}n], but found: " + c);
@@ -828,7 +876,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       } else if (c == '}') {
         return context;
       } else if (c == 'n') {
-        skip(3);
+        skipNull();
         return context;
       } else {
         throw reportError("testObject", "expected [,{}n], but found: " + c);
@@ -875,7 +923,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') {
       return null;
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return null;
     } else {
       throw reportError("applyObject", "expected [,{}n], but found: " + c);
@@ -918,7 +966,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == '}') {
       return null;
     } else if (c == 'n') {
-      skip(3);
+      skipNull();
       return null;
     } else {
       throw reportError("applyObject", "expected [,{}n], but found: " + c);
@@ -1255,8 +1303,9 @@ abstract class BaseJsonIterator implements JsonIterator {
     switch (c) {
       case '"' -> skipPastEndQuote();
       case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> skipUntilBreak();
-      case 't', 'n' -> skip(3); // true or null
-      case 'f' -> skip(4); // false
+      case 't' -> skipTrue();
+      case 'n' -> skipNull();
+      case 'f' -> skipFalse();
       case '[' -> skipArray();
       case '{' -> skipObject();
       default -> throw reportError("skip", "Cannot skip: " + c);
@@ -1268,7 +1317,8 @@ abstract class BaseJsonIterator implements JsonIterator {
   public final boolean readNull() {
     final char c = peekToken();
     if (c == 'n') {
-      skip(4); // null
+      ++head; // 'n'
+      skipNull();
       return true;
     } else {
       return false;
@@ -1279,10 +1329,10 @@ abstract class BaseJsonIterator implements JsonIterator {
   public final boolean readBoolean() {
     final char c = nextToken();
     if (c == 't') {
-      skip(3); // true
+      skipTrue();
       return true;
     } else if (c == 'f') {
-      skip(4); // false
+      skipFalse();
       return false;
     } else {
       throw reportError("readBoolean", "expected t or f, found: " + c);
@@ -1527,7 +1577,7 @@ abstract class BaseJsonIterator implements JsonIterator {
     } else if (c == ']') {
       return false;
     } else if (c == 'n') {
-      skip(3); // null
+      skipNull();
       return false;
     } else {
       throw reportError("readArray", "expected [ or , or n or ], but found: " + c);

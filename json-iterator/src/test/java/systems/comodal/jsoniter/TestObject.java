@@ -93,13 +93,9 @@ final class TestObject {
     assertNull(factory.create(TRICKY_FIELDS_JSON).skipUntil("wa"));
     assertNull(factory.create(TRICKY_FIELDS_JSON).skipUntil("wants"));
 
-    // Escape codes are decoded on byte sources; the char[] path only strips
-    // the backslash (pre-existing: "\t" unescapes to 't', not a tab), so
-    // code-escaped names only match on byte sources.
+    // code-escaped names decode identically on every source type
     final var tabJson = "{\"a\\tb\":1,\"c\":2}";
-    if (factory != systems.comodal.jsoniter.factories.CharArray.INSTANCE) {
-      assertEquals(1, factory.create(tabJson).skipUntil("a\tb").readInt());
-    }
+    assertEquals(1, factory.create(tabJson).skipUntil("a\tb").readInt());
     assertEquals(2, factory.create(tabJson).skipUntil("c").readInt());
   }
 

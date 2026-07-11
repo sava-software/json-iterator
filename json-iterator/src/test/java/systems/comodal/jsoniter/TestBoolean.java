@@ -5,6 +5,9 @@ import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @ParameterizedClass
@@ -46,5 +49,34 @@ final class TestBoolean {
     assertTrue(factory.create("null").readNull());
     assertFalse(factory.create("true").readNull());
     assertFalse(factory.create("false").readNull());
+  }
+
+  @Test
+  void test_invalid_literals() {
+    assertThrows(JsonException.class, () -> factory.create("trux").readBoolean());
+    assertThrows(JsonException.class, () -> factory.create("tru").readBoolean());
+    assertThrows(JsonException.class, () -> factory.create("falsy").readBoolean());
+    assertThrows(JsonException.class, () -> factory.create("fals").readBoolean());
+    assertThrows(JsonException.class, () -> factory.create("nul").readNull());
+    assertThrows(JsonException.class, () -> factory.create("nulL").readString());
+    assertThrows(JsonException.class, () -> factory.create("[tru]").openArray().skip());
+    assertThrows(JsonException.class, () -> factory.create("[nell]").openArray().skip());
+    assertThrows(JsonException.class, () -> factory.create("[folse]").openArray().skip());
+  }
+
+  @Test
+  void test_literals_across_buffer_boundaries() {
+    // walks the stream refill boundary across every position, so each literal
+    // is split at every point, both when read and when skipped over
+    final var bytes = "{\"a\":true,\"b\":false,\"c\":null,\"want\":1}".getBytes(StandardCharsets.US_ASCII);
+    for (int bufSize = 4; bufSize <= bytes.length; ++bufSize) {
+      var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), bufSize);
+      assertEquals(1, ji.skipUntil("want").readInt(), "bufSize=" + bufSize);
+
+      ji = JsonIterator.parse(new ByteArrayInputStream(bytes), bufSize);
+      assertTrue(ji.skipUntil("a").readBoolean(), "bufSize=" + bufSize);
+      assertFalse(ji.skipUntil("b").readBoolean(), "bufSize=" + bufSize);
+      assertTrue(ji.skipUntil("c").readNull(), "bufSize=" + bufSize);
+    }
   }
 }

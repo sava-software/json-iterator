@@ -102,6 +102,21 @@ final class TestString {
 
     ji = factory.create("\"odd\\\"\"");
     assertEquals("odd\"", ji.readString());
+
+    // escape codes are decoded, not just backslash-stripped
+    ji = factory.create("\"a\\tb\\nc\\rd\\fe\\bf\\/g\"");
+    assertEquals("a\tb\nc\rd\fe\bf/g", ji.readString());
+
+    // unicode escapes, including a surrogate pair
+    ji = factory.create("\"\\u4e2d\\u6587 \\ud83d\\ude0a \\u0041\"");
+    assertEquals("中文 😊 A", ji.readString());
+
+    // escapes reach the IOC char buffer identically
+    assertEquals("a\tb", factory.create("\"a\\tb\"").applyChars(String::new));
+
+    // a lone low surrogate and an unknown escape are rejected
+    assertThrows(JsonException.class, () -> factory.create("\"\\ude0a\"").readString());
+    assertThrows(RuntimeException.class, () -> factory.create("\"a\\xb\"").readString());
   }
 
   @Test
