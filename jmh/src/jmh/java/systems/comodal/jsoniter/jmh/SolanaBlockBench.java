@@ -42,7 +42,7 @@ public class SolanaBlockBench {
 
   private byte[] json;
   private JsonIterator jsonIterator;
-  private IndexedJsonIterator indexed;
+  private IndexedJsonIterator jsonIndexed;
   private SimdJsonParser simdParser;
 
   @Setup
@@ -53,12 +53,12 @@ public class SolanaBlockBench {
       throw new UncheckedIOException(e);
     }
     jsonIterator = JsonIterator.parse(json);
-    indexed = IndexedJsonIterator.parse(json);
+    jsonIndexed = IndexedJsonIterator.parse(json);
     simdParser = new SimdJsonParser(json.length + 1_024, 1_024);
 
-    check(fullWalk_jsonIterator(), fullWalk_indexed(), fullWalk_simdjson());
-    check(fees_jsonIterator(), fees_indexed(), fees_simdjson());
-    check(blockParse_jsonIterator(), blockParse_indexed(), blockParse_simdjson());
+    check(fullWalk_jsonIterator(), fullWalk_jsonIndexed(), fullWalk_simdjson());
+    check(fees_jsonIterator(), fees_jsonIndexed(), fees_simdjson());
+    check(blockParse_jsonIterator(), blockParse_jsonIndexed(), blockParse_simdjson());
   }
 
   private static void check(final long a, final long b, final long c) {
@@ -70,8 +70,8 @@ public class SolanaBlockBench {
   // parseOnly
 
   @Benchmark
-  public Object parseOnly_indexed() {
-    return indexed.reset(json);
+  public Object parseOnly_jsonIndexed() {
+    return jsonIndexed.reset(json);
   }
 
   @Benchmark
@@ -87,8 +87,8 @@ public class SolanaBlockBench {
   }
 
   @Benchmark
-  public long fullWalk_indexed() {
-    return Walks.walk(indexed.reset(json));
+  public long fullWalk_jsonIndexed() {
+    return Walks.walk(jsonIndexed.reset(json));
   }
 
   @Benchmark
@@ -104,8 +104,8 @@ public class SolanaBlockBench {
   }
 
   @Benchmark
-  public long fees_indexed() {
-    return fees(indexed.reset(json));
+  public long fees_jsonIndexed() {
+    return fees(jsonIndexed.reset(json));
   }
 
   private static long fees(final JsonIterator ji) {
@@ -205,8 +205,8 @@ public class SolanaBlockBench {
   }
 
   @Benchmark
-  public long blockParse_indexed() {
-    return parseBlock(indexed.reset(json));
+  public long blockParse_jsonIndexed() {
+    return parseBlock(jsonIndexed.reset(json));
   }
 
   @Benchmark

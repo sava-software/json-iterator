@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 /// Compares three parsers over the classic simdjson twitter.json corpus (617 KiB):
 /// - `jsonIterator`: this library's original pull parser (vectorized fast paths)
-/// - `jsonIter`: this library's IndexedJsonIterator (structural-index navigation)
+/// - `jsonIndexed`: this library's IndexedJsonIterator (structural-index navigation)
 /// - `simdjson`: simdjson-java (eager two-stage parse to a tape/DOM)
 ///
 /// Workloads:
@@ -36,7 +36,7 @@ public class TwitterBench {
 
   private byte[] json;
   private JsonIterator jsonIterator;
-  private IndexedJsonIterator jsonIter;
+  private IndexedJsonIterator jsonIndexed;
   private SimdJsonParser simdParser;
 
   @Setup
@@ -47,11 +47,11 @@ public class TwitterBench {
       throw new UncheckedIOException(e);
     }
     jsonIterator = JsonIterator.parse(json);
-    jsonIter = IndexedJsonIterator.parse(json);
+    jsonIndexed = IndexedJsonIterator.parse(json);
     simdParser = new SimdJsonParser(json.length + 1_024, 1_024);
 
-    check(fullWalk_jsonIterator(), fullWalk_jsonIter(), fullWalk_simdjson());
-    check(screenNames_jsonIterator(), screenNames_jsonIter(), screenNames_simdjson());
+    check(fullWalk_jsonIterator(), fullWalk_jsonIndexed(), fullWalk_simdjson());
+    check(screenNames_jsonIterator(), screenNames_jsonIndexed(), screenNames_simdjson());
   }
 
   private static void check(final long a, final long b, final long c) {
@@ -63,8 +63,8 @@ public class TwitterBench {
   // parseOnly
 
   @Benchmark
-  public Object parseOnly_jsonIter() {
-    return jsonIter.reset(json);
+  public Object parseOnly_jsonIndexed() {
+    return jsonIndexed.reset(json);
   }
 
   @Benchmark
@@ -80,8 +80,8 @@ public class TwitterBench {
   }
 
   @Benchmark
-  public long fullWalk_jsonIter() {
-    return Walks.walk(jsonIter.reset(json));
+  public long fullWalk_jsonIndexed() {
+    return Walks.walk(jsonIndexed.reset(json));
   }
 
   @Benchmark
@@ -105,8 +105,8 @@ public class TwitterBench {
   }
 
   @Benchmark
-  public long screenNames_jsonIter() {
-    final var ji = jsonIter.reset(json);
+  public long screenNames_jsonIndexed() {
+    final var ji = jsonIndexed.reset(json);
     long sum = 0;
     ji.skipUntil("statuses");
     while (ji.readArray()) {
