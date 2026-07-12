@@ -1,5 +1,8 @@
 package systems.comodal.jsoniter;
 
+/// @deprecated superseded by [ContextFieldIndexMaskedPredicate] via
+/// [JsonIterator#testObject(Object, FieldMatcher, ContextFieldIndexMaskedPredicate)].
+@Deprecated(forRemoval = true)
 public interface ContextFieldBufferMaskedPredicate<C> {
 
   long BREAK_OUT = 0xffffffff_ffffffffL;

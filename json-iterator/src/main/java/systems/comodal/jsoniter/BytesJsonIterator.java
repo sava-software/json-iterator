@@ -21,6 +21,10 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   byte[] buf;
   private char[] charBuf;
+  // Field name span for the matcher hook: buf itself on the zero-copy fast
+  // path, or a decoded UTF-8 array for escaped names.
+  private byte[] fieldBuf;
+  private int fieldOffset;
 
   BytesJsonIterator(final byte[] buf, final int head, final int tail) {
     this(buf, head, tail, 64);
@@ -472,6 +476,59 @@ class BytesJsonIterator extends BaseJsonIterator {
   private boolean parseFieldEqualsSlow(final String field) {
     final int len = parse();
     return JsonIterator.fieldEquals(field, charBuf, 0, len);
+  }
+
+  @Override
+  final int parseFieldName() {
+    // Scan word-at-a-time for the closing quote; a clean ascii name is
+    // returned as a span of buf with no copy. Escapes and multi-byte
+    // characters fall through to the byte-accurate loop below.
+    int i = head;
+    for (int nextOffset = i + Long.BYTES; nextOffset <= tail; ) {
+      final long word = (long) TO_LONG.get(buf, i);
+      if (containsMultiByteOrEscapePattern(word)) {
+        break;
+      }
+      final long tmp = matchQuotePattern(word);
+      if (tmp != 0) {
+        final int quote = i + ((Long.numberOfTrailingZeros(tmp << 1) >>> 3) - 1);
+        fieldBuf = buf;
+        fieldOffset = head;
+        final int len = quote - head;
+        head = quote + 1;
+        return len;
+      }
+      i = nextOffset;
+      nextOffset += Long.BYTES;
+    }
+    for (byte c; i < tail; ++i) {
+      c = buf[i];
+      if (c == '"') {
+        fieldBuf = buf;
+        fieldOffset = head;
+        final int len = i - head;
+        head = i + 1;
+        return len;
+      } else if ((c ^ '\\') < 1) { // escape or multi-byte
+        return parseFieldNameSlow();
+      }
+    }
+    throw reportError("parseFieldName", "incomplete string");
+  }
+
+  /// Escaped or multi-byte field names are rare: unescape into charBuf, then
+  /// re-encode so the matcher always sees the decoded name's UTF-8 bytes.
+  private int parseFieldNameSlow() {
+    final int len = parse();
+    final byte[] utf8 = new String(charBuf, 0, len).getBytes(StandardCharsets.UTF_8);
+    fieldBuf = utf8;
+    fieldOffset = 0;
+    return utf8.length;
+  }
+
+  @Override
+  final int matchField(final FieldMatcher matcher, final int len) {
+    return matcher.match(fieldBuf, fieldOffset, len);
   }
 
   @Override

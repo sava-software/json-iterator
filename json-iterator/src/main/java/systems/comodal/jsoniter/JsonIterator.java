@@ -40,14 +40,16 @@ public interface JsonIterator extends Closeable {
 
   static JsonIterator parse(final String field, final int charBufferLength) {
     return parse(field.getBytes(), charBufferLength);
-  }  /// Iterators hold no closeable resource: InputStream sources are read to
+  }
+
+  /// Iterators hold no closeable resource: InputStream sources are read to
   /// EOF and closed inside parse/reset.
   ///
   /// @deprecated no-op; JsonIterator will stop extending [Closeable] in the
   /// next major version.
   @Deprecated(forRemoval = true)
   @Override
-  default void close() {
+  default void close() throws IOException {
   }
 
   /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
@@ -218,10 +220,16 @@ public interface JsonIterator extends Closeable {
 
   JsonIterator closeArray();
 
+  /// @deprecated allocates a String per field name; iterate objects with the
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)] family instead.
+  @Deprecated(forRemoval = true)
   default String readObject() {
     return readObjField();
   }
 
+  /// @deprecated allocates a String per field name; iterate objects with the
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)] family instead.
+  @Deprecated(forRemoval = true)
   String readObjField();
 
   JsonIterator skipObjField();
@@ -352,19 +360,47 @@ public interface JsonIterator extends Closeable {
 
   // IOC Field Methods
 
+  /// @deprecated single-field probes are covered by
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
+  /// first field.
+  @Deprecated(forRemoval = true)
   boolean testObjField(final CharBufferPredicate testField);
 
+  /// @deprecated single-field probes are covered by
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
+  /// first field.
+  @Deprecated(forRemoval = true)
   <R> R applyObjField(final CharBufferFunction<R> applyChars);
 
   <C, R> R applyObject(final C context, final ContextFieldBufferFunction<C, R> fieldBufferFunction);
 
+  /// @deprecated single-field probes are covered by
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
+  /// first field.
+  @Deprecated(forRemoval = true)
   int applyObjFieldAsInt(final CharBufferToIntFunction applyChars, final int terminalSentinel);
 
+  /// @deprecated single-field probes are covered by
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
+  /// first field.
+  @Deprecated(forRemoval = true)
   long applyObjFieldAsLong(final CharBufferToLongFunction applyChars, final long terminalSentinel);
 
-  <C> int applyObjFieldAsInt(final C context, final ContextCharBufferToIntFunction<C> applyChars, final int terminalSentinel);
+  /// @deprecated single-field probes are covered by
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
+  /// first field.
+  @Deprecated(forRemoval = true)
+  <C> int applyObjFieldAsInt(final C context,
+                             final ContextCharBufferToIntFunction<C> applyChars,
+                             final int terminalSentinel);
 
-  <C> long applyObjFieldAsLong(final C context, final ContextCharBufferToLongFunction<C> applyChars, final long terminalSentinel);
+  /// @deprecated single-field probes are covered by
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
+  /// first field.
+  @Deprecated(forRemoval = true)
+  <C> long applyObjFieldAsLong(final C context,
+                               final ContextCharBufferToLongFunction<C> applyChars,
+                               final long terminalSentinel);
 
   <R> R applyObject(final FieldBufferFunction<R> fieldBufferFunction);
 
@@ -372,5 +408,29 @@ public interface JsonIterator extends Closeable {
 
   void testObject(final FieldBufferPredicate fieldBufferFunction);
 
+  /// @deprecated unused by known consumers and superseded by
+  /// [#testObject(Object, FieldMatcher, ContextFieldIndexMaskedPredicate)],
+  /// whose int index makes the seen-fields mask trivial to manage.
+  @Deprecated(forRemoval = true)
   <C> C testObject(final C context, final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction);
+
+  /// [FieldMatcher]-driven variants: each field name is resolved to its
+  /// index in the matcher's declared order (-1 if unknown) with a single
+  /// O(1) lookup, replacing sequential fieldEquals chains.
+  void testObject(final FieldMatcher matcher, final FieldIndexPredicate fieldPredicate);
+
+  <C> C testObject(final C context, final FieldMatcher matcher, final ContextFieldIndexPredicate<C> fieldPredicate);
+
+  /// Masked matcher variant: the predicate threads a bitmask of seen field
+  /// indices and returns [ContextFieldIndexMaskedPredicate#BREAK_OUT] to stop
+  /// once every wanted field has been captured, skipping the rest of the
+  /// object.
+  <C> C testObject(final C context, final FieldMatcher matcher, final ContextFieldIndexMaskedPredicate<C> fieldPredicate);
+
+  /// Reads the next string value and resolves it through the matcher on the
+  /// same zero-copy fast path as field-name dispatch — for enum values and
+  /// string discriminators. Returns -1 for an unrecognized value or JSON
+  /// null; callers needing the unrecognized text should instead resolve via
+  /// [FieldMatcher#match] inside an [#applyChars] callback.
+  int matchString(final FieldMatcher matcher);
 }

@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
 
-import static systems.comodal.jsoniter.ContextFieldBufferMaskedPredicate.BREAK_OUT;
+import static systems.comodal.jsoniter.ContextFieldIndexMaskedPredicate.BREAK_OUT;
 import static systems.comodal.jsoniter.ValueType.*;
 
 abstract class BaseJsonIterator implements JsonIterator {
@@ -519,7 +519,9 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   @Override
-  public final <C> int applyObjFieldAsInt(final C context, final ContextCharBufferToIntFunction<C> applyChars, final int terminalSentinel) {
+  public final <C> int applyObjFieldAsInt(final C context,
+                                          final ContextCharBufferToIntFunction<C> applyChars,
+                                          final int terminalSentinel) {
     char c = nextToken();
     if (c == ',') {
       c = nextToken();
@@ -599,7 +601,9 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   @Override
-  public final <C> long applyObjFieldAsLong(final C context, final ContextCharBufferToLongFunction<C> applyChars, final long terminalSentinel) {
+  public final <C> long applyObjFieldAsLong(final C context,
+                                            final ContextCharBufferToLongFunction<C> applyChars,
+                                            final long terminalSentinel) {
     char c = nextToken();
     if (c == ',') {
       c = nextToken();
@@ -868,6 +872,157 @@ abstract class BaseJsonIterator implements JsonIterator {
                          final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction,
                          final int offset, final int len);
 
+  /// Positions head past the field name's closing quote and stashes the
+  /// decoded name span for the matchField hook. The returned length is only
+  /// meaningful to the same subclass's hooks (UTF-8 byte length for
+  /// byte-backed iterators, char length for char-backed ones). Unescaped
+  /// names are kept as a zero-copy span of the underlying buffer.
+  abstract int parseFieldName();
+
+  /// Resolves the field name span stashed by [#parseFieldName()] against the
+  /// matcher — byte-backed iterators match directly against the underlying
+  /// buffer.
+  abstract int matchField(final FieldMatcher matcher, final int len);
+
+  @Override
+  public final void testObject(final FieldMatcher matcher, final FieldIndexPredicate fieldPredicate) {
+    char c;
+    for (int len; ; ) {
+      if ((c = nextToken()) == ',') {
+        c = nextToken();
+        if (c != '"') {
+          throw reportError("testObject", "expected string field, but " + c);
+        } else {
+          len = parseFieldName();
+          if ((c = nextToken()) != ':') {
+            throw reportError("testObject", "expected :, but " + c);
+          } else if (!fieldPredicate.test(matchField(matcher, len), this)) {
+            return;
+          }
+        }
+      } else if (c == '{') {
+        c = nextToken();
+        if (c == '"') {
+          len = parseFieldName();
+          if ((c = nextToken()) != ':') {
+            throw reportError("testObject", "expected :, but " + c);
+          } else if (!fieldPredicate.test(matchField(matcher, len), this)) {
+            return;
+          }
+        } else if (c == '}') { // end of object
+          return;
+        } else {
+          throw reportError("testObject", "expected \" after {");
+        }
+      } else if (c == '}') {
+        return;
+      } else if (c == 'n') {
+        skipNull();
+        return;
+      } else {
+        throw reportError("testObject", "expected [,{}n], but found: " + c);
+      }
+    }
+  }
+
+  @Override
+  public final <C> C testObject(final C context,
+                                final FieldMatcher matcher,
+                                final ContextFieldIndexPredicate<C> fieldPredicate) {
+    char c;
+    for (int len; ; ) {
+      if ((c = nextToken()) == ',') {
+        c = nextToken();
+        if (c != '"') {
+          throw reportError("testObject", "expected string field, but " + c);
+        }
+        len = parseFieldName();
+        if ((c = nextToken()) != ':') {
+          throw reportError("testObject", "expected :, but " + c);
+        } else if (!fieldPredicate.test(context, matchField(matcher, len), this)) {
+          return context;
+        }
+      } else if (c == '{') {
+        c = nextToken();
+        if (c == '"') {
+          len = parseFieldName();
+          if ((c = nextToken()) != ':') {
+            throw reportError("testObject", "expected :, but " + c);
+          } else if (!fieldPredicate.test(context, matchField(matcher, len), this)) {
+            return context;
+          }
+        } else if (c == '}') { // end of object
+          return context;
+        } else {
+          throw reportError("testObject", "expected \" after {");
+        }
+      } else if (c == '}') {
+        return context;
+      } else if (c == 'n') {
+        skipNull();
+        return context;
+      } else {
+        throw reportError("testObject", "expected [,{}n], but found: " + c);
+      }
+    }
+  }
+
+  @Override
+  public final <C> C testObject(final C context, final FieldMatcher matcher, final ContextFieldIndexMaskedPredicate<C> fieldPredicate) {
+    char c;
+    long mask = 0;
+    for (int len; ; ) {
+      if ((c = nextToken()) == ',') {
+        c = nextToken();
+        if (c != '"') {
+          throw reportError("testObject", "expected string field, but " + c);
+        }
+        len = parseFieldName();
+        if ((c = nextToken()) != ':') {
+          throw reportError("testObject", "expected :, but " + c);
+        } else if ((mask = fieldPredicate.test(context, mask, matchField(matcher, len), this)) == BREAK_OUT) {
+          return context;
+        }
+      } else if (c == '{') {
+        c = nextToken();
+        if (c == '"') {
+          len = parseFieldName();
+          if ((c = nextToken()) != ':') {
+            throw reportError("testObject", "expected :, but " + c);
+          } else if ((mask = fieldPredicate.test(context, mask, matchField(matcher, len), this)) == BREAK_OUT) {
+            return context;
+          }
+        } else if (c == '}') { // end of object
+          return context;
+        } else {
+          throw reportError("testObject", "expected \" after {");
+        }
+      } else if (c == '}') {
+        return context;
+      } else if (c == 'n') {
+        skipNull();
+        return context;
+      } else {
+        throw reportError("testObject", "expected [,{}n], but found: " + c);
+      }
+    }
+  }
+
+  @Override
+  public final int matchString(final FieldMatcher matcher) {
+    final char c = nextToken();
+    if (c == '"') {
+      // A string value scans identically to a field name.
+      final int len = parseFieldName();
+      return matchField(matcher, len);
+    } else if (c == 'n') {
+      skipNull();
+      return -1;
+    } else {
+      throw reportError("matchString", "expected string or null, but " + c);
+    }
+  }
+
   @Override
   public final <R> R applyObject(final FieldBufferFunction<R> fieldBufferFunction) {
     char c = nextToken();
@@ -952,7 +1107,10 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
-  abstract <C, R> R apply(final C context, final ContextFieldBufferFunction<C, R> fieldBufferFunction, final int offset, final int len);
+  abstract <C, R> R apply(final C context,
+                          final ContextFieldBufferFunction<C, R> fieldBufferFunction,
+                          final int offset,
+                          final int len);
 
   private static final CharBufferToDoubleFunction READ_DOUBLE_FUNCTION = DoubleParser::parse;
 

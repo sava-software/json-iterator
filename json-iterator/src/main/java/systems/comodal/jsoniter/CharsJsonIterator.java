@@ -377,6 +377,32 @@ final class CharsJsonIterator extends BaseJsonIterator {
     return JsonIterator.fieldEquals(field, buf, from, len);
   }
 
+  // Field name span for the matcher hook: buf itself, or the unescaped copy.
+  private char[] fieldChars;
+  private int fieldCharsOffset;
+
+  /// Returns the name's char length.
+  @Override
+  int parseFieldName() {
+    final int from = head;
+    final int len = parse(from);
+    if (numEscapes > 0) {
+      final char[] chars = handleEscapes(from, len);
+      fieldChars = chars;
+      fieldCharsOffset = 0;
+      return chars.length;
+    } else {
+      fieldChars = buf;
+      fieldCharsOffset = from;
+      return len;
+    }
+  }
+
+  @Override
+  int matchField(final FieldMatcher matcher, final int len) {
+    return matcher.match(fieldChars, fieldCharsOffset, len);
+  }
+
   @Override
   boolean breakOut(final FieldBufferPredicate fieldBufferFunction, final int offset, final int len) {
     if (numEscapes > 0) {
