@@ -1,17 +1,17 @@
 package systems.comodal.jsoniter.jmh;
 
-import jsoniter.v21.ContextFieldBufferPredicate;
-import jsoniter.v21.FieldBufferPredicate;
-import jsoniter.v21.JsonIterator;
+import jsoniter.published.ContextFieldBufferPredicate;
+import jsoniter.published.FieldBufferPredicate;
+import jsoniter.published.JsonIterator;
 
-import static jsoniter.v21.JsonIterator.fieldEquals;
+import static jsoniter.published.JsonIterator.fieldEquals;
 
 /// [SolanaBlockBench] selective workloads duplicated against the relocated
-/// published 21.1.0 baseline (package jsoniter.v21); bodies are identical to
+/// published 25.1.0 (published) baseline (package jsoniter.published); bodies are identical to
 /// the current-version equivalents in [SolanaBlockBench].
-final class SolanaV21 {
+final class SolanaPublished {
 
-  private SolanaV21() {
+  private SolanaPublished() {
   }
 
   static long fees(final JsonIterator ji) {

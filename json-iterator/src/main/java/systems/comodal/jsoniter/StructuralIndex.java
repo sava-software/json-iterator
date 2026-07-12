@@ -1,7 +1,6 @@
 package systems.comodal.jsoniter;
 
 import jdk.incubator.vector.ByteVector;
-import jdk.incubator.vector.ShortVector;
 import jdk.incubator.vector.VectorShuffle;
 
 import java.util.Arrays;
@@ -172,26 +171,22 @@ final class StructuralIndex {
     block(blockStart, backslash, quote, whitespace, op);
   }
 
+  /// Chars are already decoded, so the char-source stage 1 builds its masks
+  /// with a plain scalar sweep: 16-bit lanes halve vector throughput and no
+  /// known consumer feeds char[] input (see the closed-doors section of
+  /// AGENTS.md), so this path deliberately stays scalar.
   private void charBlock(final char[] src, final int srcOffset, final int blockStart) {
-    final var species = VectorSupport.SHORT_SPECIES;
-    final int lanes = VectorSupport.SHORT_LANES;
     long backslash = 0, quote = 0, whitespace = 0, op = 0;
-    for (int o = srcOffset, shift = 0; shift < BLOCK; o += lanes, shift += lanes) {
-      final var chunk = ShortVector.fromCharArray(species, src, o);
-      backslash |= chunk.eq((short) '\\').toLong() << shift;
-      quote |= chunk.eq((short) '"').toLong() << shift;
-      whitespace |= chunk.eq((short) ' ')
-          .or(chunk.eq((short) '\t'))
-          .or(chunk.eq((short) '\n'))
-          .or(chunk.eq((short) '\r'))
-          .toLong() << shift;
-      op |= chunk.eq((short) ':')
-          .or(chunk.eq((short) ','))
-          .or(chunk.eq((short) '{'))
-          .or(chunk.eq((short) '}'))
-          .or(chunk.eq((short) '['))
-          .or(chunk.eq((short) ']'))
-          .toLong() << shift;
+    for (int i = 0; i < BLOCK; ++i) {
+      final long bit = 1L << i;
+      switch (src[srcOffset + i]) {
+        case '\\' -> backslash |= bit;
+        case '"' -> quote |= bit;
+        case ' ', '\t', '\n', '\r' -> whitespace |= bit;
+        case ':', ',', '{', '}', '[', ']' -> op |= bit;
+        default -> {
+        }
+      }
     }
     block(blockStart, backslash, quote, whitespace, op);
   }

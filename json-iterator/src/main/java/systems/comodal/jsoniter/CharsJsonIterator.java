@@ -1,15 +1,10 @@
 package systems.comodal.jsoniter;
 
-import jdk.incubator.vector.ShortVector;
-
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.Arrays;
 
 class CharsJsonIterator extends BaseJsonIterator {
-
-  private static final short QUOTE = '"';
-  private static final short BACKSLASH = '\\';
 
   char[] buf;
 
@@ -111,33 +106,13 @@ class CharsJsonIterator extends BaseJsonIterator {
   private int numEscapes = 0;
 
   private int parse(final int from) {
+    char c;
     numEscapes = 0;
-    final int lanes = VectorSupport.SHORT_LANES;
-    int i = from;
-    for (; i + lanes <= tail; i += lanes) {
-      final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, i);
-      final var stopMask = chunk.eq(QUOTE).or(chunk.eq(BACKSLASH));
-      if (!stopMask.anyTrue()) {
-        continue;
-      }
-      final int n = stopMask.firstTrue();
-      if (buf[i + n] == '"') {
-        final int end = i + n;
-        head = end + 1;
-        return end - from;
-      }
-      // Escape sequences need pairwise skipping and counting; continue scalar.
-      return parseScalar(from, i + n);
-    }
-    return parseScalar(from, i);
-  }
-
-  private int parseScalar(final int from, int i) {
-    for (char c; ; i++) {
+    for (int i = from; ; i++) {
       if (i >= tail) {
         throw reportError("parse", "incomplete string");
       }
-      c = buf[i];
+      c = peekChar(i);
       if (c == '"') {
         head = i + 1;
         return i - from;
@@ -150,69 +125,16 @@ class CharsJsonIterator extends BaseJsonIterator {
 
   @Override
   void skipPastEndQuote() {
-    final int lanes = VectorSupport.SHORT_LANES;
-    int i = head;
-    for (; i + lanes <= tail; i += lanes) {
-      final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, i);
-      final var stopMask = chunk.eq(QUOTE).or(chunk.eq(BACKSLASH));
-      if (!stopMask.anyTrue()) {
-        continue;
-      }
-      final int n = stopMask.firstTrue();
-      if (buf[i + n] == '"') {
-        head = i + n + 1;
-      } else {
-        skipPastEndQuoteScalar(i + n);
-      }
-      return;
-    }
-    skipPastEndQuoteScalar(i);
-  }
-
-  private void skipPastEndQuoteScalar(int i) {
     char c;
-    while (i < tail) {
-      c = buf[i++];
+    while (head < tail) {
+      c = buf[head++];
       if (c == '"') {
-        head = i;
         return;
       } else if (c == '\\') {
-        ++i;
+        ++head;
       }
     }
     throw reportError("skipPastEndQuote", "incomplete string");
-  }
-
-  @Override
-  void skipContainer(final char open, final char close, int level) {
-    final int lanes = VectorSupport.SHORT_LANES;
-    int h = head;
-    outer:
-    while (h + lanes <= tail) {
-      final var chunk = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, buf, h);
-      // One combined extraction: the char at each marked position identifies
-      // which of the three markers it is, so per-marker masks are unnecessary.
-      long bits = chunk.eq((short) open).or(chunk.eq((short) close)).or(chunk.eq(QUOTE)).toLong();
-      while (bits != 0) {
-        final int n = Long.numberOfTrailingZeros(bits);
-        final char c = buf[h + n];
-        if (c == '"') {
-          head = h + n + 1;
-          skipPastEndQuote();
-          h = head;
-          continue outer;
-        } else if (c == open) {
-          ++level;
-        } else if (--level == 0) {
-          head = h + n + 1;
-          return;
-        }
-        bits &= bits - 1;
-      }
-      h += lanes;
-    }
-    head = h;
-    super.skipContainer(open, close, level);
   }
 
   @Override

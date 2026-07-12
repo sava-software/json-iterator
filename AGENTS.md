@@ -45,9 +45,10 @@ just `readString`. Benchmarks that consume via `String` allocation misrepresent 
 
   Use the **absolute jar path** (background shells reset cwd) and **rebuild jmhJar after
   every source change** — stale-jar runs have twice produced numbers for the wrong variant.
-- The published baseline (`21.1.0`, shade-relocated to `jsoniter.v21`) is benchmarked
-  alongside as `*_jsonIterator21`; its gradle configuration opts out of includeBuild
-  substitution. simdjson-java 0.4.0 comes from Maven Central; it requires 256/512-bit
+- The published baseline (`25.1.0`, built from main, shade-relocated to
+  `jsoniter.published`) is benchmarked alongside as `*_jsonIteratorPublished`; its gradle
+  configuration opts out of includeBuild substitution and resolves from GitHub Packages
+  until the release reaches Maven Central. simdjson-java 0.4.0 comes from Maven Central; it requires 256/512-bit
   species, so on NEON it runs emulated via `-Dorg.simdjson.species=256` and its numbers
   are unrepresentative (~100×) — omitted from README comparisons for that reason.
 - Benchmark setup methods cross-check all implementations for identical results; a
@@ -96,6 +97,30 @@ These will shift on AVX2/AVX-512 — an open task is easy benchmarking on 256/51
   uniform runs (long strings ~1.5×, minify ~1.9×) and is at parity on Solana full walks,
   doubles, and dates. `IndexedJsonIterator` wins selective access over large documents but
   its stage-1 fixed cost (≈2.4ms for 4.7MiB) makes it lose read-everything workloads.
+
+## Closed doors (workload-structural — no hardware or JDK will reopen them)
+
+Unlike the hardware-conditional truths above, these are closed by input-shape data and
+consumer surveys, not by lane width. Do not revisit them on new hardware.
+
+- **Never vectorize the `char[]`-source paths.** Every surveyed consumer call site feeds
+  `byte[]` (even `parse(String)` routes through `getBytes()`); `char[]` is the same data
+  at twice the width, so 16-bit lanes halve throughput forever; and a perf-sensitive
+  `char[]` holder should narrow to bytes once and get byte-lane scans, the zero-copy
+  matcher, and the base64 fast path. The chars scan loops, `DECODE_BASE64` (reachable
+  only from the chars-family iterators — the bytes family overrides `decodeBase64String`),
+  and `StructuralIndex.charBlock` were reverted to scalar for this reason (2026-07-12);
+  this also keeps those files textually close to main. To be precise about what was given
+  up: the vector `DECODE_BASE64` narrowing measured a real 3-6% end-to-end win over scalar
+  on the chars path (`DecodeBase64Bench`, NEON, 64B-16KiB payloads) — this door is closed
+  by consumer reality and merge alignment, not because the vector code lost.
+- **Never vectorize field-name scanning.** Surveyed field names average 12.5 bytes,
+  max ~34; `parseFieldName`'s 32-byte SWAR prefix covers essentially every name before a
+  vector chunk could engage. The length distribution, not the ISA, is the constraint.
+- **Never vectorize dispatch comparison.** `FieldMatcher.match` is two scalar word loads
+  plus a mix; the jmh/README decision table shows linear chains win below ~8-10 names and
+  the hash wins above — there is no regime where a vector string-compare of ≤34-byte
+  names or `matchString` values (≤~25 bytes) fits.
 
 ## Hardware strategy: experiment locally, commit generally
 

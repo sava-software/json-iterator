@@ -30,7 +30,7 @@ public class SyntheticBench {
   private byte[] rfcDatesDoc;
   private byte[] isoDatesDoc;
   private JsonIterator jsonIterator;
-  private jsoniter.v21.JsonIterator jsonIterator21;
+  private jsoniter.published.JsonIterator jsonIteratorPublished;
   private IndexedJsonIterator jsonIndexed;
 
   @Setup
@@ -87,7 +87,7 @@ public class SyntheticBench {
     isoDatesDoc = isoDates.append(']').toString().getBytes(StandardCharsets.UTF_8);
 
     jsonIterator = JsonIterator.parse(skipDoc);
-    jsonIterator21 = jsoniter.v21.JsonIterator.parse(skipDoc);
+    jsonIteratorPublished = jsoniter.published.JsonIterator.parse(skipDoc);
     jsonIndexed = IndexedJsonIterator.parse(skipDoc);
 
     check(skipHeavy_jsonIterator(), skipHeavy_jsonIndexed());
@@ -96,15 +96,15 @@ public class SyntheticBench {
     check(bigLongs_jsonIterator(), bigLongs_jsonIndexed());
     check(Double.doubleToLongBits(doubles_jsonIterator()), Double.doubleToLongBits(doubles_jsonIndexed()));
 
-    check(skipHeavy_jsonIterator21(), skipHeavy_jsonIterator());
-    check(longStrings_read_jsonIterator21(), longStrings_read_jsonIterator());
-    check(longStrings_apply_jsonIterator21(), longStrings_apply_jsonIterator());
-    check(bigLongs_jsonIterator21(), bigLongs_jsonIterator());
-    check(dates_rfc1123_jsonIterator21(), dates_rfc1123());
-    check(dates_iso_jsonIterator21(), dates_iso());
-    // 21.1.0 shares the correctly-rounded Eisel-Lemire parser, so the sums
+    check(skipHeavy_jsonIteratorPublished(), skipHeavy_jsonIterator());
+    check(longStrings_read_jsonIteratorPublished(), longStrings_read_jsonIterator());
+    check(longStrings_apply_jsonIteratorPublished(), longStrings_apply_jsonIterator());
+    check(bigLongs_jsonIteratorPublished(), bigLongs_jsonIterator());
+    check(dates_rfc1123_jsonIteratorPublished(), dates_rfc1123());
+    check(dates_iso_jsonIteratorPublished(), dates_iso());
+    // 25.1.0 (published) shares the correctly-rounded Eisel-Lemire parser, so the sums
     // must agree bit for bit
-    check(Double.doubleToLongBits(doubles_jsonIterator21()), Double.doubleToLongBits(doubles_jsonIterator()));
+    check(Double.doubleToLongBits(doubles_jsonIteratorPublished()), Double.doubleToLongBits(doubles_jsonIterator()));
   }
 
   private static void check(final long a, final long b) {
@@ -120,8 +120,8 @@ public class SyntheticBench {
   }
 
   @Benchmark
-  public long skipHeavy_jsonIterator21() {
-    final var ji = jsonIterator21.reset(skipDoc);
+  public long skipHeavy_jsonIteratorPublished() {
+    final var ji = jsonIteratorPublished.reset(skipDoc);
     return ji.skipUntil("want").readLong();
   }
 
@@ -152,8 +152,8 @@ public class SyntheticBench {
   }
 
   @Benchmark
-  public long longStrings_read_jsonIterator21() {
-    final var ji = jsonIterator21.reset(stringsDoc);
+  public long longStrings_read_jsonIteratorPublished() {
+    final var ji = jsonIteratorPublished.reset(stringsDoc);
     long sum = 0;
     while (ji.readArray()) {
       sum += ji.readString().length();
@@ -162,8 +162,8 @@ public class SyntheticBench {
   }
 
   @Benchmark
-  public long longStrings_apply_jsonIterator21() {
-    final var ji = jsonIterator21.reset(stringsDoc);
+  public long longStrings_apply_jsonIteratorPublished() {
+    final var ji = jsonIteratorPublished.reset(stringsDoc);
     long sum = 0;
     while (ji.readArray()) {
       sum += ji.applyCharsAsInt((buf, offset, len) -> len);
@@ -192,8 +192,8 @@ public class SyntheticBench {
   }
 
   @Benchmark
-  public long bigLongs_jsonIterator21() {
-    final var ji = jsonIterator21.reset(longsDoc);
+  public long bigLongs_jsonIteratorPublished() {
+    final var ji = jsonIteratorPublished.reset(longsDoc);
     long sum = 0;
     while (ji.readArray()) {
       sum += ji.readLong();
@@ -222,8 +222,8 @@ public class SyntheticBench {
   }
 
   @Benchmark
-  public double doubles_jsonIterator21() {
-    final var ji = jsonIterator21.reset(doublesDoc);
+  public double doubles_jsonIteratorPublished() {
+    final var ji = jsonIteratorPublished.reset(doublesDoc);
     double sum = 0;
     while (ji.readArray()) {
       sum += ji.readDouble();
@@ -262,8 +262,8 @@ public class SyntheticBench {
   }
 
   @Benchmark
-  public long dates_rfc1123_jsonIterator21() {
-    final var ji = jsonIterator21.reset(rfcDatesDoc);
+  public long dates_rfc1123_jsonIteratorPublished() {
+    final var ji = jsonIteratorPublished.reset(rfcDatesDoc);
     long sum = 0;
     while (ji.readArray()) {
       sum += ji.readDateTime().getEpochSecond();
@@ -272,8 +272,8 @@ public class SyntheticBench {
   }
 
   @Benchmark
-  public long dates_iso_jsonIterator21() {
-    final var ji = jsonIterator21.reset(isoDatesDoc);
+  public long dates_iso_jsonIteratorPublished() {
+    final var ji = jsonIteratorPublished.reset(isoDatesDoc);
     long sum = 0;
     while (ji.readArray()) {
       sum += ji.readDateTime().getEpochSecond();

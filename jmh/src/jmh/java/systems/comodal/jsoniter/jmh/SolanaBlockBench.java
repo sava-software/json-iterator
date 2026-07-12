@@ -42,7 +42,7 @@ public class SolanaBlockBench {
 
   private byte[] json;
   private JsonIterator jsonIterator;
-  private jsoniter.v21.JsonIterator jsonIterator21;
+  private jsoniter.published.JsonIterator jsonIteratorPublished;
   private IndexedJsonIterator jsonIndexed;
   private IndexedJsonIterator jsonIndexedValidating;
   private SimdJsonParser simdParser;
@@ -55,7 +55,7 @@ public class SolanaBlockBench {
       throw new UncheckedIOException(e);
     }
     jsonIterator = JsonIterator.parse(json);
-    jsonIterator21 = jsoniter.v21.JsonIterator.parse(json);
+    jsonIteratorPublished = jsoniter.published.JsonIterator.parse(json);
     jsonIndexed = IndexedJsonIterator.parse(json);
     jsonIndexedValidating = IndexedJsonIterator.parseValidating(json);
     simdParser = new SimdJsonParser(json.length + 1_024, 1_024);
@@ -64,9 +64,9 @@ public class SolanaBlockBench {
     check(fees_jsonIterator(), fees_jsonIndexed(), fees_simdjson());
     check(blockParse_jsonIterator(), blockParse_jsonIndexed(), blockParse_simdjson());
     check(feesAndUnitsUnordered_jsonIndexed(), feesAndUnitsOrdered(), feesAndUnitsOrdered());
-    check(fullWalk_jsonIterator21(), fullWalk_jsonIterator(), fullWalk_jsonIterator());
-    check(fees_jsonIterator21(), fees_jsonIterator(), fees_jsonIterator());
-    check(blockParse_jsonIterator21(), blockParse_jsonIterator(), blockParse_jsonIterator());
+    check(fullWalk_jsonIteratorPublished(), fullWalk_jsonIterator(), fullWalk_jsonIterator());
+    check(fees_jsonIteratorPublished(), fees_jsonIterator(), fees_jsonIterator());
+    check(blockParse_jsonIteratorPublished(), blockParse_jsonIterator(), blockParse_jsonIterator());
   }
 
   private static void check(final long a, final long b, final long c) {
@@ -100,8 +100,8 @@ public class SolanaBlockBench {
   }
 
   @Benchmark
-  public long fullWalk_jsonIterator21() {
-    return Walks21.walk(jsonIterator21.reset(json));
+  public long fullWalk_jsonIteratorPublished() {
+    return WalksPublished.walk(jsonIteratorPublished.reset(json));
   }
 
   @Benchmark
@@ -122,8 +122,8 @@ public class SolanaBlockBench {
   }
 
   @Benchmark
-  public long fees_jsonIterator21() {
-    return SolanaV21.fees(jsonIterator21.reset(json));
+  public long fees_jsonIteratorPublished() {
+    return SolanaPublished.fees(jsonIteratorPublished.reset(json));
   }
 
   @Benchmark
@@ -262,8 +262,8 @@ public class SolanaBlockBench {
   }
 
   @Benchmark
-  public long blockParse_jsonIterator21() {
-    return SolanaV21.parseBlock(jsonIterator21.reset(json));
+  public long blockParse_jsonIteratorPublished() {
+    return SolanaPublished.parseBlock(jsonIteratorPublished.reset(json));
   }
 
   @Benchmark

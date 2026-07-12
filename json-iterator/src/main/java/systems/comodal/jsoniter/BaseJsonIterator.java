@@ -1,8 +1,5 @@
 package systems.comodal.jsoniter;
 
-import jdk.incubator.vector.ByteVector;
-import jdk.incubator.vector.ShortVector;
-import jdk.incubator.vector.VectorOperators;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -197,20 +194,11 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   private static final CharBufferFunction<byte[]> DECODE_BASE64 = (chars, offset, len) -> {
-    // Narrow the base64 alphabet chars without an intermediate String: two
-    // short vectors fill one byte vector, mirroring the widening copies.
+    // Narrow the base64 alphabet chars without an intermediate String, which
+    // would copy them twice: once into the String and again into the byte[]
+    // the decoder extracts from it.
     final byte[] ascii = new byte[len];
-    final int byteLanes = VectorSupport.BYTE_LANES;
-    final int shortLanes = VectorSupport.SHORT_LANES;
-    int i = 0;
-    for (; i + byteLanes <= len; i += byteLanes) {
-      final var low = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, chars, offset + i);
-      final var high = ShortVector.fromCharArray(VectorSupport.SHORT_SPECIES, chars, offset + i + shortLanes);
-      ((ByteVector) low.convertShape(VectorOperators.S2B, VectorSupport.BYTE_SPECIES, 0))
-          .or(high.convertShape(VectorOperators.S2B, VectorSupport.BYTE_SPECIES, -1))
-          .intoArray(ascii, i);
-    }
-    for (; i < len; ++i) {
+    for (int i = 0; i < len; ++i) {
       ascii[i] = (byte) chars[offset + i];
     }
     return Base64.getDecoder().decode(ascii);

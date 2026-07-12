@@ -36,7 +36,7 @@ public class TwitterBench {
 
   private byte[] json;
   private JsonIterator jsonIterator;
-  private jsoniter.v21.JsonIterator jsonIterator21;
+  private jsoniter.published.JsonIterator jsonIteratorPublished;
   private IndexedJsonIterator jsonIndexed;
   private SimdJsonParser simdParser;
 
@@ -48,14 +48,14 @@ public class TwitterBench {
       throw new UncheckedIOException(e);
     }
     jsonIterator = JsonIterator.parse(json);
-    jsonIterator21 = jsoniter.v21.JsonIterator.parse(json);
+    jsonIteratorPublished = jsoniter.published.JsonIterator.parse(json);
     jsonIndexed = IndexedJsonIterator.parse(json);
     simdParser = new SimdJsonParser(json.length + 1_024, 1_024);
 
     check(fullWalk_jsonIterator(), fullWalk_jsonIndexed(), fullWalk_simdjson());
     check(screenNames_jsonIterator(), screenNames_jsonIndexed(), screenNames_simdjson());
-    check(fullWalk_jsonIterator21(), fullWalk_jsonIterator(), fullWalk_jsonIterator());
-    check(screenNames_jsonIterator21(), screenNames_jsonIterator(), screenNames_jsonIterator());
+    check(fullWalk_jsonIteratorPublished(), fullWalk_jsonIterator(), fullWalk_jsonIterator());
+    check(screenNames_jsonIteratorPublished(), screenNames_jsonIterator(), screenNames_jsonIterator());
   }
 
   private static void check(final long a, final long b, final long c) {
@@ -84,8 +84,8 @@ public class TwitterBench {
   }
 
   @Benchmark
-  public long fullWalk_jsonIterator21() {
-    return Walks21.walk(jsonIterator21.reset(json));
+  public long fullWalk_jsonIteratorPublished() {
+    return WalksPublished.walk(jsonIteratorPublished.reset(json));
   }
 
   @Benchmark
@@ -114,8 +114,8 @@ public class TwitterBench {
   }
 
   @Benchmark
-  public long screenNames_jsonIterator21() {
-    final var ji = jsonIterator21.reset(json);
+  public long screenNames_jsonIteratorPublished() {
+    final var ji = jsonIteratorPublished.reset(json);
     long sum = 0;
     ji.skipUntil("statuses");
     while (ji.readArray()) {

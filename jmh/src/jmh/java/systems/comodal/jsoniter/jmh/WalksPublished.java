@@ -1,16 +1,16 @@
 package systems.comodal.jsoniter.jmh;
 
-import jsoniter.v21.CharBufferToIntFunction;
-import jsoniter.v21.CharBufferToLongFunction;
-import jsoniter.v21.ContextFieldBufferPredicate;
-import jsoniter.v21.JsonIterator;
+import jsoniter.published.CharBufferToIntFunction;
+import jsoniter.published.CharBufferToLongFunction;
+import jsoniter.published.ContextFieldBufferPredicate;
+import jsoniter.published.JsonIterator;
 import systems.comodal.jsoniter.JIUtil;
 
 /// [Walks#walk(systems.comodal.jsoniter.JsonIterator)] duplicated against the
-/// relocated published 21.1.0 baseline (package jsoniter.v21). The checksum
+/// relocated published 25.1.0 (published) baseline (package jsoniter.published). The checksum
 /// lambdas share the same bodies — including the current [JIUtil#parseDouble]
 /// helper — so the comparison isolates the iterator, not the user code.
-final class Walks21 {
+final class WalksPublished {
 
   private static final CharBufferToIntFunction LENGTH = (buf, offset, len) -> len;
 
@@ -38,7 +38,7 @@ final class Walks21 {
     return true;
   };
 
-  private Walks21() {
+  private WalksPublished() {
   }
 
   static long walk(final JsonIterator ji) {
