@@ -1,6 +1,5 @@
 package systems.comodal.jsoniter;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -8,7 +7,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 
-public interface JsonIterator extends Closeable {
+public interface JsonIterator {
 
   static JsonIterator parse(final byte[] buf) {
     return new BytesJsonIterator(buf, 0, buf.length);
@@ -42,16 +41,6 @@ public interface JsonIterator extends Closeable {
     return parse(field.getBytes(), charBufferLength);
   }
 
-  /// Iterators hold no closeable resource: InputStream sources are read to
-  /// EOF and closed inside parse/reset.
-  ///
-  /// @deprecated no-op; JsonIterator will stop extending [Closeable] in the
-  /// next major version.
-  @Deprecated(forRemoval = true)
-  @Override
-  default void close() throws IOException {
-  }
-
   /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
   private static byte[] readFully(final InputStream in) {
     try (in) {
@@ -66,13 +55,13 @@ public interface JsonIterator extends Closeable {
   }
 
   /// @param bufSize ignored; the stream is always read fully.
-  @Deprecated
+  @Deprecated(forRemoval = true)
   static JsonIterator parse(final InputStream in, final int bufSize) {
     return parse(readFully(in));
   }
 
   /// @param bufSize ignored; the stream is always read fully.
-  @Deprecated
+  @Deprecated(forRemoval = true)
   static JsonIterator parse(final InputStream in, final int bufSize, final int charBufferLength) {
     return parse(readFully(in), charBufferLength);
   }
@@ -284,7 +273,7 @@ public interface JsonIterator extends Closeable {
 
   BigDecimal readBigDecimal();
 
-  @Deprecated
+  @Deprecated(forRemoval = true)
   default BigDecimal readBigDecimalStripTrailingZeroes() {
     return readBigDecimalDropZeroes();
   }
@@ -425,7 +414,9 @@ public interface JsonIterator extends Closeable {
   /// indices and returns [ContextFieldIndexMaskedPredicate#BREAK_OUT] to stop
   /// once every wanted field has been captured, skipping the rest of the
   /// object.
-  <C> C testObject(final C context, final FieldMatcher matcher, final ContextFieldIndexMaskedPredicate<C> fieldPredicate);
+  <C> C testObject(final C context,
+                   final FieldMatcher matcher,
+                   final ContextFieldIndexMaskedPredicate<C> fieldPredicate);
 
   /// Reads the next string value and resolves it through the matcher on the
   /// same zero-copy fast path as field-name dispatch — for enum values and

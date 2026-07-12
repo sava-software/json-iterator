@@ -20,8 +20,18 @@ options to JMH:
 
 ```sh
 ../gradlew jmhJar
-java -jar build/libs/json-iterator-jmh-jmh.jar 'MigrationBench' -f 3 -wi 5 -w 1s -i 6 -r 1s -foe true
+java -XX:+UseCompactObjectHeaders -Xms2g -Xmx2g -XX:+AlwaysPreTouch \
+  -XX:+PerfDisableSharedMem -XX:+UseZGC \
+  -jar build/libs/json-iterator-jmh-jmh.jar 'MigrationBench' -f 3 -wi 5 -w 1s -i 6 -r 1s -foe true
 ```
+
+The Gradle `jmh` task passes this flag set to the forked benchmark JVMs by
+default — compact object headers (product since JDK 25), generational ZGC
+(what the consuming sava services run), a pinned pre-touched heap, and
+`-XX:+PerfDisableSharedMem` — to replicate the long-running-service JVM the
+library targets. Direct jar runs must pass the flags themselves as above;
+JMH forks inherit the parent JVM's flags, so placing them before `-jar`
+covers the forked benchmark JVMs too.
 
 The first argument is a regex over benchmark names (e.g. `'dispatchTwitter'`,
 `'blockParse_matcher$'`).
@@ -29,10 +39,14 @@ The first argument is a regex over benchmark names (e.g. `'dispatchTwitter'`,
 The JDK used by Gradle is pinned in `gradle.properties`
 (`org.gradle.java.installations.paths`); adjust it to a local JDK 27 install.
 
-**Always compare with at least `-f 3`.** Single-fork results on this codebase
-swing 10–20% on JIT inlining luck alone — a real 21% win has measured as a
-13% loss in one fork. Every benchmark's `@Setup` cross-checks that all
-variants of a workload produce identical checksums, and `-foe true` turns any
+**Always compare with at least `-f 3`, and run in isolation.** Single-fork
+results on this codebase swing 10–20% on JIT inlining luck alone — a real 21%
+win has measured as a 13% loss in one fork. Concurrent builds or other
+benchmark runs on the same machine inflate error bars enough to flip
+close verdicts (a ±134 error that was really ±8 in isolation has happened);
+treat any row with an error above ~10% of its score as contaminated and
+re-run it alone. Every benchmark's `@Setup` cross-checks that all variants of
+a workload produce identical checksums, and `-foe true` turns any
 disagreement into a hard failure.
 
 ## Benchmarks
@@ -53,21 +67,24 @@ disagreement into a hard failure.
 
 ## Migration decision table
 
-Measured 2026-07-12 on an Apple Silicon macOS box, JDK 27 EA, 3 forks; treat
-the ratios as the signal, not the absolute numbers. "Before" is the pattern as
-it exists in sava / idl-src-gen today; "after" is the FieldMatcher migration.
-These numbers postdate the `FieldMatcher` hash moving to `VarHandle` word
-loads — with the earlier byte-at-a-time hash the matcher lost several of
-these comparisons, so re-verify against library changes before re-deciding.
+Measured 2026-07-12 on an Apple Silicon macOS box, JDK 27 EA (the library
+targets 25), 3 forks, under the default service flag set above (ZGC, compact
+headers, pinned pre-touched heap); treat the ratios as the signal, not the
+absolute numbers. "Before" is the pattern as it exists in sava / idl-src-gen
+today; "after" is the FieldMatcher migration. Two history notes: these
+numbers postdate the `FieldMatcher` hash moving to `VarHandle` word loads
+(the earlier byte-at-a-time hash lost several comparisons), and the earlier
+G1 baseline produced the same dispatch verdicts but larger margins on the
+small-win rows — the big wins are GC-robust, the ~3–5% wins are not.
 
 | Pattern (survey → benchmark) | Before µs/op | After µs/op | Verdict |
 |---|---|---|---|
-| Large value union, 37–52 branches (`IxError`, `TransactionError`) → `dispatchTwitter` | 1194 (linear char chain) | 655 (matcher) | **Migrate — biggest win (~45%)** |
-| Kind dispatch, 30 names (`TypeNode`/`ValueNode`) → `kindDispatch` | 588 (`readString` + String switch) | 537 (`matchString`) | **Migrate — ~9% and zero allocation** |
-| Wide DTO with real value reads, 13 fields (`TxMeta`) → `txMetaWalk` | 2847 (char chain) | 2759 (matcher) | **Migrate — ~3%**; value consumption dominates, win is mostly code shape |
-| Small enum, 3 names (`Commitment`, `RpcEncoding`) → `enumValues` | 432 (char chain) | 505 (`matchString`) / 792 (`applyChars` + `match`) | **Keep the chain** — first-compare hits beat any hash below ~8–10 names |
-| Selective parse early-out → `blockParse_matcherMasked` | 2587 (matcher) | 2510 (masked) | **~3%** — worth it only where the wanted set is small and objects are large |
-| `readObjField()` String loops (idl-src-gen) → `fieldWalkTwitter` | 568 | 543 (char IOC) | **~5%** — migrate for allocation hygiene, not speed |
+| Large value union, 37–52 branches (`IxError`, `TransactionError`) → `dispatchTwitter` | 1036 (linear char chain) | 691 (matcher) | **Migrate — biggest win (~33%; ~45% under G1)** |
+| Kind dispatch, 30 names (`TypeNode`/`ValueNode`) → `kindDispatch` | 586 (`readString` + String switch) | 527 (`matchString`) | **Migrate — ~10% and zero allocation** |
+| Wide DTO with real value reads, 13 fields (`TxMeta`) → `txMetaWalk` | 2818 (char chain) | 2778 (matcher) | **Migrate for code shape** — ~1–3% depending on GC; value consumption dominates |
+| Small enum, 3 names (`Commitment`, `RpcEncoding`) → `enumValues` | 464 (char chain) | 488 (`matchString`) / 798 (`applyChars` + `match`) | **Keep the chain — but it's now a ~5% edge, not a rout.** Under ZGC the two are near-tied (single-fork runs flip either way); there's no performance reason to migrate tiny enums, and no penalty if one is migrated for consistency. `applyChars` + `match` stays clearly worst at this size |
+| Selective parse early-out → `blockParse_matcherMasked` | 2524 (matcher) | 2490 (masked) | **~1–3%** — worth it only where the wanted set is small and objects are large |
+| `readObjField()` String loops (idl-src-gen) → `fieldWalkTwitter` | 549 | 627 (char IOC) | **GC-sensitive: under ZGC + compact headers the String-per-field loop is actually ~12% *faster* than the char IOC walk** (it was ~5% slower under G1). The deprecation stands on API-consistency grounds, not performance |
 
 Deprecations driven by this table (`@Deprecated(forRemoval = true)` in
 `JsonIterator`): `testObject(C, ContextFieldBufferMaskedPredicate)` (unused by

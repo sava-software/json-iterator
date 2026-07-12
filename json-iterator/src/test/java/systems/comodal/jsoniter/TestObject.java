@@ -45,7 +45,7 @@ final class TestObject {
       assertEquals(TRUE, context);
       assertEquals("field1", new String(buf, offset, len));
       assertEquals("hello", jsonIterator.readString());
-      return jsonIterator.applyObject(FALSE, (_context, _buf, o, _len, _ji) -> {
+      return jsonIterator.applyObject(FALSE, (_context, _buf, _, _len, _) -> {
         assertEquals(FALSE, _context);
         assertEquals(-1, _len);
         assertNull(_buf);

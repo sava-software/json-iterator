@@ -205,11 +205,11 @@ final class TestFieldMatcher {
   @Test
   void test_empty_and_null_object() {
     final var matcher = FieldMatcher.of("a");
-    factory.create("{}").testObject(matcher, (fieldIndex, jsonIterator) -> {
+    factory.create("{}").testObject(matcher, (_, _) -> {
           throw new AssertionError("no fields expected");
         }
     );
-    factory.create("null").testObject(matcher, (fieldIndex, jsonIterator) -> {
+    factory.create("null").testObject(matcher, (_, _) -> {
           throw new AssertionError("no fields expected");
         }
     );
