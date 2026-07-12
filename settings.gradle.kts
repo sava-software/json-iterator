@@ -25,7 +25,7 @@ pluginManagement {
 }
 
 plugins {
-  id("software.sava.build") version "21.5.1"
+  id("software.sava.build") version "21.5.2"
 }
 
 javaModules {
