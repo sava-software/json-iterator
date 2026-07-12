@@ -11,12 +11,25 @@ from `..`, so benchmarks always run against the local sources.
 
 ```sh
 cd jmh
-../gradlew jmh          # run everything with the defaults in build.gradle.kts
+../gradlew jmh                                    # everything, quick-look defaults (1 fork)
+../gradlew jmh -PjmhFork=3 -PjmhIncludes=enumValues,kindDispatch   # decision-grade subset
 ```
 
-For ad-hoc runs (subsets, fork counts, profilers), build the fat jar once and
-drive JMH directly — the `me.champeau.jmh` plugin does not forward `-P`
-options to JMH:
+Configuration comes from the shared `software.sava.build.feature.jmh`
+convention plugin (resolved from the sibling `../sava-build` checkout). Every
+default it sets is overridable per invocation: `-PjmhFork`, `-PjmhIncludes`,
+`-PjmhWarmupIterations`, `-PjmhWarmup`, `-PjmhIterations`,
+`-PjmhTimeOnIteration`, `-PjmhFailOnError`, and
+`-PjmhJvmArgsAppend="<flag> <flag>..."` — the last replacing the service
+flag set wholesale (e.g. to A/B the GC). For anything the extension does not
+expose (profilers, output formats), build the fat jar once and drive JMH
+directly. Each Gradle run's raw output is archived timestamped under
+`jmh-results/` (in the project directory, outside `build/`, so `clean`
+cannot erase measurement history), and `build/results/jmh/results.txt` is
+re-rendered after every run as the merge of all archived runs (newest row
+wins per benchmark) — so subset runs converge on a full scoreboard. The
+archive is the source of truth: delete an archive file to drop a bad run's
+rows from the next merge, and mind that rows can be of mixed vintage.
 
 ```sh
 ../gradlew jmhJar
@@ -67,8 +80,9 @@ disagreement into a hard failure.
 
 ## Migration decision table
 
-Measured 2026-07-12 on an Apple Silicon macOS box, JDK 27 EA (the library
-targets 25), 3 forks, under the default service flag set above (ZGC, compact
+Measured 2026-07-12 on an Apple Silicon macOS box: one isolated full-suite
+run (`../gradlew jmh -PjmhFork=3`, 24 samples per benchmark), JDK 27 EA (the
+library targets 25), under the default service flag set above (ZGC, compact
 headers, pinned pre-touched heap); treat the ratios as the signal, not the
 absolute numbers. "Before" is the pattern as it exists in sava / idl-src-gen
 today; "after" is the FieldMatcher migration. Two history notes: these
@@ -79,12 +93,13 @@ small-win rows — the big wins are GC-robust, the ~3–5% wins are not.
 
 | Pattern (survey → benchmark) | Before µs/op | After µs/op | Verdict |
 |---|---|---|---|
-| Large value union, 37–52 branches (`IxError`, `TransactionError`) → `dispatchTwitter` | 1036 (linear char chain) | 691 (matcher) | **Migrate — biggest win (~33%; ~45% under G1)** |
-| Kind dispatch, 30 names (`TypeNode`/`ValueNode`) → `kindDispatch` | 586 (`readString` + String switch) | 527 (`matchString`) | **Migrate — ~10% and zero allocation** |
-| Wide DTO with real value reads, 13 fields (`TxMeta`) → `txMetaWalk` | 2818 (char chain) | 2778 (matcher) | **Migrate for code shape** — ~1–3% depending on GC; value consumption dominates |
-| Small enum, 3 names (`Commitment`, `RpcEncoding`) → `enumValues` | 464 (char chain) | 488 (`matchString`) / 798 (`applyChars` + `match`) | **Keep the chain — but it's now a ~5% edge, not a rout.** Under ZGC the two are near-tied (single-fork runs flip either way); there's no performance reason to migrate tiny enums, and no penalty if one is migrated for consistency. `applyChars` + `match` stays clearly worst at this size |
-| Selective parse early-out → `blockParse_matcherMasked` | 2524 (matcher) | 2490 (masked) | **~1–3%** — worth it only where the wanted set is small and objects are large |
-| `readObjField()` String loops (idl-src-gen) → `fieldWalkTwitter` | 549 | 627 (char IOC) | **GC-sensitive: under ZGC + compact headers the String-per-field loop is actually ~12% *faster* than the char IOC walk** (it was ~5% slower under G1). The deprecation stands on API-consistency grounds, not performance |
+| Large value union, 37–52 branches (`IxError`, `TransactionError`) → `dispatchTwitter` | 1074 ± 20 (linear char chain) | 646 ± 22 (matcher) | **Migrate — biggest win (~40%; ~33–45% across GC/runs)** |
+| Kind dispatch, 30 names (`TypeNode`/`ValueNode`) → `kindDispatch` | 571 ± 16 (`readString` + String switch) | 512 ± 4 (`matchString`) | **Migrate — ~10% and zero allocation** |
+| String-value dispatch plumbing → `valueDispatchTwitter` | 881 ± 19 (`applyChars` + `match`) | 806 ± 23 (`matchString`) | **Prefer `matchString` (~8%)** where the unrecognized text isn't needed; `applyChars` + `match` remains the fallback-preserving form |
+| Wide DTO with real value reads, 13 fields (`TxMeta`) → `txMetaWalk` | 2856 ± 49 (char chain) | 2838 ± 80 (matcher) | **Migrate for code shape** — a wash to ~3% depending on GC/run; value consumption dominates |
+| Small enum, 3 names (`Commitment`, `RpcEncoding`) → `enumValues` | 468 ± 12 (char chain) | 481 ± 5 (`matchString`) / 748 ± 8 (`applyChars` + `match`) | **Keep the chain — a ~3% edge with overlapping CIs, effectively a tie.** No performance reason to migrate tiny enums, and no penalty if one is migrated for consistency. `applyChars` + `match` stays clearly worst at this size |
+| Selective parse early-out → `blockParse_matcherMasked` | 2544 ± 27 (matcher) | 2537 ± 65 (masked) | **Within error this run; ≤3% at best** — worth it only where the wanted set is small and objects are large |
+| `readObjField()` String loops (idl-src-gen) → `fieldWalkTwitter` | 555 ± 46 | 605 ± 43 (char IOC) | **GC-sensitive: under ZGC + compact headers the String-per-field loop is ~8–12% *faster* than the char IOC walk** (it was ~5% slower under G1). The deprecation stands on API-consistency grounds, not performance |
 
 Deprecations driven by this table (`@Deprecated(forRemoval = true)` in
 `JsonIterator`): `testObject(C, ContextFieldBufferMaskedPredicate)` (unused by
