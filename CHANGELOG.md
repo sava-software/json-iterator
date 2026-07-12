@@ -1,5 +1,20 @@
 # Changelog
 
+## [25.1.0](https://github.com/sava-software/json-iterator/compare/21.1.0...25.1.0) (2026-07-12)
+
+
+### Features
+
+* **jmh:** add benchmarks for IOC parsing and FieldMatcher dispatch ([2150847](https://github.com/sava-software/json-iterator/commit/2150847b382ef02a0f054f5c32b9a3c56807ca55))
+* **jmh:** improve JMH setup and results documentation ([426cb06](https://github.com/sava-software/json-iterator/commit/426cb0697b623c98529b77cd5f93b610416bdce4))
+* **jmh:** improve JMH setup and results documentation ([e5d0b10](https://github.com/sava-software/json-iterator/commit/e5d0b1054f885d1da48a7a71dc8b03dcb4069960))
+* **jsoniter:** deprecate unused APIs and adjust JVM configuration ([a2d2e2d](https://github.com/sava-software/json-iterator/commit/a2d2e2d90deda085936c1b43053cafa437e5c40f))
+
+
+### Miscellaneous Chores
+
+* release 25.1.0 ([d912c93](https://github.com/sava-software/json-iterator/commit/d912c93c6e5c98c82d3b28ec3a43617b0e93e3ee))
+
 ## [21.1.0](https://github.com/sava-software/json-iterator/compare/21.0.12...21.1.0) (2026-07-11)
 
 
