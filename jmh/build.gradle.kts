@@ -2,7 +2,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
   java
-  id("me.champeau.jmh") version "0.7.3"
+  id("software.sava.build.feature.jmh")
   id("com.gradleup.shadow") version "9.5.1"
 }
 
@@ -45,14 +45,10 @@ tasks.withType<JavaCompile>().configureEach {
   options.compilerArgs.add("--add-modules=jdk.incubator.vector")
 }
 
+// Run defaults, '-Pjmh*' overrides, service JVM flags, and results archiving
+// come from software.sava.build.feature.jmh; this block only appends the
+// vector-specific arguments on top.
 jmh {
-  fork = 1
-  warmupIterations = 5
-  warmup = "1s"
-  // Enough measurement iterations that a single noisy iteration (thermal or
-  // background activity) cannot dominate the reported confidence interval.
-  iterations = 8
-  timeOnIteration = "1s"
   // simdjson-java only supports 256/512-bit species; on 128-bit NEON hardware
   // it must be forced to an emulated 256-bit shape.
   jvmArgsAppend.addAll("--add-modules=jdk.incubator.vector", "-Dorg.simdjson.species=256")

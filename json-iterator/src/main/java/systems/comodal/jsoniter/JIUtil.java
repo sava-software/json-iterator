@@ -208,4 +208,16 @@ public final class JIUtil {
       }
     }
   }
+
+  public static long compileReplacePattern(final byte byteToFind) {
+    final long pattern = byteToFind & 0xFFL;
+    return pattern
+        | (pattern << 8)
+        | (pattern << 16)
+        | (pattern << 24)
+        | (pattern << 32)
+        | (pattern << 40)
+        | (pattern << 48)
+        | (pattern << 56);
+  }
 }

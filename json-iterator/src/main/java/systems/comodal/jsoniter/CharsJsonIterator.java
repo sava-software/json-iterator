@@ -55,11 +55,6 @@ class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  public JsonIterator reset(final InputStream in, final int bufSize) {
-    return JsonIterator.parse(in);
-  }
-
-  @Override
   String getBufferString(final int from, final int to) {
     return new String(buf, from, Math.min(to, tail) - from);
   }
@@ -321,6 +316,18 @@ class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
+  double parse(final CharBufferToDoubleFunction applyChars) {
+    final int from = head;
+    final int len = parse(from);
+    if (numEscapes > 0) {
+      final char[] chars = handleEscapes(from, len);
+      return applyChars.applyAsDouble(chars, 0, chars.length);
+    } else {
+      return applyChars.applyAsDouble(buf, from, len);
+    }
+  }
+
+  @Override
   <C> int parse(final C context, final ContextCharBufferToIntFunction<C> applyChars) {
     final int from = head;
     final int len = parse(from);
@@ -332,17 +339,6 @@ class CharsJsonIterator extends BaseJsonIterator {
     }
   }
 
-  @Override
-  double parse(final CharBufferToDoubleFunction applyChars) {
-    final int from = head;
-    final int len = parse(from);
-    if (numEscapes > 0) {
-      final char[] chars = handleEscapes(from, len);
-      return applyChars.applyAsDouble(chars, 0, chars.length);
-    } else {
-      return applyChars.applyAsDouble(buf, from, len);
-    }
-  }
 
   @Override
   double parseNumber(final CharBufferToDoubleFunction applyChars, final int len) {
@@ -457,6 +453,32 @@ class CharsJsonIterator extends BaseJsonIterator {
     return JsonIterator.fieldEquals(field, buf, from, len);
   }
 
+  // Field name span for the matcher hook: buf itself, or the unescaped copy.
+  private char[] fieldChars;
+  private int fieldCharsOffset;
+
+  /// Returns the name's char length.
+  @Override
+  int parseFieldName() {
+    final int from = head;
+    final int len = parse(from);
+    if (numEscapes > 0) {
+      final char[] chars = handleEscapes(from, len);
+      fieldChars = chars;
+      fieldCharsOffset = 0;
+      return chars.length;
+    } else {
+      fieldChars = buf;
+      fieldCharsOffset = from;
+      return len;
+    }
+  }
+
+  @Override
+  int matchField(final FieldMatcher matcher, final int len) {
+    return matcher.match(fieldChars, fieldCharsOffset, len);
+  }
+
   @Override
   boolean breakOut(final FieldBufferPredicate fieldBufferFunction, final int offset, final int len) {
     if (numEscapes > 0) {
@@ -477,20 +499,6 @@ class CharsJsonIterator extends BaseJsonIterator {
       return !fieldBufferFunction.test(context, chars, 0, chars.length, this);
     } else {
       return !fieldBufferFunction.test(context, buf, offset, len, this);
-    }
-  }
-
-  @Override
-  <C> long test(final C context,
-                final long mask,
-                final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction,
-                final int offset,
-                final int len) {
-    if (numEscapes > 0) {
-      final char[] chars = handleEscapes(offset, len);
-      return fieldBufferFunction.test(context, mask, chars, 0, chars.length, this);
-    } else {
-      return fieldBufferFunction.test(context, mask, buf, offset, len, this);
     }
   }
 

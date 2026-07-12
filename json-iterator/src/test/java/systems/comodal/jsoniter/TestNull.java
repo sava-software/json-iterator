@@ -22,7 +22,7 @@ final class TestNull {
   @Test
   void test_null_as_String() {
     var ji = factory.create("{\"field\":null}");
-    ji.readObject();
+    ji.skipObjField();
     assertNull(ji.readString());
 
     ji = factory.create("{\"field\":null}");
@@ -36,21 +36,21 @@ final class TestNull {
   @Test
   void test_null_as_Object() {
     var ji = factory.create("{\"field\":null}");
-    ji.readObject();
-    assertNull(ji.readObject());
+    ji.skipObjField();
+    assertNull(ji.skipObjField());
   }
 
   @Test
   void test_null_as_BigDecimal() {
     var ji = factory.create("{\"field\":null}");
-    ji.readObject();
+    ji.skipObjField();
     assertNull(ji.readBigDecimal());
   }
 
   @Test
   void test_null_as_BigInteger() {
     var ji = factory.create("{\"field\":null}");
-    ji.readObject();
+    ji.skipObjField();
     assertNull(ji.readBigInteger());
   }
 }

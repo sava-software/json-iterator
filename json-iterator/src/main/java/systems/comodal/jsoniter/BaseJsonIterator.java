@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
 
-import static systems.comodal.jsoniter.ContextFieldBufferMaskedPredicate.BREAK_OUT;
+import static systems.comodal.jsoniter.ContextFieldIndexMaskedPredicate.BREAK_OUT;
 import static systems.comodal.jsoniter.ValueType.*;
 
 abstract class BaseJsonIterator implements JsonIterator {
@@ -421,290 +421,8 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
-  @Override
-  public final boolean testObjField(final CharBufferPredicate testField) {
-    char c = nextToken();
-    if (c == ',') {
-      c = nextToken();
-      if (c != '"') {
-        throw reportError("testObjField", "expected field string, but " + c);
-      } else {
-        final boolean result = parse(testField);
-        if ((c = nextToken()) != ':') {
-          throw reportError("testObjField", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      }
-    } else if (c == '{') {
-      c = nextToken();
-      if (c == '"') {
-        final boolean result = parse(testField);
-        if ((c = nextToken()) != ':') {
-          throw reportError("testObjField", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      } else if (c == '}') {
-        return false; // empty object
-      } else {
-        throw reportError("testObjField", "expected \" after {");
-      }
-    } else if (c == '}') {
-      return false; // end of object
-    } else if (c == 'n') {
-      skipNull();
-      return false;
-    } else {
-      throw reportError("testObjField", "expected [\\{\\}n], but found: " + c);
-    }
-  }
-
-  @Override
-  public final <R> R applyObjField(final CharBufferFunction<R> applyChars) {
-    char c = nextToken();
-    if (c == ',') {
-      c = nextToken();
-      if (c != '"') {
-        throw reportError("applyObjField", "expected field string, but " + c);
-      } else {
-        final var result = parse(applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjField", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      }
-    } else if (c == '{') {
-      c = nextToken();
-      if (c == '"') {
-        final var result = parse(applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjField", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      } else if (c == '}') {
-        return null; // empty object
-      } else {
-        throw reportError("applyObjField", "expected \" after {");
-      }
-    } else if (c == '}') {
-      return null; // end of object
-    } else if (c == 'n') {
-      final var result = applyChars.apply(EMPTY_CHARS, 0, 0);
-      skipNull();
-      return result;
-    } else {
-      throw reportError("applyObjField", "expected [\\{\\}n], but found: " + c);
-    }
-  }
-
-  @Override
-  public final int applyObjFieldAsInt(final CharBufferToIntFunction applyChars, final int terminalSentinel) {
-    char c = nextToken();
-    if (c == ',') {
-      c = nextToken();
-      if (c != '"') {
-        throw reportError("applyObjFieldAsInt", "expected field string, but " + c);
-      } else {
-        final var result = parse(applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjFieldAsInt", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      }
-    } else if (c == '{') {
-      c = nextToken();
-      if (c == '"') {
-        final var result = parse(applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjFieldAsInt", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      } else if (c == '}') {
-        return terminalSentinel; // empty object
-      } else {
-        throw reportError("applyObjFieldAsInt", "expected \" after {");
-      }
-    } else if (c == '}') {
-      return terminalSentinel; // end of object
-    } else if (c == 'n') {
-      final var result = applyChars.applyAsInt(EMPTY_CHARS, 0, 0);
-      skipNull(); // null
-      return result;
-    } else {
-      throw reportError("applyObjFieldAsInt", "expected [\\{\\}n], but found: " + c);
-    }
-  }
-
-  @Override
-  public final <C> int applyObjFieldAsInt(final C context,
-                                          final ContextCharBufferToIntFunction<C> applyChars,
-                                          final int terminalSentinel) {
-    char c = nextToken();
-    if (c == ',') {
-      c = nextToken();
-      if (c != '"') {
-        throw reportError("applyObjFieldAsInt", "expected field string, but " + c);
-      } else {
-        final var result = parse(context, applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjFieldAsInt", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      }
-    } else if (c == '{') {
-      c = nextToken();
-      if (c == '"') {
-        final var result = parse(context, applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjFieldAsInt", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      } else if (c == '}') {
-        return terminalSentinel; // empty object
-      } else {
-        throw reportError("applyObjFieldAsInt", "expected \" after {");
-      }
-    } else if (c == '}') {
-      return terminalSentinel; // end of object
-    } else if (c == 'n') {
-      final var result = applyChars.applyAsInt(context, EMPTY_CHARS, 0, 0);
-      skipNull(); // null
-      return result;
-    } else {
-      throw reportError("applyObjFieldAsInt", "expected [\\{\\}n], but found: " + c);
-    }
-  }
-
-  @Override
-  public final long applyObjFieldAsLong(final CharBufferToLongFunction applyChars, final long terminalSentinel) {
-    char c = nextToken();
-    if (c == ',') {
-      c = nextToken();
-      if (c != '"') {
-        throw reportError("applyObjFieldAsLong", "expected field string, but " + c);
-      } else {
-        final var result = parse(applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjFieldAsLong", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      }
-    } else if (c == '{') {
-      c = nextToken();
-      if (c == '"') {
-        final var result = parse(applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjFieldAsLong", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      } else if (c == '}') {
-        return terminalSentinel; // empty object
-      } else {
-        throw reportError("applyObjFieldAsLong", "expected \" after {");
-      }
-    } else if (c == '}') {
-      return terminalSentinel; // end of object
-    } else if (c == 'n') {
-      final var result = applyChars.applyAsLong(EMPTY_CHARS, 0, 0);
-      skipNull(); // null
-      return result;
-    } else {
-      throw reportError("applyObjFieldAsLong", "expected [\\{\\}n], but found: " + c);
-    }
-  }
-
-  @Override
-  public final <C> long applyObjFieldAsLong(final C context,
-                                            final ContextCharBufferToLongFunction<C> applyChars,
-                                            final long terminalSentinel) {
-    char c = nextToken();
-    if (c == ',') {
-      c = nextToken();
-      if (c != '"') {
-        throw reportError("applyObjFieldAsLong", "expected field string, but " + c);
-      } else {
-        final var result = parse(context, applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjFieldAsLong", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      }
-    } else if (c == '{') {
-      c = nextToken();
-      if (c == '"') {
-        final var result = parse(context, applyChars);
-        if ((c = nextToken()) != ':') {
-          throw reportError("applyObjFieldAsLong", "expected :, but " + c);
-        } else {
-          return result;
-        }
-      } else if (c == '}') {
-        return terminalSentinel; // empty object
-      } else {
-        throw reportError("applyObjFieldAsLong", "expected \" after {");
-      }
-    } else if (c == '}') {
-      return terminalSentinel; // end of object
-    } else if (c == 'n') {
-      final var result = applyChars.applyAsLong(context, EMPTY_CHARS, 0, 0);
-      skipNull(); // null
-      return result;
-    } else {
-      throw reportError("applyObjFieldAsLong", "expected [\\{\\}n], but found: " + c);
-    }
-  }
-
   protected String parseString() {
     return parse(READ_STRING_FUNCTION);
-  }
-
-  @Override
-  public final String readObjField() {
-    char c = nextToken();
-    if (c == ',') {
-      c = nextToken();
-      if (c == '"') {
-        final var field = parseString();
-        if ((c = nextToken()) == ':') {
-          return field;
-        } else {
-          throw reportError("readObjField", "expected :, but " + c);
-        }
-      } else {
-        throw reportError("readObjField", "expected field string, but " + c);
-      }
-    } else if (c == '{') {
-      c = nextToken();
-      if (c == '"') {
-        final var field = parseString();
-        if ((c = nextToken()) == ':') {
-          return field;
-        } else {
-          throw reportError("readObjField", "expected :, but " + c);
-        }
-      } else if (c == '}') {
-        return null; // empty object
-      } else {
-        throw reportError("readObjField", "expected \" after {");
-      }
-    } else if (c == '}') {
-      return null; // end of object
-    } else if (c == 'n') {
-      skipNull();
-      return null;
-    } else {
-      throw reportError("readObjField", "expected [\\{\\}n], but found: " + c);
-    }
   }
 
   public final JsonIterator skipObjField() {
@@ -846,31 +564,83 @@ abstract class BaseJsonIterator implements JsonIterator {
                                 final ContextFieldBufferPredicate<C> fieldBufferFunction,
                                 final int offset, final int len);
 
+  /// Positions head past the field name's closing quote and stashes the
+  /// decoded name span for the matchField hook. The returned length is only
+  /// meaningful to the same subclass's hooks (UTF-8 byte length for
+  /// byte-backed iterators, char length for char-backed ones). Unescaped
+  /// names are kept as a zero-copy span of the underlying buffer.
+  abstract int parseFieldName();
+
+  /// Resolves the field name span stashed by [#parseFieldName()] against the
+  /// matcher — byte-backed iterators match directly against the underlying
+  /// buffer.
+  abstract int matchField(final FieldMatcher matcher, final int len);
+
   @Override
-  public final <C> C testObject(final C context, final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction) {
+  public final void testObject(final FieldMatcher matcher, final FieldIndexPredicate fieldPredicate) {
     char c;
-    long mask = 0;
-    for (int offset, len; ; ) {
+    for (int len; ; ) {
+      if ((c = nextToken()) == ',') {
+        c = nextToken();
+        if (c != '"') {
+          throw reportError("testObject", "expected string field, but " + c);
+        } else {
+          len = parseFieldName();
+          if ((c = nextToken()) != ':') {
+            throw reportError("testObject", "expected :, but " + c);
+          } else if (!fieldPredicate.test(matchField(matcher, len), this)) {
+            return;
+          }
+        }
+      } else if (c == '{') {
+        c = nextToken();
+        if (c == '"') {
+          len = parseFieldName();
+          if ((c = nextToken()) != ':') {
+            throw reportError("testObject", "expected :, but " + c);
+          } else if (!fieldPredicate.test(matchField(matcher, len), this)) {
+            return;
+          }
+        } else if (c == '}') { // end of object
+          return;
+        } else {
+          throw reportError("testObject", "expected \" after {");
+        }
+      } else if (c == '}') {
+        return;
+      } else if (c == 'n') {
+        skipNull();
+        return;
+      } else {
+        throw reportError("testObject", "expected [,{}n], but found: " + c);
+      }
+    }
+  }
+
+  @Override
+  public final <C> C testObject(final C context,
+                                final FieldMatcher matcher,
+                                final ContextFieldIndexPredicate<C> fieldPredicate) {
+    char c;
+    for (int len; ; ) {
       if ((c = nextToken()) == ',') {
         c = nextToken();
         if (c != '"') {
           throw reportError("testObject", "expected string field, but " + c);
         }
-        offset = head;
-        len = parse();
+        len = parseFieldName();
         if ((c = nextToken()) != ':') {
           throw reportError("testObject", "expected :, but " + c);
-        } else if ((mask = test(context, mask, fieldBufferFunction, offset, len)) == BREAK_OUT) {
+        } else if (!fieldPredicate.test(context, matchField(matcher, len), this)) {
           return context;
         }
       } else if (c == '{') {
         c = nextToken();
         if (c == '"') {
-          offset = head;
-          len = parse();
+          len = parseFieldName();
           if ((c = nextToken()) != ':') {
             throw reportError("testObject", "expected :, but " + c);
-          } else if ((mask = test(context, mask, fieldBufferFunction, offset, len)) == BREAK_OUT) {
+          } else if (!fieldPredicate.test(context, matchField(matcher, len), this)) {
             return context;
           }
         } else if (c == '}') { // end of object
@@ -889,10 +659,61 @@ abstract class BaseJsonIterator implements JsonIterator {
     }
   }
 
-  abstract <C> long test(final C context,
-                         final long mask,
-                         final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction,
-                         final int offset, final int len);
+  @Override
+  public final <C> C testObject(final C context, final FieldMatcher matcher, final ContextFieldIndexMaskedPredicate<C> fieldPredicate) {
+    char c;
+    long mask = 0;
+    for (int len; ; ) {
+      if ((c = nextToken()) == ',') {
+        c = nextToken();
+        if (c != '"') {
+          throw reportError("testObject", "expected string field, but " + c);
+        }
+        len = parseFieldName();
+        if ((c = nextToken()) != ':') {
+          throw reportError("testObject", "expected :, but " + c);
+        } else if ((mask = fieldPredicate.test(context, mask, matchField(matcher, len), this)) == BREAK_OUT) {
+          return context;
+        }
+      } else if (c == '{') {
+        c = nextToken();
+        if (c == '"') {
+          len = parseFieldName();
+          if ((c = nextToken()) != ':') {
+            throw reportError("testObject", "expected :, but " + c);
+          } else if ((mask = fieldPredicate.test(context, mask, matchField(matcher, len), this)) == BREAK_OUT) {
+            return context;
+          }
+        } else if (c == '}') { // end of object
+          return context;
+        } else {
+          throw reportError("testObject", "expected \" after {");
+        }
+      } else if (c == '}') {
+        return context;
+      } else if (c == 'n') {
+        skipNull();
+        return context;
+      } else {
+        throw reportError("testObject", "expected [,{}n], but found: " + c);
+      }
+    }
+  }
+
+  @Override
+  public final int matchString(final FieldMatcher matcher) {
+    final char c = nextToken();
+    if (c == '"') {
+      // A string value scans identically to a field name.
+      final int len = parseFieldName();
+      return matchField(matcher, len);
+    } else if (c == 'n') {
+      skipNull();
+      return -1;
+    } else {
+      throw reportError("matchString", "expected string or null, but " + c);
+    }
+  }
 
   @Override
   public final <R> R applyObject(final FieldBufferFunction<R> fieldBufferFunction) {
@@ -1010,37 +831,35 @@ abstract class BaseJsonIterator implements JsonIterator {
   @Override
   public final double readDouble() {
     try {
-      final var valueType = whatIsNext();
-      if (valueType == NUMBER) {
-        return applyNumberCharsAsDouble(READ_DOUBLE_FUNCTION);
-      } else if (valueType == STRING) {
-        return applyCharsAsDouble(READ_DOUBLE_FUNCTION);
-      } else {
-        throw reportError("readDouble", "Must be a number or string but found " + valueType);
-      }
+      return readAsDouble("readDouble", READ_DOUBLE_FUNCTION);
     } catch (final NumberFormatException e) {
       throw reportError("readDouble", e.toString());
     }
   }
 
   // A float widens to double losslessly, so readFloat shares the double-valued
-  // IOC plumbing; the parse itself is binary32-parameterized because narrowing
-  // a parsed double would double-round.
+  // plumbing; the parse itself is binary32-parameterized because narrowing a
+  // parsed double would double-round.
   private static final CharBufferToDoubleFunction READ_FLOAT_FUNCTION = DoubleParser::parseFloat;
 
   @Override
   public final float readFloat() {
     try {
-      final var valueType = whatIsNext();
-      if (valueType == NUMBER) {
-        return (float) applyNumberCharsAsDouble(READ_FLOAT_FUNCTION);
-      } else if (valueType == STRING) {
-        return (float) applyCharsAsDouble(READ_FLOAT_FUNCTION);
-      } else {
-        throw reportError("readFloat", "Must be a number or string but found " + valueType);
-      }
+      return (float) readAsDouble("readFloat", READ_FLOAT_FUNCTION);
     } catch (final NumberFormatException e) {
       throw reportError("readFloat", e.toString());
+    }
+  }
+
+  private double readAsDouble(final String op, final CharBufferToDoubleFunction parseChars) {
+    final var valueType = whatIsNext();
+    if (valueType == NUMBER) {
+      return parseNumber(parseChars, parseNumber());
+    } else if (valueType == STRING) {
+      nextToken();
+      return parse(parseChars);
+    } else {
+      throw reportError(op, "Must be a number or string but found " + valueType);
     }
   }
 

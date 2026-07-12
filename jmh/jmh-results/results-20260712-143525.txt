@@ -1,0 +1,20 @@
+Benchmark                                  Mode  Cnt     Score      Error  Units
+IocBench.blockParse_chars                  avgt   24  2577.467 ±   58.839  us/op
+IocBench.blockParse_matcher                avgt   24  2543.858 ±   26.891  us/op
+IocBench.blockParse_matcherMasked          avgt   24  2537.392 ±   65.159  us/op
+IocBench.dispatchTwitterChars_charsLinear  avgt   24  1327.158 ±   68.581  us/op
+IocBench.dispatchTwitterChars_matcher      avgt   24   748.062 ±   20.219  us/op
+IocBench.dispatchTwitter_charsLinear       avgt   24  1074.142 ±   19.565  us/op
+IocBench.dispatchTwitter_matcher           avgt   24   645.566 ±   21.525  us/op
+IocBench.fieldWalkSolana_chars             avgt   24  5576.255 ± 1463.262  us/op
+IocBench.fieldWalkTwitter_chars            avgt   24   605.045 ±   42.868  us/op
+IocBench.fieldWalkTwitter_readObjField     avgt   24   554.954 ±   46.038  us/op
+IocBench.valueDispatchTwitter_applyChars   avgt   24   880.859 ±   19.006  us/op
+IocBench.valueDispatchTwitter_matchString  avgt   24   806.204 ±   22.528  us/op
+MigrationBench.enumValues_charsChain       avgt   24   467.899 ±   12.165  us/op
+MigrationBench.enumValues_charsMatch       avgt   24   747.500 ±    8.353  us/op
+MigrationBench.enumValues_matchString      avgt   24   480.885 ±    4.844  us/op
+MigrationBench.kindDispatch_matchString    avgt   24   511.649 ±    4.017  us/op
+MigrationBench.kindDispatch_stringSwitch   avgt   24   570.657 ±   15.693  us/op
+MigrationBench.txMetaWalk_charsChain       avgt   24  2855.778 ±   48.565  us/op
+MigrationBench.txMetaWalk_matcher          avgt   24  2837.535 ±   79.670  us/op

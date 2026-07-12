@@ -16,31 +16,6 @@ import java.time.Instant;
 /// (and indexing strategy) per parsing path.
 public interface JsonIterator {
 
-  /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
-  private static byte[] readFully(final InputStream in) {
-    try (in) {
-      return in.readAllBytes();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  static JsonIterator parse(final InputStream in) {
-    return parse(readFully(in));
-  }
-
-  /// @param bufSize ignored; the stream is always read fully.
-  @Deprecated
-  static JsonIterator parse(final InputStream in, final int bufSize) {
-    return parse(readFully(in));
-  }
-
-  /// @param bufSize ignored; the stream is always read fully.
-  @Deprecated
-  static JsonIterator parse(final InputStream in, final int bufSize, final int charBufferLength) {
-    return parse(readFully(in), charBufferLength);
-  }
-
   static JsonIterator parse(final byte[] buf) {
     return new BytesJsonIterator(buf, 0, buf.length);
   }
@@ -81,6 +56,19 @@ public interface JsonIterator {
 
   static JsonIterator parse(final String field, final int charBufferLength) {
     return parse(field.getBytes(), charBufferLength);
+  }
+
+  /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
+  private static byte[] readFully(final InputStream in) {
+    try (in) {
+      return in.readAllBytes();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  static JsonIterator parse(final InputStream in) {
+    return parse(readFully(in));
   }
 
   static boolean fieldEquals(final String field, final char[] buf) {
@@ -197,20 +185,12 @@ public interface JsonIterator {
 
   JsonIterator reset(final char[] buf, final int head, final int tail);
 
+  /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
   JsonIterator reset(final InputStream in);
-
-  /// @param bufSize ignored; the stream is always read fully.
-  JsonIterator reset(final InputStream in, final int bufSize);
 
   String currentBuffer();
 
   // Object Field & Navigation Methods
-
-  /// All iterators support mark/reset now that InputStream sources are read fully upfront.
-  @Deprecated
-  default boolean supportsMarkReset() {
-    return true;
-  }
 
   int mark();
 
@@ -223,12 +203,6 @@ public interface JsonIterator {
   JsonIterator continueArray();
 
   JsonIterator closeArray();
-
-  default String readObject() {
-    return readObjField();
-  }
-
-  String readObjField();
 
   JsonIterator skipObjField();
 
@@ -319,11 +293,6 @@ public interface JsonIterator {
 
   BigDecimal readBigDecimal();
 
-  @Deprecated
-  default BigDecimal readBigDecimalStripTrailingZeroes() {
-    return readBigDecimalDropZeroes();
-  }
-
   /// Drops trailing decimal zeroes.
   BigDecimal readBigDecimalDropZeroes();
 
@@ -399,23 +368,7 @@ public interface JsonIterator {
 
   // IOC Field Methods
 
-  boolean testObjField(final CharBufferPredicate testField);
-
-  <R> R applyObjField(final CharBufferFunction<R> applyChars);
-
   <C, R> R applyObject(final C context, final ContextFieldBufferFunction<C, R> fieldBufferFunction);
-
-  int applyObjFieldAsInt(final CharBufferToIntFunction applyChars, final int terminalSentinel);
-
-  long applyObjFieldAsLong(final CharBufferToLongFunction applyChars, final long terminalSentinel);
-
-  <C> int applyObjFieldAsInt(final C context,
-                             final ContextCharBufferToIntFunction<C> applyChars,
-                             final int terminalSentinel);
-
-  <C> long applyObjFieldAsLong(final C context,
-                               final ContextCharBufferToLongFunction<C> applyChars,
-                               final long terminalSentinel);
 
   <R> R applyObject(final FieldBufferFunction<R> fieldBufferFunction);
 
@@ -423,5 +376,25 @@ public interface JsonIterator {
 
   void testObject(final FieldBufferPredicate fieldBufferFunction);
 
-  <C> C testObject(final C context, final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction);
+  /// [FieldMatcher]-driven variants: each field name is resolved to its
+  /// index in the matcher's declared order (-1 if unknown) with a single
+  /// O(1) lookup, replacing sequential fieldEquals chains.
+  void testObject(final FieldMatcher matcher, final FieldIndexPredicate fieldPredicate);
+
+  <C> C testObject(final C context, final FieldMatcher matcher, final ContextFieldIndexPredicate<C> fieldPredicate);
+
+  /// Masked matcher variant: the predicate threads a bitmask of seen field
+  /// indices and returns [ContextFieldIndexMaskedPredicate#BREAK_OUT] to stop
+  /// once every wanted field has been captured, skipping the rest of the
+  /// object.
+  <C> C testObject(final C context,
+                   final FieldMatcher matcher,
+                   final ContextFieldIndexMaskedPredicate<C> fieldPredicate);
+
+  /// Reads the next string value and resolves it through the matcher on the
+  /// same zero-copy fast path as field-name dispatch — for enum values and
+  /// string discriminators. Returns -1 for an unrecognized value or JSON
+  /// null; callers needing the unrecognized text should instead resolve via
+  /// [FieldMatcher#match] inside an [#applyChars] callback.
+  int matchString(final FieldMatcher matcher);
 }

@@ -33,7 +33,7 @@ final class TestDemo {
   void test_iterator() {
     final var json = "{\"numbers\": [\"1\", \"2\", [\"3\", \"4\"]]}";
     final var ji = factory.create(json);
-    assertEquals("numbers", ji.readObject());
+    assertEquals("numbers", readField(ji));
     assertTrue(ji.readArray());
     assertEquals("1", ji.readString());
     assertTrue(ji.readArray());
@@ -47,7 +47,7 @@ final class TestDemo {
     assertEquals("4", ji.readString());
     assertFalse(ji.readArray()); // end inner array
     assertFalse(ji.readArray()); // end outer array
-    assertNull(ji.readObject()); // end object
+    assertNull(ji.skipObjField()); // end object
   }
 
   @Test
@@ -70,7 +70,7 @@ final class TestDemo {
       final var _last = _iter.readString();
       assertFalse(_iter.readArray()); // end inner array
       assertFalse(_iter.readArray()); // end outer array
-      assertNull(_iter.readObject()); // end object
+      assertNull(_iter.skipObjField()); // end object
       return _last;
     });
     assertEquals("4", last);
@@ -97,10 +97,14 @@ final class TestDemo {
   @Test
   void test_readme() {
     var jsonIterator = factory.create("{\"hello\": \"world\"}");
-    var fieldName = jsonIterator.readObject();
+    var fieldName = readField(jsonIterator);
     var fieldValue = jsonIterator.readString();
     assertEquals("hello", fieldName);
     assertEquals("world", fieldValue);
     assertEquals("hello world", fieldName + ' ' + fieldValue);
+  }
+
+  private static String readField(final JsonIterator ji) {
+    return ji.applyObject((buf, offset, len, _) -> buf == null ? null : new String(buf, offset, len));
   }
 }

@@ -159,7 +159,7 @@ final class TestIndexedJsonIterator {
   @Test
   void test_escaped_and_multibyte_field_names() {
     final var ji = IndexedJsonIterator.parse("{\"a\\tb\":1,\"c\":2}");
-    assertEquals("a\tb", ji.readObjField());
+    assertEquals("a\tb", readField(ji));
     assertEquals(1, ji.readInt());
 
     assertEquals(2, IndexedJsonIterator.parse("{\"a\\tb\":1,\"c\":2}").skipUntil("c").readInt());
@@ -182,14 +182,18 @@ final class TestIndexedJsonIterator {
     int count = 0;
     long sum = 0;
     while (ji.readArray()) {
-      assertEquals("i", ji.readObjField());
+      assertEquals("i", readField(ji));
       sum += ji.readLong();
-      assertEquals("s", ji.readObjField());
+      assertEquals("s", readField(ji));
       assertEquals("value " + count, ji.readString());
-      assertNull(ji.readObjField());
+      assertNull(ji.skipObjField());
       ++count;
     }
     assertEquals(2_000, count);
     assertEquals(1_999L * 2_000 / 2, sum);
+  }
+
+  private static String readField(final JsonIterator ji) {
+    return ji.applyObject((buf, offset, len, _) -> buf == null ? null : new String(buf, offset, len));
   }
 }

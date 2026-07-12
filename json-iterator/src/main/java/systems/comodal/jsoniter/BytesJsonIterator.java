@@ -18,6 +18,11 @@ import java.util.Base64;
 
 class BytesJsonIterator extends BaseJsonIterator {
 
+  private static final VarHandle TO_LONG = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
+  private static final long QUOTE_PATTERN = JIUtil.compileReplacePattern((byte) '"');
+  private static final long ESCAPE_PATTERN = JIUtil.compileReplacePattern((byte) ('\\' & 0xFF));
+  private static final long HIGH_BITS = 0x8080808080808080L;
+
   private static final byte QUOTE = '"';
   private static final byte BACKSLASH = '\\';
 
@@ -27,22 +32,13 @@ class BytesJsonIterator extends BaseJsonIterator {
   // string scans below therefore SWAR the first few words and only switch to
   // vector chunks for longer runs.
   private static final int SWAR_PREFIX = 32;
-  private static final long QUOTE_PATTERN = 0x2222222222222222L;
-  private static final long ESCAPE_PATTERN = 0x5C5C5C5C5C5C5C5CL;
-  private static final long HIGH_BITS = 0x8080808080808080L;
-
-  /// Marks zero bytes; Hacker's Delight ch. 6.
-  private static long matchPattern(final long input) {
-    return ~(((input & 0x7F7F7F7F7F7F7F7FL) + 0x7F7F7F7F7F7F7F7FL) | input | 0x7F7F7F7F7F7F7F7FL);
-  }
-
-  /// An escape or a multi-byte UTF-8 byte, either of which needs the scalar decoder.
-  private static boolean containsSpecialPattern(final long word) {
-    return (word & HIGH_BITS) != 0 || matchPattern(word ^ ESCAPE_PATTERN) != 0;
-  }
 
   byte[] buf;
   private char[] charBuf;
+  // Field name span for the matcher hook: buf itself on the zero-copy fast
+  // path, or a decoded UTF-8 array for escaped names.
+  private byte[] fieldBuf;
+  private int fieldOffset;
 
   BytesJsonIterator(final byte[] buf, final int head, final int tail) {
     this(buf, head, tail, 64);
@@ -52,6 +48,28 @@ class BytesJsonIterator extends BaseJsonIterator {
     super(head, tail);
     this.buf = buf;
     this.charBuf = new char[charBufferLength];
+  }
+
+  private static long matchPattern(final long input) {
+    // https://richardstartin.github.io/posts/finding-bytes
+    // Hacker's Delight ch. 6: https://books.google.com/books?id=VicPJYM0I5QC&lpg=PP1&pg=PA117#v=onepage&q&f=false
+    return ~(((input & 0x7F7F7F7F7F7F7F7FL) + 0x7F7F7F7F7F7F7F7FL) | input | 0x7F7F7F7F7F7F7F7FL);
+  }
+
+  private static boolean containsPattern(final long input) {
+    return matchPattern(input) != 0;
+  }
+
+  private static long matchQuotePattern(final long word) {
+    return matchPattern(word ^ BytesJsonIterator.QUOTE_PATTERN);
+  }
+
+  private static boolean containsMultiByteOrEscapePattern(final long word) {
+    // A multi-byte UTF-8 byte is any byte with its high bit set, not the exact
+    // byte 0x80: an XOR/zero-byte match here let the word loops in parseString
+    // and skipPastEndQuote hop through multi-byte content and hand off to the
+    // byte-accurate parsers mid-character.
+    return (word & HIGH_BITS) != 0 || containsPattern(word ^ ESCAPE_PATTERN);
   }
 
   @Override
@@ -92,11 +110,6 @@ class BytesJsonIterator extends BaseJsonIterator {
     } catch (final IOException e) {
       throw new UncheckedIOException(e);
     }
-  }
-
-  @Override
-  public JsonIterator reset(final InputStream in, final int bufSize) {
-    return reset(in);
   }
 
   @Override
@@ -190,7 +203,7 @@ class BytesJsonIterator extends BaseJsonIterator {
     boolean special = false;
     for (final int prefixEnd = h + SWAR_PREFIX; h + Long.BYTES <= tail && h < prefixEnd; ) {
       final long word = (long) TO_LONG.get(buf, h);
-      if (containsSpecialPattern(word)) {
+      if (containsMultiByteOrEscapePattern(word)) {
         special = true;
         break;
       }
@@ -262,7 +275,7 @@ class BytesJsonIterator extends BaseJsonIterator {
     throw reportError("parse", "incomplete string");
   }
 
-  void skipPastSingleByteEndQuote() {
+  final void skipPastSingleByteEndQuote() {
     for (byte c; head < tail; head++) {
       c = buf[head];
       if (c == '"') {
@@ -280,7 +293,7 @@ class BytesJsonIterator extends BaseJsonIterator {
   void skipPastEndQuote() {
     for (final int prefixEnd = head + SWAR_PREFIX; head + Long.BYTES <= tail && head < prefixEnd; ) {
       final long word = (long) TO_LONG.get(buf, head);
-      if (containsSpecialPattern(word)) {
+      if (containsMultiByteOrEscapePattern(word)) {
         skipPastMultiByteEndQuote();
         return;
       }
@@ -392,7 +405,7 @@ class BytesJsonIterator extends BaseJsonIterator {
     int h = head;
     for (final int prefixEnd = h + SWAR_PREFIX; h + Long.BYTES <= tail && h < prefixEnd; ) {
       final long word = (long) TO_LONG.get(buf, h);
-      if (containsSpecialPattern(word)) {
+      if (containsMultiByteOrEscapePattern(word)) {
         final int len = parseMultiByteString(0);
         return new String(charBuf, 0, len);
       }
@@ -457,7 +470,13 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  <C> int parse(final C context, final ContextCharBufferToIntFunction<C> applyChars) {
+  final double parse(final CharBufferToDoubleFunction applyChars) {
+    final int len = parse();
+    return applyChars.applyAsDouble(charBuf, 0, len);
+  }
+
+  @Override
+  final <C> int parse(final C context, final ContextCharBufferToIntFunction<C> applyChars) {
     final int len = parse();
     return applyChars.applyAsInt(context, charBuf, 0, len);
   }
@@ -468,16 +487,7 @@ class BytesJsonIterator extends BaseJsonIterator {
     return applyChars.applyAsLong(charBuf, 0, len);
   }
 
-  @Override
-  double parse(final CharBufferToDoubleFunction applyChars) {
-    final int len = parse();
-    return applyChars.applyAsDouble(charBuf, 0, len);
-  }
 
-  @Override
-  double parseNumber(final CharBufferToDoubleFunction applyChars, final int len) {
-    return applyChars.applyAsDouble(charBuf, 0, len);
-  }
 
   @Override
   <C> long parse(final C context, final ContextCharBufferToLongFunction<C> applyChars) {
@@ -510,7 +520,7 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  boolean parseFieldEquals(final String field) {
+  final boolean parseFieldEquals(final String field) {
     final int fieldLength = field.length();
     int i = head;
     for (int f = 0; f < fieldLength; ++f, ++i) {
@@ -546,7 +556,60 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  boolean breakOut(final FieldBufferPredicate fieldBufferFunction, final int offset, final int len) {
+  final int parseFieldName() {
+    // Scan word-at-a-time for the closing quote; a clean ascii name is
+    // returned as a span of buf with no copy. Escapes and multi-byte
+    // characters fall through to the byte-accurate loop below.
+    int i = head;
+    for (int nextOffset = i + Long.BYTES; nextOffset <= tail; ) {
+      final long word = (long) TO_LONG.get(buf, i);
+      if (containsMultiByteOrEscapePattern(word)) {
+        break;
+      }
+      final long tmp = matchQuotePattern(word);
+      if (tmp != 0) {
+        final int quote = i + ((Long.numberOfTrailingZeros(tmp << 1) >>> 3) - 1);
+        fieldBuf = buf;
+        fieldOffset = head;
+        final int len = quote - head;
+        head = quote + 1;
+        return len;
+      }
+      i = nextOffset;
+      nextOffset += Long.BYTES;
+    }
+    for (byte c; i < tail; ++i) {
+      c = buf[i];
+      if (c == '"') {
+        fieldBuf = buf;
+        fieldOffset = head;
+        final int len = i - head;
+        head = i + 1;
+        return len;
+      } else if ((c ^ '\\') < 1) { // escape or multi-byte
+        return parseFieldNameSlow();
+      }
+    }
+    throw reportError("parseFieldName", "incomplete string");
+  }
+
+  /// Escaped or multi-byte field names are rare: unescape into charBuf, then
+  /// re-encode so the matcher always sees the decoded name's UTF-8 bytes.
+  private int parseFieldNameSlow() {
+    final int len = parse();
+    final byte[] utf8 = new String(charBuf, 0, len).getBytes(StandardCharsets.UTF_8);
+    fieldBuf = utf8;
+    fieldOffset = 0;
+    return utf8.length;
+  }
+
+  @Override
+  final int matchField(final FieldMatcher matcher, final int len) {
+    return matcher.match(fieldBuf, fieldOffset, len);
+  }
+
+  @Override
+  final boolean breakOut(final FieldBufferPredicate fieldBufferFunction, final int offset, final int len) {
     return !fieldBufferFunction.test(charBuf, 0, len, this);
   }
 
@@ -556,15 +619,6 @@ class BytesJsonIterator extends BaseJsonIterator {
                        final int offset,
                        final int len) {
     return !fieldBufferFunction.test(context, charBuf, 0, len, this);
-  }
-
-  @Override
-  <C> long test(final C context,
-                final long mask,
-                final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction,
-                final int offset,
-                final int len) {
-    return fieldBufferFunction.test(context, mask, charBuf, 0, len, this);
   }
 
   @Override
@@ -846,7 +900,12 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  <C> long parseNumber(final C context, final ContextCharBufferToLongFunction<C> applyChars, final int len) {
+  final double parseNumber(final CharBufferToDoubleFunction applyChars, final int len) {
+    return applyChars.applyAsDouble(charBuf, 0, len);
+  }
+
+  @Override
+  final <C> long parseNumber(final C context, final ContextCharBufferToLongFunction<C> applyChars, final int len) {
     return applyChars.applyAsLong(context, charBuf, 0, len);
   }
 
@@ -884,7 +943,6 @@ class BytesJsonIterator extends BaseJsonIterator {
     super.skipContainer(open, close, level);
   }
 
-  private static final VarHandle TO_LONG = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
 
   /// SWAR conversion of eight ASCII digits at once, or -1 if any of the eight
   /// bytes is not a digit. simdjson's parse_eight_digits trick; the digit test

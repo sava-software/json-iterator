@@ -25,7 +25,7 @@ final class TestObject {
   @Test
   void test_empty_object() {
     var ji = factory.create("{}");
-    assertNull(ji.readObject());
+    assertNull(ji.skipObjField());
   }
 
   @Test
@@ -36,24 +36,22 @@ final class TestObject {
         \t"hello" }""";
 
     var ji = factory.create(json);
-    assertEquals("field1", ji.readObject());
+    assertEquals("field1", readField(ji));
     assertEquals("hello", ji.readString());
-    assertNull(ji.readObject());
+    assertNull(ji.skipObjField());
 
     ji = factory.create(json);
     assertNull(ji.applyObject(TRUE, ((context, buf, offset, len, jsonIterator) -> {
-          assertEquals(TRUE, context);
-          assertEquals("field1", new String(buf, offset, len));
-          assertEquals("hello", jsonIterator.readString());
-          return jsonIterator.applyObject(FALSE, (_context, _buf, _, _len, _) -> {
-                assertEquals(FALSE, _context);
-                assertEquals(-1, _len);
-                assertNull(_buf);
-                return null;
-              }
-          );
-        })
-    ));
+      assertEquals(TRUE, context);
+      assertEquals("field1", new String(buf, offset, len));
+      assertEquals("hello", jsonIterator.readString());
+      return jsonIterator.applyObject(FALSE, (_context, _buf, _, _len, _) -> {
+        assertEquals(FALSE, _context);
+        assertEquals(-1, _len);
+        assertNull(_buf);
+        return null;
+      });
+    })));
 
     ji = factory.create(json);
     assertEquals(ji, ji.skipObjField());
@@ -64,11 +62,11 @@ final class TestObject {
   @Test
   void test_two_fields() {
     var ji = factory.create("{ \"field1\" : \"hello\" , \"field2\": \"world\" }");
-    assertEquals("field1", ji.readObject());
+    assertEquals("field1", readField(ji));
     assertEquals("hello", ji.readString());
-    assertEquals("field2", ji.readObject());
+    assertEquals("field2", readField(ji));
     assertEquals("world", ji.readString());
-    assertNull(ji.readObject());
+    assertNull(ji.skipObjField());
 
     ji = factory.create("{ \"field1\" : \"hello\" , \"field2\": \"world\" }");
     assertEquals("world", ji.skipUntil("field2").readString());
@@ -78,26 +76,6 @@ final class TestObject {
   void test_skip_until() {
     var ji = factory.create("{ \"field1\" : \"hello\" , \"field2\": {\"nested1\" : \"blah\", \"nested2\": \"world\"} }");
     assertEquals("world", ji.skipUntil("field2").skipUntil("nested2").readString());
-  }
-
-  @Test
-  void test_read_null() {
-    var ji = factory.create("null");
-    assertTrue(ji.readNull());
-  }
-
-  @Test
-  void test_json_pointer() {
-    final var json = "{\"a\":{\"b\":[10,{\"c\":42},30]},\"x~y\":1,\"s/t\":2}";
-    assertEquals(42, factory.create(json).at("/a/b/1/c").readInt());
-    assertEquals(10, factory.create(json).at("/a/b/0").readInt());
-    assertEquals(30, factory.create(json).at("/a/b/2").readInt());
-    assertEquals(1, factory.create(json).at("/x~0y").readInt());
-    assertEquals(2, factory.create(json).at("/s~1t").readInt());
-    assertNull(factory.create(json).at("/a/missing"));
-    assertNull(factory.create(json).at("/a/b/9"));
-    assertEquals(ValueType.OBJECT, factory.create(json).at("").whatIsNext());
-    assertThrows(JsonException.class, () -> factory.create(json).at("a/b"));
   }
 
   private static final String TRICKY_FIELDS_JSON = "{\"wan\":1,\"wanted\":2,\"a\\\"b\":3,\"中文\":4,\"want\":42}";
@@ -123,12 +101,35 @@ final class TestObject {
 
   @Test
   void test_skip_until_across_buffer_boundaries() {
-    // InputStream sources are read fully upfront, so the bufSize sweep just
-    // re-verifies field matching through the deprecated entry points
+    // InputStream sources are read fully upfront; this re-verifies field
+    // matching through the stream entry point
     final var bytes = TRICKY_FIELDS_JSON.getBytes(StandardCharsets.UTF_8);
-    for (int bufSize = 4; bufSize <= bytes.length; ++bufSize) {
-      final var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), bufSize);
-      assertEquals(42, ji.skipUntil("want").readInt(), "bufSize=" + bufSize);
-    }
+    final var ji = JsonIterator.parse(new ByteArrayInputStream(bytes));
+    assertEquals(42, ji.skipUntil("want").readInt());
+  }
+
+  @Test
+  void test_read_null() {
+    var ji = factory.create("null");
+    assertTrue(ji.readNull());
+  }
+
+  @Test
+  void test_json_pointer() {
+    final var json = "{\"a\":{\"b\":[10,{\"c\":42},30]},\"x~y\":1,\"s/t\":2}";
+    assertEquals(42, factory.create(json).at("/a/b/1/c").readInt());
+    assertEquals(10, factory.create(json).at("/a/b/0").readInt());
+    assertEquals(30, factory.create(json).at("/a/b/2").readInt());
+    assertEquals(1, factory.create(json).at("/x~0y").readInt());
+    assertEquals(2, factory.create(json).at("/s~1t").readInt());
+    assertNull(factory.create(json).at("/a/missing"));
+    assertNull(factory.create(json).at("/a/b/9"));
+    assertEquals(ValueType.OBJECT, factory.create(json).at("").whatIsNext());
+    assertThrows(JsonException.class, () -> factory.create(json).at("a/b"));
+  }
+
+
+  private static String readField(final JsonIterator ji) {
+    return ji.applyObject((buf, offset, len, _) -> buf == null ? null : new String(buf, offset, len));
   }
 }

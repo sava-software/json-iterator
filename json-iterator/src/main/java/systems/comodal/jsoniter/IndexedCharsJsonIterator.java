@@ -60,11 +60,6 @@ final class IndexedCharsJsonIterator extends CharsJsonIterator implements Indexe
     }
   }
 
-  @Override
-  public JsonIterator reset(final InputStream in, final int bufSize) {
-    return reset(in);
-  }
-
 
   @Override
   public JsonIterator findField(final String field) {
