@@ -1,0 +1,7 @@
+Benchmark                           (document)  Mode  Cnt     Score   Error  Units
+MinifyKernelBench.scalar               twitter  avgt    2   567.657          us/op
+MinifyKernelBench.scalar                solana  avgt    2  3687.353          us/op
+MinifyKernelBench.vector               twitter  avgt    2   551.267          us/op
+MinifyKernelBench.vector                solana  avgt    2  2046.912          us/op
+Stage1KernelBench.stage1                   N/A  avgt    2  2408.974          us/op
+Stage1KernelBench.stage1Validating         N/A  avgt    2  2524.001          us/op
