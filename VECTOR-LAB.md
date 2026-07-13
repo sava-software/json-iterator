@@ -106,7 +106,9 @@ for what each kernel looked like wired into the library —
   machine (Apple M-series) gets noisy under sustained benching. Kernel benches
   cross-check variants at `@Setup`; a mismatch is a correctness bug, not noise.
 - `jmh/README.md` holds the migration decision table and measurement methodology
-  inherited from main's FieldMatcher work.
+  inherited from main's FieldMatcher work. `jmh/VECTOR.md` is this branch's results
+  document — benchmark conclusions, verdicts, and action triggers for the open
+  questions; update it whenever a kernel bench produces decision-grade data.
 
 ## Performance truths (measured on 128-bit NEON, Apple M-series, on the retired fork)
 
