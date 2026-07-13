@@ -31,10 +31,10 @@ stage 1 pays ~14 ms before reading a single value from this document. The vector
 version remains capped ~2 GB/s on NEON by the 12 `mask.toLong()` extractions per
 64-byte block (the C++ simdjson `vpaddq` reduction tree is not expressible in the
 Vector API). Fused validation is nearly free (~4%).
-**`selectFrom` experiment:** replacing the nibble lookup's `toShuffle`+`rearrange`
-with `selectFrom` (NEON TBL-shaped) measured 2.24 ms vs 2.35 ms same-run — a ~5%
-gain with barely separated error bars. Promising; adopt as the default
-classification after an isolated 3-fork confirmation.
+**`selectFrom` experiment — not adopted on NEON.** The same-run 2-fork ~5% gain
+did not survive an isolated 3-fork confirmation: 2373 ± 77 (rearrange) vs
+2344 ± 202 (selectFrom) — a statistical tie, textbook two-fork tease. The variant
+stays benched for wide lanes, where table-lookup lowering differs.
 **Action trigger:** wide-lane re-measurement. If ≥256-bit lanes lift stage 1 well
 past NEON's cap, indexed navigation's economics revive alongside the finalized
 Vector API; if not, the indexed bet dies on all hardware.
@@ -99,12 +99,27 @@ SWAR probe (up to 3 clean words) before entering vector chunks. Results:
 | escaped_json | 34.0 | 98.3 | 35.4 — vector's 3x loss neutralized |
 | cjk | 56.9 | 385.3 | 89.9 — 6.7x loss collapsed to 1.6x, still losing |
 
-The adaptive shape is directionally right: it captures the sparse-run upside and
-neutralizes most of the downside. Remaining flaw: the SWAR probe itself costs one
-word-load per run, which dense-stop content pays on every character (the CJK 1.6x).
-**Next refinement:** hysteresis — only probe after N consecutive clean scalar bytes
-(a multibyte character strongly predicts another), targeting CJK parity while
-keeping the log-line win. Not integration-ready until CJK reaches ~1.0x.
+**Gating refuted (streak and one-shot variants, since removed).** Two hysteresis
+designs were implemented and measured: probe gated on a 4-byte clean streak, and
+the same gate with one-shot arming per run. Both achieved CJK parity (55-57 µs vs
+scalar 55.9) but both paid an equal ~1.8x pathology on mixed-emoji content
+(42 µs vs scalar 23.9) — and since one-shot firing did not help, the cost is the
+gate itself: per-character streak/armed bookkeeping deforms the JIT's tight scalar
+loop, not the probes it saves. Full final table (2 forks):
+
+| Profile | scalar | vector | v1 always-probe | streak | one-shot |
+|---|---|---|---|---|---|
+| ascii_newlines | 38.6 | 9.7 | 11.8 | 15.7 | 15.1 |
+| european | 42.6 | 64.5 | 38.4 | 36.4 | 38.5 |
+| cjk | 55.9 | 375.3 | 88.7 | 55.1 | 56.9 |
+| escaped_json | 32.0 | 96.9 | 36.4 | 37.8 | 40.9 |
+| emoji_mixed | 23.9 | 21.9 | 24.3 | 42.6 | 42.2 |
+
+`decodeAdaptive` (v1) remains the leading shape: best wins, smallest worst-case
+(CJK 1.59x). Still short of the breadth bar (worst-case ~1.1x).
+**Next design:** per-string triage instead of per-run gating — one word-load at
+string entry counting high-bit density routes the whole string to pure scalar
+(CJK) or v1 (everything else), keeping the hot loops themselves unmodified.
 
 ## Question 4 — Container skipping (`SkipContainerKernelBench`)
 
