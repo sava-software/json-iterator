@@ -144,6 +144,44 @@ final class StructuralIndex {
     }
   }
 
+  /// Scalar twin of the vector classification: the same four masks built by a
+  /// per-byte sweep. Exists so Stage1KernelBench tracks the vector-vs-scalar
+  /// delta — the number that decides whether indexed navigation's economics
+  /// revive on wide lanes.
+  void indexScalar(final byte[] buf, final int from, final int to) {
+    this.utf8 = null;
+    begin(to - from);
+    int offset = from;
+    int last = from;
+    for (; offset + BLOCK <= to; offset += BLOCK) {
+      scalarByteBlock(buf, offset, offset);
+      last = offset;
+    }
+    if (offset < to) {
+      Arrays.fill(lastByteBlock, (byte) ' ');
+      System.arraycopy(buf, offset, lastByteBlock, 0, to - offset);
+      scalarByteBlock(lastByteBlock, 0, offset);
+      last = offset;
+    }
+    finish(last, to);
+  }
+
+  private void scalarByteBlock(final byte[] src, final int srcOffset, final int blockStart) {
+    long backslash = 0, quote = 0, whitespace = 0, op = 0;
+    for (int i = 0; i < BLOCK; ++i) {
+      final long bit = 1L << i;
+      switch (src[srcOffset + i]) {
+        case '\\' -> backslash |= bit;
+        case '"' -> quote |= bit;
+        case ' ', '\t', '\n', '\r' -> whitespace |= bit;
+        case ':', ',', '{', '}', '[', ']' -> op |= bit;
+        default -> {
+        }
+      }
+    }
+    block(blockStart, backslash, quote, whitespace, op);
+  }
+
   private void byteBlock(final byte[] src, final int srcOffset, final int blockStart) {
     final var species = VectorSupport.BYTE_SPECIES;
     final int lanes = VectorSupport.BYTE_LANES;

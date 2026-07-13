@@ -14,15 +14,48 @@ All Vector API experimentation lives in the `jmh/` composite build:
   `VectorSupport` (species selection). Kernels live in their own source set because
   the JMH bytecode generator reflects every class in the `jmh` source set in a JVM
   without the incubator module — classes with vector-typed fields must stay out of it.
-- `jmh/src/jmh/java/.../jmh/vector` — kernel benches (`Stage1KernelBench`), sharing the
-  kernels' package for package-private access.
+- `jmh/src/jmh/java/.../jmh/vector` — kernel benches (`Stage1KernelBench`,
+  `StringScanKernelBench`), sharing the kernels' package for package-private access.
 
-The lab intentionally holds exactly one open question: stage-1 structural-indexing
-throughput on wide lanes, which decides whether indexed navigation's economics revive
-once the Vector API finalizes. Kernels whose feature verdict is already settled were
-removed (JsonMinifier/MinifyKernelBench with the minify verdict; DecodeBase64Bench
-refereed a closed door) — they remain in this branch's history and in
-`vectorize-archive`.
+**Scope principle: consumer surveys gate API surface, never scan-path coverage.**
+The parser must serve the breadth of JSON in the wild — international scripts,
+escape density, every string-length regime — regardless of what the currently
+surveyed consumers feed it. Performance questions on scan/decode paths are judged
+across content shapes, not against one ecosystem's documents.
+
+The lab holds three open questions, each with a bench that tracks the
+scalar-vs-vector delta directly:
+
+1. **Stage-1 structural indexing on wide lanes** (`Stage1KernelBench`: vector vs
+   scalar classification vs validating) — decides whether indexed navigation's
+   economics revive once the Vector API finalizes. First NEON data: vector
+   classification 2.34 ms vs scalar 14.3 ms on the 4.7 MiB block (6.1x) —
+   empirical confirmation that scalar-backed indexing was rightly rejected;
+   fused validation costs ~4%.
+2. **String scanning: main's SWAR vs the fork's hybrid SWAR-prefix+vector**
+   (`StringScanKernelBench`: widen and skip shapes across a string-length sweep).
+   First NEON kernel data (2 forks): the skip shape crosses over between 24 and 44
+   bytes — vector wins 18% at 44 B, 38% at 88 B (base58 key/signature lengths),
+   3.1x at 512 B, 4x at 4 KiB; the widen shape crosses over near ~64 B (21% at
+   88 B, 3x at 4 KiB), with vector no worse than ~7% below the crossover. This is
+   the #1 integration candidate for a short-lived branch off main; the open part
+   is whether integrated wins survive per-string dispatch and mixed-length
+   documents (the fork's integrated skip-heavy losses say not automatically).
+3. **Escape/multibyte decode: main's scalar byte-at-a-time vs the fork's
+   vector run-copy** (`MultiByteDecodeKernelBench`, per the scope principle above:
+   profiles sweep clean-run length between stops). First NEON data (2 forks) is
+   sharply bimodal: vector wins 4x on sparse-stop content (log lines, escape
+   every ~54 B) and ties at ~20-char runs (emoji_mixed), but loses 1.6x on
+   European text, 3x on escape-dense embedded JSON, and 6.7x on dense CJK.
+   Neither pure idiom is shippable for broad content: the fork's unconditional
+   run-copy fast-paths English and punishes CJK. The open research question is
+   an **adaptive decoder** — stay scalar until a clean-run streak justifies
+   vector chunks (the SWAR-prefix insight applied per run), with the crossover
+   near ~16-24 clean bytes — and whether wide lanes move that crossover.
+
+Kernels whose feature verdict is already settled were removed
+(JsonMinifier/MinifyKernelBench with the minify verdict; DecodeBase64Bench refereed
+a closed door) — they remain in this branch's history and in `vectorize-archive`.
 
 Consequences of the invariant:
 

@@ -33,14 +33,20 @@ public class Stage1KernelBench {
       throw new UncheckedIOException(e);
     }
     index = new StructuralIndex();
-    if (stage1() != stage1Validating()) {
-      throw new IllegalStateException("validating stage 1 changed the structural count");
+    if (stage1() != stage1Validating() || stage1() != stage1Scalar()) {
+      throw new IllegalStateException("stage 1 variants disagree on the structural count");
     }
   }
 
   @Benchmark
   public int stage1() {
     index.index(json, 0, json.length);
+    return index.count();
+  }
+
+  @Benchmark
+  public int stage1Scalar() {
+    index.indexScalar(json, 0, json.length);
     return index.count();
   }
 
