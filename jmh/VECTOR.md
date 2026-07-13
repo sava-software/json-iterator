@@ -1,7 +1,7 @@
 # Vector API Lab — Benchmark Conclusions
 
 Results and verdicts from the kernel benchmarks on the `vector-lab` branch. The lab
-model and methodology live in `../AGENTS.md`; run instructions and the shared
+model and methodology live in `../VECTOR-LAB.md`; run instructions and the shared
 measurement rules (3+ forks for decisions, isolation, error-bar hygiene) in
 `README.md`. This file records what the numbers concluded.
 
@@ -182,9 +182,23 @@ and nested before integration is considered.
   doesn't have.
 - **Char-source base64 narrowing** (`DecodeBase64Bench`, removed with the closed
   door): the vector `char[]→byte[]` narrowing was a real 3–6% end-to-end win on
-  the chars path — the door is closed by consumer reality (all consumers feed
-  `byte[]`; 16-bit lanes halve throughput forever), not because the vector code
-  lost.
+  the chars path — the door is closed by consumer reality (no surveyed consumer
+  feeds `char[]`; 16-bit lanes halve throughput forever), not because the vector
+  code lost.
+  **Re-argued 2026-07-13 against main's new `SourceBench`; the door holds, and the
+  prize is now sized.** The old supporting claim — "a `char[]` holder should narrow
+  to bytes once" — turned out to be *wrong* and has been struck from both branches:
+  for a UTF-16-backed String, `getBytes()` is a transcode (691 µs on twitter) while
+  `toCharArray()` is a copy (65 µs), so a String-holding consumer should feed
+  `char[]`, and main's docs now tell them to. The char path can therefore acquire
+  users for the first time. It changes nothing, because the same measurements bound
+  the upside: main puts the scalar char-path tax at **+10% (twitter) / +20%
+  (solana)**, which for that consumer is 45 µs of a 560 µs parse — while routing
+  them onto the right road already saved 579 µs. **A perfect vector char scan is
+  worth ~5% of what the routing fix was worth**, and 3–6% is what it measured.
+  Add the shipping cost — `jdk.incubator.vector` forces `--add-modules` on every
+  downstream consumer — and the trade is not close. Reopening requires *both* a real
+  hot-`char[]` consumer *and* a finalized Vector API.
 - **Scalar-backed indexed navigation**: rejected structurally during the 2026-07
   promotion review; Question 1's 6.1× scalar penalty is the measurement behind it.
 - **Custom vector base64 decode** (`Base64DecodeBench`): no headroom. The JDK

@@ -1,8 +1,15 @@
-# Agent Context — vector-lab
+# Vector Lab Charter — the `vector-lab` branch
 
 Context for working on the `vector-lab` branch of json-iterator. Read this before
 nontrivial changes; it encodes decisions and measured results that are expensive to
 rediscover.
+
+**Read `AGENTS.md` first — it is byte-identical to main's** and carries what both
+branches share: the correctness landmines (the position-sweep tests that police every
+scan-path change), the closed doors, the settled API and data-source verdicts, and the
+benchmark discipline. This file adds only what is specific to the lab. Keeping the two
+separate is deliberate: it is what lets this branch rebase onto `main` without ever
+conflicting.
 
 ## The lab model (this branch's invariant)
 
@@ -61,8 +68,17 @@ a closed door) — they remain in this branch's history and in `vectorize-archiv
 
 Consequences of the invariant:
 
-- Rebasing this branch onto `main` never conflicts in library sources by construction.
-  If a rebase does conflict there, someone broke the invariant — fix that first.
+- Rebasing this branch onto `main` never conflicts, in library sources or docs, by
+  construction. If a rebase conflicts anywhere, someone broke the invariant — fix that
+  first, don't resolve it away.
+- **`AGENTS.md` stays byte-identical to main's; branch-specific context goes here.** That
+  is the whole reason this file exists. It briefly was not: on 2026-07-13 main grew its
+  own `AGENTS.md` while this branch's `AGENTS.md` held the charter, which would have
+  conflicted on every single rebase — with the failure mode that someone resolves
+  `theirs` and silently deletes the lab. If you find yourself wanting to add lab context
+  to `AGENTS.md`, that is the mistake; add it here. If a genuinely *shared* truth is
+  learned here (a closed door, a measurement lesson), it belongs in `AGENTS.md` on
+  `main` and arrives on this branch by rebase — never by editing `AGENTS.md` here.
 - There is no bug-fix porting: the library has one copy, on `main`.
 - Kernel-vs-library comparisons use the library's public IOC hooks: implement each
   variant as a `CharBufferFunction` (or `FieldMatcher.match` call) and drive it through
@@ -107,10 +123,28 @@ for what each kernel looked like wired into the library —
 - Decision-grade comparisons need `-PjmhFork=3`+ and isolation from other load; this
   machine (Apple M-series) gets noisy under sustained benching. Kernel benches
   cross-check variants at `@Setup`; a mismatch is a correctness bug, not noise.
-- `jmh/README.md` holds the migration decision table and measurement methodology
-  inherited from main's FieldMatcher work. `jmh/VECTOR.md` is this branch's results
-  document — benchmark conclusions, verdicts, and action triggers for the open
-  questions; update it whenever a kernel bench produces decision-grade data.
+- `jmh/README.md` holds the migration decision table, the data-source decision table
+  (`SourceBench`), and the measurement methodology inherited from main's FieldMatcher
+  work. `jmh/VECTOR.md` is this branch's results document — benchmark conclusions,
+  verdicts, and action triggers for the open questions; update it whenever a kernel
+  bench produces decision-grade data.
+
+The measurement rules live in `AGENTS.md` (fork counts, isolation, the 10%-error
+contamination threshold, the same-session control, `uptime` before trusting a run,
+`-prof gc` for costs that hide from the score). Two of them bite *harder* here than on
+main, because this branch's entire method is scalar-vs-vector deltas:
+
+- **Bench the scalar variant in the same run as the vector one — never against a number
+  already sitting in `VECTOR.md`.** Those numbers are from other sessions on a machine
+  that has been shown to move 23% under background load. Main learned this the expensive
+  way: a "10-20% InputStream tax" reached its docs purely from a cross-run comparison,
+  and a same-session control put the true figure at +1.4%. Every table in `VECTOR.md` is
+  a historical record, not a baseline to measure against.
+- **Judge any allocation-trading kernel on `gc.alloc.rate.norm`, not `avgt`.** Run-copy
+  buffers and per-string scratch buy speed with garbage, and that cost can be *invisible*
+  in the score — main's stream source ties on latency while allocating 22x more and
+  spending 43x the GC time. The library targets a long-running service; the collector
+  pays what the benchmark doesn't.
 
 ## Performance truths (measured on 128-bit NEON, Apple M-series, on the retired fork)
 
@@ -142,31 +176,39 @@ lanes (cloud x86 or Graviton/SVE; the jmh jar is self-contained).
   documents but its stage-1 fixed cost (~2.4 ms / 4.7 MiB) loses read-everything
   workloads.
 
-## Closed doors (workload-structural — no hardware or JDK will reopen them)
+## Closed doors
 
-- **Never vectorize the `char[]`-source paths.** Every surveyed consumer feeds `byte[]`
-  (`parse(String)` routes through `getBytes()`); 16-bit lanes halve throughput forever;
-  a perf-sensitive `char[]` holder should narrow to bytes once. Measured cost of the
-  scalar revert on the retired fork: the vector `DECODE_BASE64` narrowing was a real
-  3-6% end-to-end win (DecodeBase64Bench, since removed with the door) — the door is closed by consumer reality,
-  not because the vector code lost.
-- **Never vectorize field-name scanning.** Surveyed names average 12.5 bytes, max ~34;
-  a 32-byte SWAR prefix covers essentially all of them before a vector chunk engages.
-- **Never vectorize dispatch comparison.** `FieldMatcher.match` is two word loads + a
-  mix; chains win below ~8-10 names, the hash above — no regime fits a vector compare
-  of ≤34-byte names or `matchString` values.
+**The three closed doors live in `AGENTS.md`** — never vectorize the `char[]`-source
+paths, field-name scanning, or dispatch comparison. They are shared with `main` because
+they are workload-structural: no hardware and no JDK reopens them, so they bind the lab
+as much as the library. Don't re-derive them here, and don't propose a kernel that walks
+through one.
 
-## Correctness landmines (each has bitten, on the retired fork)
+The `char[]` door was re-argued on 2026-07-13 against main's new `SourceBench` and it
+held, but the argument changed shape and the full data is in `jmh/VECTOR.md`'s settled
+verdicts. The short version, because it is the one most likely to be re-litigated *here*:
+the old supporting claim "a `char[]` holder should narrow to bytes once" was **wrong** and
+is struck — a String-holding consumer should feed `char[]`, so the char path can finally
+acquire users. It reopens nothing, because the same measurements bound the prize: a
+perfect vector char scan is worth **~5% of what merely routing that consumer correctly is
+worth**, and 3-6% is what it measured. Add the shipping cost — `jdk.incubator.vector`
+forces `--add-modules` on every downstream consumer — and it is not close. Reopening needs
+*both* a real hot-`char[]` consumer *and* a finalized Vector API.
 
-- Silent-wrong-answer bugs cluster in per-byte/word/vector scanning paths (the
-  published 21.0.12 multibyte corruption; base64 escape misdecoding; chars
-  `handleEscapes` stripping without decoding). The library's position-sweep tests
-  (`test_escape_positions_across_vector_widths`, `test_long_utf8_strings`,
-  `testDecodeBase64Robustness`, `test_skip_until_tricky_field_names`) are the police
-  for integration branches; kernel benches must cross-check outputs at `@Setup`.
-- Multibyte lead bytes are `< 0` as signed bytes; bytes exactly `0x80` appear
-  mid-character in common text. `\/` is legal JSON and `/` is in the base64 alphabet.
-  Surrogate pairs arrive as two `\u` escapes and must pair-validate.
-- javac processes `\u` escapes inside comments.
-- JMH + incubator: vector-typed fields must not appear in generator-scanned classes
-  (see the lab-model section); JMH forks inherit the parent JVM's flags.
+That shipping cost is the lab's own reason to exist: **nothing here can ship while the
+Vector API incubates**, whatever it measures. Kernels are banked against a finalized API,
+not queued for the next release.
+
+## Correctness landmines specific to the lab
+
+The library's landmines — the position-sweep tests that police every scan-path change,
+signed lead bytes, `\/` versus the base64 alphabet, surrogate pairs, `\u` in comments —
+are in `AGENTS.md` and apply to every integration branch cut from here. Two are peculiar
+to this branch:
+
+- **Kernel benches must cross-check their variants' outputs at `@Setup`.** A scalar/vector
+  mismatch is a correctness bug, not noise, and `-foe true` turns it into a hard failure.
+  Vector scan bugs are silent-wrong-answer bugs; a kernel that is fast and wrong looks
+  exactly like a kernel that is fast.
+- **JMH + incubator:** vector-typed fields must not appear in generator-scanned classes
+  (see the lab-model section above); JMH forks inherit the parent JVM's flags.
