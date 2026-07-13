@@ -34,15 +34,24 @@ full suite and benches, then merge or delete. Kernel-level wins do not predict
 integrated results — the SWAR-prefix/hit-cost interaction was only visible in
 full-path benches.
 
-**Promotion path for API features** (e.g. `IndexedJsonIterator`, `at()`, minify):
-features that work with scalar backends are promoted to `main` as ordinary feature
-branches with the vector parts replaced by scalar code (see `feat/scalar-features`);
-the vector kernels stay here until the Vector API finalizes (the post-Valhalla bet) or
-a runtime gate with scalar fallbacks justifies shipping them.
+**Promotion path for API features**: a feature that works with a scalar backend can be
+promoted to `main` as an ordinary feature branch with the vector parts replaced by
+scalar code; the vector kernels stay here until the Vector API finalizes (the
+post-Valhalla bet) or a runtime gate with scalar fallbacks justifies shipping them.
+Promotion candidates must clear the same bar as any main API: consumer-survey demand,
+and no structural dominance by existing primitives. The 2026-07 promotion review of
+the fork's features came up **empty** against that bar, which is the cautionary
+precedent: scalar-backed `IndexedJsonIterator` fails structurally (scalar stage 1
+classifies every byte slower than the plain iterator's SWAR skips, so single-pass
+workloads — all surveyed consumers — cannot win; only parse-once-query-many could,
+and nobody has that pattern); `at()` is a per-call-allocating alias for `skipUntil`
+chains; minify serves an audience this library doesn't have. All three remain in
+`vectorize-archive` with their real (vector) engines.
 
-The retired long-lived research fork is `feature/vectorize` (frozen at its final
-alignment commit); its integrated implementations are the reference for what each
-kernel looked like wired into the library.
+The retired long-lived research fork is preserved as the `vectorize-archive` tag
+(the branch itself was deleted); its integrated implementations are the reference
+for what each kernel looked like wired into the library —
+`git checkout vectorize-archive`, or browse the tag on GitHub.
 
 ## Build, test, benchmark
 
