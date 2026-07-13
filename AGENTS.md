@@ -131,8 +131,10 @@ them. They are conclusions, not open questions:
 
 Everything else vector-related is **research, and it does not live on `main`.** The
 `vector-lab` branch holds the kernels and benches (its library sources are byte-identical
-to main by invariant); the retired long-lived fork is the `vectorize-archive` tag. If you
-want to land a vector optimization here, the process is: prove the kernel on
+to main by invariant, and its charter is `VECTOR-LAB.md`, a file that exists only on that
+branch — this `AGENTS.md` is common to both); the retired long-lived fork is the
+`vectorize-archive` tag. If you want to land a vector optimization here, the process is:
+prove the kernel on
 `vector-lab`, then cut a **short-lived branch off `main`**, wire it in, and judge it with
 the full suite. Kernel wins do not survive integration automatically — the string-scan
 hybrid won 18–38% at kernel level on exactly the string lengths this library sees, then
