@@ -10,23 +10,29 @@ rediscover.
 All Vector API experimentation lives in the `jmh/` composite build:
 
 - `jmh/src/vectorKernels/java` — vector kernels (`systems.comodal.jsoniter.jmh.vector`):
-  currently `StructuralIndex` (simdjson-style stage 1), `Utf8Validator`, `JsonMinifier`,
-  and `VectorSupport` (species selection). Kernels live in their own source set because
+  currently `StructuralIndex` (simdjson-style stage 1), `Utf8Validator`, and
+  `VectorSupport` (species selection). Kernels live in their own source set because
   the JMH bytecode generator reflects every class in the `jmh` source set in a JVM
   without the incubator module — classes with vector-typed fields must stay out of it.
-- `jmh/src/jmh/java/.../jmh/vector` — kernel benches (`MinifyKernelBench`,
-  `Stage1KernelBench`), sharing the kernels' package for package-private access.
-  `DecodeBase64Bench` (library-API-driven, no kernel dependency) lives in the main
-  bench package.
+- `jmh/src/jmh/java/.../jmh/vector` — kernel benches (`Stage1KernelBench`), sharing the
+  kernels' package for package-private access.
+
+The lab intentionally holds exactly one open question: stage-1 structural-indexing
+throughput on wide lanes, which decides whether indexed navigation's economics revive
+once the Vector API finalizes. Kernels whose feature verdict is already settled were
+removed (JsonMinifier/MinifyKernelBench with the minify verdict; DecodeBase64Bench
+refereed a closed door) — they remain in this branch's history and in
+`vectorize-archive`.
 
 Consequences of the invariant:
 
 - Rebasing this branch onto `main` never conflicts in library sources by construction.
   If a rebase does conflict there, someone broke the invariant — fix that first.
 - There is no bug-fix porting: the library has one copy, on `main`.
-- Kernel-vs-library comparisons use the library's public IOC hooks
-  (`CharBufferFunction`, `applyChars*`, `FieldMatcher.match`) — see `DecodeBase64Bench`
-  for the pattern.
+- Kernel-vs-library comparisons use the library's public IOC hooks: implement each
+  variant as a `CharBufferFunction` (or `FieldMatcher.match` call) and drive it through
+  `applyChars*` on a real iterator — no library fork needed. The removed
+  DecodeBase64Bench (in history) is the worked example.
 
 **Integration experiments** (vectorizing the library's private scan loops) do not
 happen here: cut a short-lived branch off `main`, wire the proven kernel in, run the
@@ -56,7 +62,7 @@ for what each kernel looked like wired into the library —
 ## Build, test, benchmark
 
 - Benchmarks: `./gradlew -p jmh jmh` from the repo root, or filtered:
-  `./gradlew -p jmh jmh -PjmhIncludes=MinifyKernel -PjmhFork=3`. All `-Pjmh*` overrides
+  `./gradlew -p jmh jmh -PjmhIncludes=Stage1Kernel -PjmhFork=3`. All `-Pjmh*` overrides
   come from the shared `software.sava.build.feature.jmh` convention (sibling
   `../sava-build` checkout), which also archives per-run results under
   `jmh/jmh-results/` and re-renders `build/results/jmh/results.txt` as the newest-wins
@@ -89,11 +95,10 @@ lanes (cloud x86 or Graviton/SVE; the jmh jar is self-contained).
 - **Stage 1 is capped ~2 GB/s on NEON** by 12 `toLong()`s per 64-byte block
   (`Stage1KernelBench` reproduces this); the C++ simdjson `vpaddq` reduction tree is
   not expressible in the Vector API. First thing to re-measure on wide lanes.
-- **`compress()` has no NEON lowering** — JsonMinifier uses run-based copies instead.
-  `MinifyKernelBench` (3 forks, NEON): the vector minifier's win is workload-shaped,
-  not universal — 1.7x over scalar on the Solana block (long base58 runs) but a tie on
-  twitter (dense short strings, 525±38 vs 505±4 us). Minify promotion decisions should
-  weigh the consumer's document shape.
+- **`compress()` has no NEON lowering** — the (removed) JsonMinifier kernel used
+  run-based copies instead. Its final measurements (3 forks, NEON) showed the vector
+  win is workload-shaped, not universal: 1.7x over scalar on the Solana block (long
+  base58 runs) but a tie on twitter (dense short strings, 525±38 vs 505±4 us).
 - Fork-era standings vs published: published led short-string and skip-heavy workloads;
   the fork led long uniform runs (long strings ~1.5x, minify ~1.9x); parity on Solana
   full walks, doubles, dates. `IndexedJsonIterator` won selective access over large
@@ -106,7 +111,7 @@ lanes (cloud x86 or Graviton/SVE; the jmh jar is self-contained).
   (`parse(String)` routes through `getBytes()`); 16-bit lanes halve throughput forever;
   a perf-sensitive `char[]` holder should narrow to bytes once. Measured cost of the
   scalar revert on the retired fork: the vector `DECODE_BASE64` narrowing was a real
-  3-6% end-to-end win (`DecodeBase64Bench`) — the door is closed by consumer reality,
+  3-6% end-to-end win (DecodeBase64Bench, since removed with the door) — the door is closed by consumer reality,
   not because the vector code lost.
 - **Never vectorize field-name scanning.** Surveyed names average 12.5 bytes, max ~34;
   a 32-byte SWAR prefix covers essentially all of them before a vector chunk engages.
