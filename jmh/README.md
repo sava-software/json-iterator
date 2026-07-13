@@ -99,7 +99,7 @@ The two documents differ in the way that turns out to matter most: twitter is
 | `string_parse` — `parse(String)` | 1139 ± 34 | 5225 ± 180 | **2.53× / 1.33×** | **Never feed a `String`.** See below |
 | `string_toChars` — `parse(str.toCharArray())` | **560 ± 21** | 5600 ± 268 | 1.24× / 1.43× | The *other* road out of a String, and on UTF-16 content it beats `parse(String)` by **2.03×**. See below |
 | `chars_reset` — reuse one chars iterator | 495 ± 6 | 4699 ± 302 | 1.10× / 1.20× | The char-path tax: 16-bit words scan half the payload per load. Real, but an order of magnitude smaller than the String tax |
-| `stream_reset` — `reset(InputStream)` | 526 ± 96 ⚠️ | 4296 ± 181 | 1.17× / 1.10× | Roughly a 10–20% tax, but **GC-sensitive and unstable across runs** (the previous run had twitter free and solana at +19%): `readAllBytes()` allocates a full-document copy per call. There is **no incremental parse** — the stream is read to EOF and the resulting array is iterated |
+| `stream_reset` — `reset(InputStream)` | 462 ± 7 | ~4712 ⚠️ | 1.00× / ~1.21× | Nearly free in *latency* on the small document, but it allocates a full-document copy per call and the cost lands on the collector instead. See below. There is **no incremental parse** — the stream is read to EOF and the resulting array is iterated |
 
 ### The String tax is an encode, not a copy — and which conversion is expensive depends on the String
 
@@ -116,6 +116,31 @@ conversions, and they invert between the documents:
 Each String pays whichever conversion runs against the grain of its own backing.
 A UTF-16 String yields chars almost free and must transcode to yield bytes; a
 Latin-1 String yields bytes almost free and must inflate to yield chars.
+
+### The stream source's cost is GC, not latency
+
+`parse(InputStream)` and `reset(InputStream)` both call `readAllBytes()` and
+iterate the resulting array — there is no incremental parse. The `-prof gc` run
+(`SourceBench.(stream_reset|bytes_reset)`, `-f 3`) prices that copy exactly:
+
+| | `bytes_reset` | `stream_reset` | delta | document size |
+|---|---|---|---|---|
+| twitter alloc/op | 30,336 B | 661,864 B | **+631,528 B** | 631,515 B |
+| solana alloc/op | 575,858 B | 5,331,826 B | **+4,755,968 B** | 4,755,919 B |
+
+One full-document copy per call, to within ~50 bytes (±0.009 B/op error).
+
+The trap is that **this barely shows up in the parse timing.** On twitter,
+`stream_reset` ties `bytes_reset` (462 vs 464 µs) — while its allocation rate goes
+from 62 to 1367 MB/s (22×), GC count from 6 to 162, and GC time from 5 ms to
+213 ms (43×). The stream source doesn't pay for the copy in latency; it hands the
+bill to the collector. In the long-running service this library targets, that is
+the cost that matters, and it is exactly the cost a benchmark score hides. (On
+solana the latency cost does surface, ~+21%, because a 4.7 MiB array per call is
+a large-object allocation on a slower ZGC path.)
+
+If you have an `InputStream`, read it yourself and keep the array; feeding the
+stream to the iterator on every document buys nothing and allocates a copy of it.
 
 Two rules follow:
 

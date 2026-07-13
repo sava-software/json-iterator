@@ -85,9 +85,14 @@ Two corollaries that are easy to get backwards:
   inflate), which is why `getBytes()` edges it there by ~7%, within noise. **Never
   repeat "narrow to bytes once" as general advice** — it holds only when the bytes never
   became a String in the first place.
-- **There is no incremental parse.** `parse(InputStream)` and `reset(InputStream)` both
-  call `readAllBytes()` and iterate the resulting array. The stream source is a
-  full-document copy, not a streaming win, and it allocates one per call.
+- **There is no incremental parse, and the stream source's cost is GC, not latency.**
+  `parse(InputStream)` and `reset(InputStream)` both call `readAllBytes()` and iterate
+  the resulting array. `-prof gc` prices it exactly: one full-document copy allocated
+  per call (+631,528 B/op on the 631,515 B document; +4,755,968 B/op on the 4,755,919 B
+  one). The trap is that this is nearly **invisible in the parse timing** — on the
+  smaller document `stream_reset` *ties* `bytes_reset` while its allocation rate goes
+  22× and its GC time 43×. Judge the stream API by `gc.alloc.rate.norm`, not by the
+  score; in a long-running service the collector pays what the benchmark doesn't.
 
 **Three features were reviewed for promotion in 2026-07 and rejected on the merits.**
 They exist, fully implemented, on the `vectorize-archive` tag. Don't resurrect them
@@ -154,4 +159,18 @@ bad run's rows. Every benchmark cross-checks its variants' checksums at `@Setup`
 
 A same-session control run matters more than a historical baseline: when judging a
 change, measure `main` and the change back-to-back on the same machine in the same
-session. Comparing against numbers from a prior day has produced wrong verdicts.
+session. Comparing against numbers from a prior day has produced wrong verdicts — the
+"10–20% InputStream tax" briefly written into `jmh/README.md` was an artifact of
+comparing a row against a *different run's* baseline; a same-session control put it at
++1.4%.
+
+"Isolation" includes the machine, not just your own processes. Check `uptime` before
+trusting a run: Spotlight indexing and a couple of open JetBrains IDEs have inflated
+`bytes_reset` on the solana document by 23% (3899 → 4818 µs) on identical code, with
+error bars to match. Note this is invisible without the control row — the absolute
+number looked plausible.
+
+Allocation is measurable even when the machine is noisy, and it can be the whole story:
+`-prof gc` reports `gc.alloc.rate.norm` (bytes per op) to ~0.01 B/op regardless of CPU
+contention. Reach for it whenever an API might be paying in GC rather than in latency —
+the stream source ties on score and allocates 22× more.
