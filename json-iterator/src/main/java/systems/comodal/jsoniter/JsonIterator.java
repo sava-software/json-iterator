@@ -251,6 +251,16 @@ public interface JsonIterator {
   /// @return true if value was `null`.
   boolean readNull();
 
+  /// Inverse of [#readNull()], for guarding a read against a `null` value:
+  ///
+  /// Advances the iterator if the next item is `null` and returns false.
+  /// Otherwise, stays in place and returns true.
+  ///
+  /// @return true if a value other than `null` is next.
+  default boolean notNull() {
+    return !readNull();
+  }
+
   String readString();
 
   byte[] decodeBase64String();

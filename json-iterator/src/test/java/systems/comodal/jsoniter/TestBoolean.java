@@ -52,6 +52,20 @@ final class TestBoolean {
   }
 
   @Test
+  void test_not_null() {
+    assertFalse(factory.create("null").notNull());
+    assertTrue(factory.create("true").notNull());
+    assertTrue(factory.create("\"a\"").notNull());
+
+    // consumes the null, stays in place otherwise
+    final var ji = factory.create("[null,1]");
+    assertFalse(ji.openArray().notNull());
+    assertTrue(ji.continueArray().notNull());
+    assertEquals(1, ji.readInt());
+    assertNotNull(ji.closeArray());
+  }
+
+  @Test
   void test_invalid_literals() {
     assertThrows(JsonException.class, () -> factory.create("trux").readBoolean());
     assertThrows(JsonException.class, () -> factory.create("tru").readBoolean());
