@@ -166,6 +166,42 @@ final class StructuralIndex {
     finish(last, to);
   }
 
+  /// selectFrom experiment: the nibble-table lookup via `selectFrom` (NEON
+  /// TBL-shaped) instead of `toShuffle`+`rearrange`, which pays a shuffle
+  /// conversion per chunk. Same masks, different lookup plumbing.
+  void indexSelectFrom(final byte[] buf, final int from, final int to) {
+    this.utf8 = null;
+    begin(to - from);
+    int offset = from;
+    int last = from;
+    for (; offset + BLOCK <= to; offset += BLOCK) {
+      selectFromByteBlock(buf, offset, offset);
+      last = offset;
+    }
+    if (offset < to) {
+      Arrays.fill(lastByteBlock, (byte) ' ');
+      System.arraycopy(buf, offset, lastByteBlock, 0, to - offset);
+      selectFromByteBlock(lastByteBlock, 0, offset);
+      last = offset;
+    }
+    finish(last, to);
+  }
+
+  private void selectFromByteBlock(final byte[] src, final int srcOffset, final int blockStart) {
+    final var species = VectorSupport.BYTE_SPECIES;
+    final int lanes = VectorSupport.BYTE_LANES;
+    long backslash = 0, quote = 0, whitespace = 0, op = 0;
+    for (int o = srcOffset, shift = 0; shift < BLOCK; o += lanes, shift += lanes) {
+      final var chunk = ByteVector.fromArray(species, src, o);
+      backslash |= chunk.eq(BACKSLASH).toLong() << shift;
+      quote |= chunk.eq(QUOTE).toLong() << shift;
+      final var lowNibbles = chunk.and(LOW_NIBBLE_MASK);
+      whitespace |= chunk.eq(lowNibbles.selectFrom(WHITESPACE_TABLE)).toLong() << shift;
+      op |= chunk.or((byte) 0x20).eq(lowNibbles.selectFrom(OP_TABLE)).toLong() << shift;
+    }
+    block(blockStart, backslash, quote, whitespace, op);
+  }
+
   private void scalarByteBlock(final byte[] src, final int srcOffset, final int blockStart) {
     long backslash = 0, quote = 0, whitespace = 0, op = 0;
     for (int i = 0; i < BLOCK; ++i) {

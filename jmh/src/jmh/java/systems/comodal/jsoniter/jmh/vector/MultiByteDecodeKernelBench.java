@@ -92,7 +92,9 @@ public class MultiByteDecodeKernelBench {
     for (final int s : starts) {
       final int la = MultiByteDecodeKernels.decodeScalar(doc, s, doc.length, a, 0);
       final int lb = MultiByteDecodeKernels.decodeVector(doc, s, doc.length, b, 0);
-      if (la != lb || !Arrays.equals(a, 0, la, b, 0, lb)) {
+      final int lc = MultiByteDecodeKernels.decodeAdaptive(doc, s, doc.length, out, 0);
+      if (la != lb || la != lc || !Arrays.equals(a, 0, la, b, 0, lb)
+          || !Arrays.equals(a, 0, la, out, 0, lc)) {
         throw new IllegalStateException("decoders disagree at " + s);
       }
     }
@@ -103,6 +105,15 @@ public class MultiByteDecodeKernelBench {
     long sum = 0;
     for (final int s : starts) {
       sum += MultiByteDecodeKernels.decodeScalar(doc, s, doc.length, out, 0);
+    }
+    return sum;
+  }
+
+  @Benchmark
+  public long decodeAdaptive() {
+    long sum = 0;
+    for (final int s : starts) {
+      sum += MultiByteDecodeKernels.decodeAdaptive(doc, s, doc.length, out, 0);
     }
     return sum;
   }

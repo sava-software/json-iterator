@@ -31,6 +31,10 @@ stage 1 pays ~14 ms before reading a single value from this document. The vector
 version remains capped ~2 GB/s on NEON by the 12 `mask.toLong()` extractions per
 64-byte block (the C++ simdjson `vpaddq` reduction tree is not expressible in the
 Vector API). Fused validation is nearly free (~4%).
+**`selectFrom` experiment:** replacing the nibble lookup's `toShuffle`+`rearrange`
+with `selectFrom` (NEON TBL-shaped) measured 2.24 ms vs 2.35 ms same-run — a ~5%
+gain with barely separated error bars. Promising; adopt as the default
+classification after an isolated 3-fork confirmation.
 **Action trigger:** wide-lane re-measurement. If ≥256-bit lanes lift stage 1 well
 past NEON's cap, indexed navigation's economics revive alongside the finalized
 Vector API; if not, the indexed bet dies on all hardware.
@@ -84,10 +88,47 @@ content. The fork's unconditional run-copy fast-paths English-like content and
 punishes CJK by nearly 7× — the canonical example of why single-consumer-shaped
 benchmarking must not drive scan-path decisions. The crossover sits near clean
 runs of ~16–24 bytes.
-**Action trigger:** design work, not integration — an **adaptive decoder** that
-stays scalar until a clean-run streak justifies entering vector chunks (the
-SWAR-prefix insight applied per run), then re-profile. Wide lanes may also move
-the crossover.
+**Adaptive decoder (first iteration, `decodeAdaptive`):** scalar with a per-run
+SWAR probe (up to 3 clean words) before entering vector chunks. Results:
+
+| Profile | scalar | vector | adaptive |
+|---|---|---|---|
+| ascii_newlines | 38.6 | 9.9 | **11.1** — keeps ~90% of the vector win |
+| european | 41.1 | 64.4 | **37.5** — beats both pure idioms |
+| emoji_mixed | 23.3 | 22.2 | 23.3 — tie |
+| escaped_json | 34.0 | 98.3 | 35.4 — vector's 3x loss neutralized |
+| cjk | 56.9 | 385.3 | 89.9 — 6.7x loss collapsed to 1.6x, still losing |
+
+The adaptive shape is directionally right: it captures the sparse-run upside and
+neutralizes most of the downside. Remaining flaw: the SWAR probe itself costs one
+word-load per run, which dense-stop content pays on every character (the CJK 1.6x).
+**Next refinement:** hysteresis — only probe after N consecutive clean scalar bytes
+(a multibyte character strongly predicts another), targeting CJK parity while
+keeping the log-line win. Not integration-ready until CJK reaches ~1.0x.
+
+## Question 4 — Container skipping (`SkipContainerKernelBench`)
+
+The standing question from the fork era (its integrated vector walk lost skip-heavy
+workloads). Kernel-level, across structural-density profiles — scalar level-count
+walk vs the fork's OR-combined-mask vector walk:
+
+| Profile | scalar | vector | Verdict |
+|---|---|---|---|
+| numericDense (balance arrays) | 16.4 µs | 3.75 | **vector 4.4×** |
+| stringHeavy (solana meta shape) | 5.24 | 8.52 | scalar 1.6× |
+| nested (dense braces) | 18.5 | 35.7 | scalar 1.9× |
+
+**Conclusions.** The density axis was mis-framed in the fork era: what matters is
+the density of *this walk's* stop set (brackets + quotes), not structural characters
+generally. Long numeric arrays (`preBalances` — commas are not stops) are a genuine
+vector sweet spot at 4.4×; quote-dense and brace-dense shapes lose, explaining the
+fork's integrated losses on mixed real documents. A future integrated skip could
+plausibly dispatch by container's first bytes — but that is speculative tuning;
+the recorded verdict is: vector container skipping pays only on bracket-sparse,
+quote-free spans.
+**Action trigger:** wide-lane re-measurement (cheap mask extraction changes the
+loss cases), and any adaptive-skip idea must beat the scalar walk on stringHeavy
+and nested before integration is considered.
 
 ## Settled verdicts (benches since removed; data preserved here and in history)
 
@@ -103,6 +144,11 @@ the crossover.
   lost.
 - **Scalar-backed indexed navigation**: rejected structurally during the 2026-07
   promotion review; Question 1's 6.1× scalar penalty is the measurement behind it.
+- **Custom vector base64 decode** (`Base64DecodeBench`): no headroom. The JDK
+  decoder's HotSpot intrinsic is active and fast on aarch64 — 6.2–7.8 GB/s,
+  6.5× ahead of a plain scalar table decode. A Mula-style Vector API kernel has
+  nothing to offer; the base64 opportunity is confined to the quote-scan
+  (Question 2's skip shape).
 
 ## Synthesis
 

@@ -15,7 +15,8 @@ All Vector API experimentation lives in the `jmh/` composite build:
   the JMH bytecode generator reflects every class in the `jmh` source set in a JVM
   without the incubator module — classes with vector-typed fields must stay out of it.
 - `jmh/src/jmh/java/.../jmh/vector` — kernel benches (`Stage1KernelBench`,
-  `StringScanKernelBench`), sharing the kernels' package for package-private access.
+  `StringScanKernelBench`, `MultiByteDecodeKernelBench`, `SkipContainerKernelBench`,
+  `Base64DecodeBench`), sharing the kernels' package for package-private access.
 
 **Scope principle: consumer surveys gate API surface, never scan-path coverage.**
 The parser must serve the breadth of JSON in the wild — international scripts,
@@ -23,7 +24,8 @@ escape density, every string-length regime — regardless of what the currently
 surveyed consumers feed it. Performance questions on scan/decode paths are judged
 across content shapes, not against one ecosystem's documents.
 
-The lab holds three open questions, each with a bench that tracks the
+The lab holds four open questions (see jmh/VECTOR.md for data and action
+triggers), each with a bench that tracks the
 scalar-vs-vector delta directly:
 
 1. **Stage-1 structural indexing on wide lanes** (`Stage1KernelBench`: vector vs

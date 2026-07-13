@@ -33,7 +33,8 @@ public class Stage1KernelBench {
       throw new UncheckedIOException(e);
     }
     index = new StructuralIndex();
-    if (stage1() != stage1Validating() || stage1() != stage1Scalar()) {
+    if (stage1() != stage1Validating() || stage1() != stage1Scalar()
+        || stage1() != stage1SelectFrom()) {
       throw new IllegalStateException("stage 1 variants disagree on the structural count");
     }
   }
@@ -47,6 +48,12 @@ public class Stage1KernelBench {
   @Benchmark
   public int stage1Scalar() {
     index.indexScalar(json, 0, json.length);
+    return index.count();
+  }
+
+  @Benchmark
+  public int stage1SelectFrom() {
+    index.indexSelectFrom(json, 0, json.length);
     return index.count();
   }
 
