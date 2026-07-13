@@ -1,0 +1,6 @@
+Benchmark                                 Mode  Cnt    Score     Error  Units
+MigrationBench.enumValues_charsChain      avgt   24  501.476 ±  17.846  us/op
+MigrationBench.enumValues_charsMatch      avgt   24  890.597 ± 277.641  us/op
+MigrationBench.enumValues_matchString     avgt   24  498.386 ±  14.903  us/op
+MigrationBench.kindDispatch_matchString   avgt   24  511.129 ±   4.345  us/op
+MigrationBench.kindDispatch_stringSwitch  avgt   24  597.947 ±  47.275  us/op

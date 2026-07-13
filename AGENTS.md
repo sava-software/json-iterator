@@ -62,6 +62,33 @@ there isn't any. The deprecations (`readObject`/`readObjField`, the
 API consistency, not on speed — `readObjField`'s String-per-field loop actually measures
 *faster* than the char IOC walk under ZGC.
 
+**Data source: feed `byte[]`.** Measured in `SourceBench`; the table is in
+`jmh/README.md`. The rule matters more than it looks, because the cost of feeding a
+`String` is a *UTF-8 encode*, not a copy: `parse(String)` routes through
+`String.getBytes()`, and any non-ASCII content forces a UTF-16-backed String, which
+makes that call 4× more expensive per byte than the compact-String case. Measured
+penalty over `byte[]`: **2.49× on the 15%-non-ASCII twitter document**, 1.32× on the
+pure-ASCII solana one. So: don't build the String, parse the bytes off the wire.
+`parse(String)` is a convenience for tests and the REPL.
+
+Two corollaries that are easy to get backwards:
+
+- **Iterator reuse buys nothing at document scale.** A fresh `parse(byte[])` per
+  document ties `reset(byte[])` on a 600 KiB document and costs ~2% on a 4.7 MiB one.
+  `reset()` is worth reaching for only at high rates of *small* documents.
+- **If you already hold a `String`, feed `toCharArray()`, not `byte[]`** — unless the
+  content is known pure ASCII. This is measured, and it is the opposite of the obvious
+  advice: on the UTF-16-backed twitter document the char route wins **2.03×** (560 vs
+  1139 µs). Each String pays whichever conversion runs against the grain of its own
+  backing — a UTF-16 String yields chars for 65 µs and bytes for 691 µs (a transcode);
+  a Latin-1 String yields bytes for 1308 µs (a near-memcpy) and chars for 901 µs (an
+  inflate), which is why `getBytes()` edges it there by ~7%, within noise. **Never
+  repeat "narrow to bytes once" as general advice** — it holds only when the bytes never
+  became a String in the first place.
+- **There is no incremental parse.** `parse(InputStream)` and `reset(InputStream)` both
+  call `readAllBytes()` and iterate the resulting array. The stream source is a
+  full-document copy, not a streaming win, and it allocates one per call.
+
 **Three features were reviewed for promotion in 2026-07 and rejected on the merits.**
 They exist, fully implemented, on the `vectorize-archive` tag. Don't resurrect them
 without consumer demand that didn't exist then:
@@ -80,16 +107,16 @@ These are **workload-structural** — no wider vector hardware and no future JDK
 them. They are conclusions, not open questions:
 
 - **Never vectorize the `char[]`-source paths.** Not because vector code loses there —
-  it wins. The path has no users: every surveyed consumer feeds `byte[]`, and
-  `parse(String)` routes through `getBytes()`. So the trade is complexity and
-  scan-path correctness risk (the silent-corruption bugs above all live in exactly
-  this kind of code) bought with speedup that no consumer executes. And the door stays
-  shut even if a `char[]` consumer appears: 16-bit lanes hold half as many elements, so
-  a vectorized char path is permanently capped near half the byte path's throughput —
-  such a consumer is better served narrowing to `byte[]` once, up front, and taking the
-  fast path. Recorded so it isn't re-proposed on the assumption it was never tried: the
-  vector base64 narrowing on the chars path measured a real 3–6% end-to-end win, and
-  was reverted anyway.
+  it wins. The path has no users: every surveyed consumer feeds `byte[]`. So the trade
+  is complexity and scan-path correctness risk (the silent-corruption bugs above all
+  live in exactly this kind of code) bought with speedup that no consumer executes. And
+  the door stays shut even if a `char[]` consumer appears: 16-bit lanes hold half as
+  many elements, so a vectorized char path is permanently capped near half the byte
+  path's throughput. The measured scalar char tax is already 8% (twitter) to 18%
+  (solana) — `SourceBench` — and vectorizing cannot close a gap it inherits. Recorded
+  so it isn't re-proposed on the assumption it was never tried: the vector base64
+  narrowing on the chars path measured a real 3–6% end-to-end win, and was reverted
+  anyway.
 - **Never vectorize field-name scanning.** Surveyed names average 12.5 bytes and top out
   around 34; a 32-byte SWAR prefix covers essentially all of them before a vector chunk
   would engage.

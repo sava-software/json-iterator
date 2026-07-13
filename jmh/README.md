@@ -77,6 +77,57 @@ disagreement into a hard failure.
   consumption that dilutes pure dispatch wins: `txMetaWalk` (13-field TxMeta
   chain), `enumValues` (3-name Commitment-style enum), and `kindDispatch`
   (30-name Codama `"kind"` discriminator).
+- **`SourceBench`** — prices the four data sources `JsonIterator` accepts
+  (`byte[]`, `String`, `char[]`, `InputStream`) over one identical field-name
+  walk, so each pairwise delta isolates a single cost: iterator allocation, the
+  `getBytes()` encode, the char path, and the stream copy.
+
+## Data source decision table
+
+Measured 2026-07-13 (`-PjmhFork=3`, 24 samples, same machine and flag set as
+below) over the same two documents. **Feed `byte[]`.** The deltas below are all
+against `bytes_reset` — one iterator, `reset(byte[])` per document.
+
+The two documents differ in the way that turns out to matter most: twitter is
+631 KiB and **15.1% non-ASCII**, so its `String` is UTF-16-backed; solana is
+4.7 MiB and **pure ASCII**, so its `String` is Latin-1 compact.
+
+| Source | twitter µs/op | solana µs/op | vs `byte[]` | Verdict |
+|---|---|---|---|---|
+| `bytes_reset` — reuse one iterator | 450 ± 5 | 3923 ± 77 | — | **The shape to write.** |
+| `bytes_parse` — fresh iterator per document | 448 ± 3 | 3917 ± 55 | 1.00× / 1.00× | **Iterator reuse buys nothing** at document scale — allocation amortizes to noise across a 600 KiB+ parse (a dead tie on both documents, across two runs). `reset()` only matters for high rates of *small* documents |
+| `string_parse` — `parse(String)` | 1139 ± 34 | 5225 ± 180 | **2.53× / 1.33×** | **Never feed a `String`.** See below |
+| `string_toChars` — `parse(str.toCharArray())` | **560 ± 21** | 5600 ± 268 | 1.24× / 1.43× | The *other* road out of a String, and on UTF-16 content it beats `parse(String)` by **2.03×**. See below |
+| `chars_reset` — reuse one chars iterator | 495 ± 6 | 4699 ± 302 | 1.10× / 1.20× | The char-path tax: 16-bit words scan half the payload per load. Real, but an order of magnitude smaller than the String tax |
+| `stream_reset` — `reset(InputStream)` | 526 ± 96 ⚠️ | 4296 ± 181 | 1.17× / 1.10× | Roughly a 10–20% tax, but **GC-sensitive and unstable across runs** (the previous run had twitter free and solana at +19%): `readAllBytes()` allocates a full-document copy per call. There is **no incremental parse** — the stream is read to EOF and the resulting array is iterated |
+
+### The String tax is an encode, not a copy — and which conversion is expensive depends on the String
+
+`parse(String)` routes through `String.getBytes()`. When the String is
+UTF-16-backed — which any non-ASCII content forces — that is a full UTF-8
+*encode*, not a memcpy. Subtracting the walk from each row isolates the two
+conversions, and they invert between the documents:
+
+| conversion | twitter (UTF-16 String) | solana (Latin-1 String) |
+|---|---|---|
+| `getBytes()` — `string_parse` − `bytes_parse` | **691 µs** (UTF-8 encode) | 1308 µs (near-memcpy) |
+| `toCharArray()` — `string_toChars` − `chars_reset` | **65 µs** (straight copy) | 901 µs (Latin-1 → UTF-16 inflate) |
+
+Each String pays whichever conversion runs against the grain of its own backing.
+A UTF-16 String yields chars almost free and must transcode to yield bytes; a
+Latin-1 String yields bytes almost free and must inflate to yield chars.
+
+Two rules follow:
+
+1. **Don't create the `String` at all.** Parse the bytes as they came off the
+   wire. `parse(String)` is a convenience for tests and the REPL, not a hot path.
+2. **If you are already holding a `String`, feed `toCharArray()` — unless you
+   know the content is pure ASCII.** On UTF-16 content the char path wins 2.03×
+   (560 vs 1139 µs) because the 65 µs copy plus the char path's 10% scanning tax
+   is nowhere near the 691 µs encode. On pure-ASCII content `getBytes()` is
+   better by ~7% (5225 vs 5600 µs, overlapping intervals — call it a wash), since
+   there the inflate is the expensive direction. **Do not repeat "narrow to bytes
+   once" as general advice**: it holds only when the bytes never became a String.
 
 ## Migration decision table
 

@@ -1,0 +1,11 @@
+Benchmark                 (document)  Mode  Cnt     Score     Error  Units
+SourceBench.bytes_parse      twitter  avgt   24   458.051 ±   8.940  us/op
+SourceBench.bytes_parse       solana  avgt   24  3942.825 ±  47.317  us/op
+SourceBench.bytes_reset      twitter  avgt   24   460.131 ±  20.795  us/op
+SourceBench.bytes_reset       solana  avgt   24  3878.744 ±  33.103  us/op
+SourceBench.chars_reset      twitter  avgt   24   498.408 ±   7.082  us/op
+SourceBench.chars_reset       solana  avgt   24  4579.209 ±  55.347  us/op
+SourceBench.stream_reset     twitter  avgt   24   458.985 ±   1.585  us/op
+SourceBench.stream_reset      solana  avgt   24  4623.191 ± 472.118  us/op
+SourceBench.string_parse     twitter  avgt   24  1141.727 ±  33.500  us/op
+SourceBench.string_parse      solana  avgt   24  5191.654 ± 185.567  us/op
