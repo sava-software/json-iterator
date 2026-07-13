@@ -99,7 +99,12 @@ The two documents differ in the way that turns out to matter most: twitter is
 | `string_parse` — `parse(String)` | 1139 ± 34 | 5225 ± 180 | **2.53× / 1.33×** | **Never feed a `String`.** See below |
 | `string_toChars` — `parse(str.toCharArray())` | **560 ± 21** | 5600 ± 268 | 1.24× / 1.43× | The *other* road out of a String, and on UTF-16 content it beats `parse(String)` by **2.03×**. See below |
 | `chars_reset` — reuse one chars iterator | 495 ± 6 | 4699 ± 302 | 1.10× / 1.20× | The char-path tax: 16-bit words scan half the payload per load. Real, but an order of magnitude smaller than the String tax |
-| `stream_reset` — `reset(InputStream)` | 462 ± 7 | ~4712 ⚠️ | 1.00× / ~1.21× | Nearly free in *latency* on the small document, but it allocates a full-document copy per call and the cost lands on the collector instead. See below. There is **no incremental parse** — the stream is read to EOF and the resulting array is iterated |
+| `stream_reset` — `reset(InputStream)` | 455 ± 0.3 † | 4148 ± 147 † | **1.03× / 1.03×** | Only ~3% in *latency* — but it allocates a full-document copy per call, and that cost lands on the collector, not the clock. See below. There is **no incremental parse** — the stream is read to EOF and the resulting array is iterated |
+
+† The stream rows come from a dedicated same-session control run (`-PjmhFork=5`,
+`SourceBench.(stream_reset|bytes_reset)`, 40 samples), whose own `bytes_reset` baseline
+was 441 ± 0.5 / 4023 ± 125 — that run's pairing is what the 1.03× is computed from, not
+a cross-run comparison against the table above.
 
 ### The String tax is an encode, not a copy — and which conversion is expensive depends on the String
 
@@ -130,14 +135,20 @@ iterate the resulting array — there is no incremental parse. The `-prof gc` ru
 
 One full-document copy per call, to within ~50 bytes (±0.009 B/op error).
 
-The trap is that **this barely shows up in the parse timing.** On twitter,
-`stream_reset` ties `bytes_reset` (462 vs 464 µs) — while its allocation rate goes
-from 62 to 1367 MB/s (22×), GC count from 6 to 162, and GC time from 5 ms to
-213 ms (43×). The stream source doesn't pay for the copy in latency; it hands the
-bill to the collector. In the long-running service this library targets, that is
-the cost that matters, and it is exactly the cost a benchmark score hides. (On
-solana the latency cost does surface, ~+21%, because a 4.7 MiB array per call is
-a large-object allocation on a slower ZGC path.)
+The trap is that **this barely shows up in the parse timing.** A same-session control
+run puts the latency cost at just **+3.1%, identically on both documents** (455 vs 441 µs
+on twitter; 4148 vs 4023 µs on solana) — while twitter's allocation rate goes from 62 to
+1367 MB/s (22×), its GC count from 6 to 162, and its GC time from 5 ms to 213 ms (43×).
+The stream source doesn't pay for the copy in latency; it hands the bill to the
+collector. In the long-running service this library targets, that is the cost that
+matters, and it is exactly the cost a benchmark score hides.
+
+Getting that 3% took four runs, and the three before it were wrong in instructive ways —
+they variously showed the tax at +19%, +21%, and 0%, always in rows whose error bars were
+over the contamination threshold. Two of those bogus figures reached these docs before
+being caught. If a row's error exceeds ~10% of its score, it is not a number; and a
+mechanism invented to explain such a row (a "large-object ZGC path" was the story here)
+will sound perfectly plausible and be entirely fictional.
 
 If you have an `InputStream`, read it yourself and keep the array; feeding the
 stream to the iterator on every document buys nothing and allocates a copy of it.

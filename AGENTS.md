@@ -89,10 +89,11 @@ Two corollaries that are easy to get backwards:
   `parse(InputStream)` and `reset(InputStream)` both call `readAllBytes()` and iterate
   the resulting array. `-prof gc` prices it exactly: one full-document copy allocated
   per call (+631,528 B/op on the 631,515 B document; +4,755,968 B/op on the 4,755,919 B
-  one). The trap is that this is nearly **invisible in the parse timing** — on the
-  smaller document `stream_reset` *ties* `bytes_reset` while its allocation rate goes
-  22× and its GC time 43×. Judge the stream API by `gc.alloc.rate.norm`, not by the
-  score; in a long-running service the collector pays what the benchmark doesn't.
+  one). The trap is that this is nearly **invisible in the parse timing** — the latency
+  cost is only **+3.1%** (identically on both documents, same-session control) while the
+  allocation rate goes 22× and GC time 43×. Judge the stream API by
+  `gc.alloc.rate.norm`, not by the score; in a long-running service the collector pays
+  what the benchmark doesn't.
 
 **Three features were reviewed for promotion in 2026-07 and rejected on the merits.**
 They exist, fully implemented, on the `vectorize-archive` tag. Don't resurrect them
@@ -163,14 +164,23 @@ A same-session control run matters more than a historical baseline: when judging
 change, measure `main` and the change back-to-back on the same machine in the same
 session. Comparing against numbers from a prior day has produced wrong verdicts — the
 "10–20% InputStream tax" briefly written into `jmh/README.md` was an artifact of
-comparing a row against a *different run's* baseline; a same-session control put it at
-+1.4%.
+comparing a row against a *different run's* baseline. Pinning that one number down took
+**four runs**; the true figure is +3.1%, and the intermediate answers were +19%, +21%,
+0%, and +1.4%. Every wrong one came from a row whose error bar was over the 10% rule, or
+from a control measured in another session.
 
 "Isolation" includes the machine, not just your own processes. Check `uptime` before
 trusting a run: Spotlight indexing and a couple of open JetBrains IDEs have inflated
 `bytes_reset` on the solana document by 23% (3899 → 4818 µs) on identical code, with
 error bars to match. Note this is invisible without the control row — the absolute
-number looked plausible.
+number looked plausible. Contamination also moves between rows run to run (it hit
+`stream_reset` in three sessions, then `bytes_reset` in the next), so a row being clean
+last time is no reason to trust it this time.
+
+Do not invent a mechanism to explain a contaminated row. The bogus solana stream tax got
+a confident, plausible explanation — a "large-object ZGC allocation path" — that was pure
+fiction, and it survived precisely because it sounded like an answer. If the error bar is
+over the threshold, there is nothing to explain yet.
 
 Allocation is measurable even when the machine is noisy, and it can be the whole story:
 `-prof gc` reports `gc.alloc.rate.norm` (bytes per op) to ~0.01 B/op regardless of CPU
