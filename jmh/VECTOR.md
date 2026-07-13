@@ -60,12 +60,22 @@ winning at exactly the string lengths that dominate Solana documents (base58 key
 and signatures) — today, on the weakest vector hardware. The widen shape crosses
 near ~64 bytes; below the crossovers the hybrid costs at most ~7%. This is the
 lab's **#1 integration candidate**.
-**Action trigger:** a short-lived integration branch off `main` wiring the hybrid
-into `parse`/`skipPastEndQuote`, judged by the full suite (`fees`, `fieldWalk`,
-`blockParse`, twitter walks) — the open question is precisely whether these kernel
-wins survive per-string dispatch and mixed-length documents, which the fork's
-integrated skip-heavy losses show is not automatic. Re-sweep `SWAR_PREFIX` (32)
-during that experiment; the 16-vs-32 trade-off interacts with hit cost.
+**Integration attempt #1 (2026-07-12): FAILED, branch deleted.** The hybrid was
+wired into `parse`/`skipPastEndQuote` on `integrate/string-scan-hybrid` (all 285
+tests green, including the position-sweep police) and judged by the full suite
+with a same-session main control: `blockParse_matcher` +11.5% slower (2779 ± 9 vs
+2491 ± 13), masked +12%, chars +7%, kindDispatch +16%, `fieldWalkSolana` a tie —
+kernel wins of 18-38% at these exact skip lengths inverted to losses once
+integrated. Third independent confirmation that on NEON the integration barrier,
+not kernel throughput, is the binding constraint. Leading suspect: method size —
+the hybrid multiplies `parse`/`skipPastEndQuote` body size, plausibly breaking
+their inlining into the skip/dispatch loops (unverified; would need
+-XX:+PrintInlining on an integration branch).
+**Remaining moves for Question 2:** (a) an inline-friendly integration shape —
+keep the SWAR loop as the tiny method body and outline the vector tail behind a
+cold-path call, so the common case inlines as before; (b) the wide-lane run,
+where bigger kernel margins could survive integration overhead. Until one of
+those measures a win, main's pure SWAR stands.
 
 ## Question 3 — Escape/multibyte decode: scalar vs vector run-copy (`MultiByteDecodeKernelBench`)
 
@@ -115,11 +125,29 @@ loop, not the probes it saves. Full final table (2 forks):
 | escaped_json | 32.0 | 96.9 | 36.4 | 37.8 | 40.9 |
 | emoji_mixed | 23.9 | 21.9 | 24.3 | 42.6 | 42.2 |
 
-`decodeAdaptive` (v1) remains the leading shape: best wins, smallest worst-case
-(CJK 1.59x). Still short of the breadth bar (worst-case ~1.1x).
-**Next design:** per-string triage instead of per-run gating — one word-load at
-string entry counting high-bit density routes the whole string to pure scalar
-(CJK) or v1 (everything else), keeping the hot loops themselves unmodified.
+**Per-string triage (`decodeTriage`) — GRADUATED, first shape to clear the
+breadth bar.** One word-load at string entry: >=3 high-bit bytes or any escape
+byte in the first word routes the whole string to pure scalar; everything else
+takes the v1 adaptive path. Both hot loops stay unmodified (the
+gate-in-the-loop lesson). Results (2 forks):
+
+| Profile | scalar | triage | vs scalar |
+|---|---|---|---|
+| ascii_newlines | 38.6 | 11.4 | **3.4x faster** |
+| european | 41.9 | 38.5 | 1.09x faster |
+| escaped_json | 32.1 | 31.9 | parity |
+| emoji_mixed | 23.4 | 23.9 | 1.02x (within noise) |
+| cjk | 55.6 | 56.2 | 1.01x (within noise) |
+
+Worst case ~2% — the first vector decode shape safe for arbitrary JSON content.
+**Integration status: untested, but with better odds than Question 2's failure**
+— `parseMultiByteString` is already a large, outlined cold-path method that the
+JIT does not inline into hot loops, so the method-size mechanism suspected in the
+Question 2 integration failure does not apply in the same way. Next action: an
+integration branch off main replacing `parseMultiByteString`'s body with the
+triage shape, judged by the full suite plus an escape/multibyte-heavy document
+workload (the current suite's documents are ascii-dominated and would understate
+both the win and any regression).
 
 ## Question 4 — Container skipping (`SkipContainerKernelBench`)
 

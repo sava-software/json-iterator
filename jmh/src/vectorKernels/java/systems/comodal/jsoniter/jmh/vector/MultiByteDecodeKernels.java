@@ -422,6 +422,20 @@ final class MultiByteDecodeKernels {
     throw new IllegalStateException("incomplete string");
   }
 
+  /// Question 3's per-string triage: one word-load at string entry routes
+  /// the whole string — dense multibyte or early escapes go pure scalar,
+  /// everything else takes the adaptive path. Both hot loops stay unmodified
+  /// (the gate-in-the-loop lesson from the refuted hysteresis variants).
+  static int decodeTriage(final byte[] buf, final int head, final int tail, final char[] out, final int j) {
+    if (head + Long.BYTES <= tail) {
+      final long word = (long) TO_LONG.get(buf, head);
+      if (Long.bitCount(word & HIGH_BITS) >= 3 || matchPattern(word ^ ESCAPE_PATTERN) != 0) {
+        return decodeScalar(buf, head, tail, out, j);
+      }
+    }
+    return decodeAdaptive(buf, head, tail, out, j);
+  }
+
   private static int decodeHex(final int b) {
     final int digit = Character.digit(b, 16);
     if (digit < 0) {

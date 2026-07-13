@@ -97,6 +97,10 @@ public class MultiByteDecodeKernelBench {
           || !Arrays.equals(a, 0, la, out, 0, lc)) {
         throw new IllegalStateException("decoders disagree at " + s);
       }
+      final int lt = MultiByteDecodeKernels.decodeTriage(doc, s, doc.length, out, 0);
+      if (la != lt || !Arrays.equals(a, 0, la, out, 0, lt)) {
+        throw new IllegalStateException("triage decoder disagrees at " + s);
+      }
     }
   }
 
@@ -114,6 +118,15 @@ public class MultiByteDecodeKernelBench {
     long sum = 0;
     for (final int s : starts) {
       sum += MultiByteDecodeKernels.decodeAdaptive(doc, s, doc.length, out, 0);
+    }
+    return sum;
+  }
+
+  @Benchmark
+  public long decodeTriage() {
+    long sum = 0;
+    for (final int s : starts) {
+      sum += MultiByteDecodeKernels.decodeTriage(doc, s, doc.length, out, 0);
     }
     return sum;
   }

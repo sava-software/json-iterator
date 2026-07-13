@@ -1,0 +1,7 @@
+Benchmark                                 Mode  Cnt     Score     Error  Units
+IocBench.blockParse_chars                 avgt   24  2630.205 ±  89.414  us/op
+IocBench.blockParse_matcher               avgt   24  2491.473 ±  13.316  us/op
+IocBench.blockParse_matcherMasked         avgt   24  2511.197 ±  49.959  us/op
+IocBench.fieldWalkSolana_chars            avgt   24  5025.466 ± 171.576  us/op
+MigrationBench.kindDispatch_matchString   avgt   24   509.938 ±   7.307  us/op
+MigrationBench.kindDispatch_stringSwitch  avgt   24   566.391 ±   3.617  us/op

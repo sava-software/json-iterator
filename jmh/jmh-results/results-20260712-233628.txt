@@ -1,0 +1,21 @@
+Benchmark                                       (profile)  Mode  Cnt    Score    Error  Units
+MultiByteDecodeKernelBench.decodeAdaptive  ascii_newlines  avgt   10   11.240 ±  0.368  us/op
+MultiByteDecodeKernelBench.decodeAdaptive        european  avgt   10   37.687 ±  1.259  us/op
+MultiByteDecodeKernelBench.decodeAdaptive             cjk  avgt   10  104.970 ± 52.235  us/op
+MultiByteDecodeKernelBench.decodeAdaptive    escaped_json  avgt   10   36.155 ±  0.923  us/op
+MultiByteDecodeKernelBench.decodeAdaptive     emoji_mixed  avgt   10   23.424 ±  0.413  us/op
+MultiByteDecodeKernelBench.decodeScalar    ascii_newlines  avgt   10   38.631 ±  1.013  us/op
+MultiByteDecodeKernelBench.decodeScalar          european  avgt   10   41.919 ±  2.839  us/op
+MultiByteDecodeKernelBench.decodeScalar               cjk  avgt   10   55.577 ±  2.383  us/op
+MultiByteDecodeKernelBench.decodeScalar      escaped_json  avgt   10   32.134 ±  0.804  us/op
+MultiByteDecodeKernelBench.decodeScalar       emoji_mixed  avgt   10   23.375 ±  1.150  us/op
+MultiByteDecodeKernelBench.decodeTriage    ascii_newlines  avgt   10   11.389 ±  0.230  us/op
+MultiByteDecodeKernelBench.decodeTriage          european  avgt   10   38.480 ±  1.422  us/op
+MultiByteDecodeKernelBench.decodeTriage               cjk  avgt   10   56.209 ±  2.148  us/op
+MultiByteDecodeKernelBench.decodeTriage      escaped_json  avgt   10   31.912 ±  0.310  us/op
+MultiByteDecodeKernelBench.decodeTriage       emoji_mixed  avgt   10   23.923 ±  1.223  us/op
+MultiByteDecodeKernelBench.decodeVector    ascii_newlines  avgt   10    9.692 ±  0.077  us/op
+MultiByteDecodeKernelBench.decodeVector          european  avgt   10   62.781 ±  0.422  us/op
+MultiByteDecodeKernelBench.decodeVector               cjk  avgt   10  371.822 ±  2.818  us/op
+MultiByteDecodeKernelBench.decodeVector      escaped_json  avgt   10   95.208 ±  2.078  us/op
+MultiByteDecodeKernelBench.decodeVector       emoji_mixed  avgt   10   21.715 ±  0.224  us/op
