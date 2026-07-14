@@ -5,6 +5,7 @@ import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.function.Function;
 
 /// Immutable set of expected field names compiled once into a hash table,
 /// mapping a field name span to its index in the declared order — O(1)
@@ -64,6 +65,38 @@ public final class FieldMatcher {
       table[slot] = i;
     }
     return new FieldMatcher(names, table);
+  }
+
+  /// Builds a value matcher for an enum: resolves a string value span to the
+  /// enum constant whose name matches, or `null` for an unknown value. Use
+  /// with [JsonIterator#applyChars(CharBufferFunction)]:
+  ///
+  /// ```java
+  /// private static final CharBufferFunction<Mode> PARSER = FieldMatcher.enumMatcher(Mode.values());
+  /// ...
+  /// mode = ji.applyChars(PARSER);
+  /// ```
+  ///
+  /// Matching is exact (case-sensitive); wire values with case variance
+  /// should stay on a [JsonIterator#fieldEqualsIgnoreCase] chain.
+  public static <E extends Enum<E>> CharBufferFunction<E> enumMatcher(final E[] values) {
+    return enumMatcher(values, Enum::name);
+  }
+
+  /// [#enumMatcher(Enum[])] with wire names decoupled from the constant
+  /// names, e.g. `enumMatcher(Scope.values(), Scope::wireName)`. Duplicate
+  /// wire names throw [IllegalArgumentException].
+  public static <E extends Enum<E>> CharBufferFunction<E> enumMatcher(final E[] values,
+                                                                      final Function<E, String> wireName) {
+    final var names = new String[values.length];
+    for (int i = 0; i < values.length; ++i) {
+      names[i] = wireName.apply(values[i]);
+    }
+    final var matcher = of(names);
+    return (buf, offset, len) -> {
+      final int i = matcher.match(buf, offset, len);
+      return i < 0 ? null : values[i];
+    };
   }
 
   /// Extends a base matcher with additional names: the base names keep their

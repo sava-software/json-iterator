@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
@@ -214,5 +215,90 @@ final class TestObject {
         ji.skipUntil("m").readMap(String::new, (_, jsonIterator) -> jsonIterator.readInt())
     );
     assertEquals(2, ji.skipUntil("after").readInt());
+  }
+
+  private record Pair(int x, int y) {
+
+    private static final class Parser implements FieldBufferPredicate, FieldIndexPredicate, Supplier<Pair> {
+
+      private int x;
+      private int y;
+
+      private Pair create() {
+        return new Pair(x, y);
+      }
+
+      @Override
+      public Pair get() {
+        return create();
+      }
+
+      @Override
+      public boolean test(final char[] buf, final int offset, final int len, final JsonIterator ji) {
+        if (JsonIterator.fieldEquals("x", buf, offset, len)) {
+          x = ji.readInt();
+        } else if (JsonIterator.fieldEquals("y", buf, offset, len)) {
+          y = ji.readInt();
+        } else {
+          ji.skip();
+        }
+        return true;
+      }
+
+      private static final FieldMatcher FIELDS = FieldMatcher.of("x", "y");
+
+      @Override
+      public boolean test(final int fieldIndex, final JsonIterator ji) {
+        switch (fieldIndex) {
+          case 0 -> x = ji.readInt();
+          case 1 -> y = ji.readInt();
+          default -> ji.skip();
+        }
+        return true;
+      }
+    }
+  }
+
+  @Test
+  void test_parse_object() {
+    var ji = factory.create("""
+        {"x":1,"unknown":true,"y":2}""");
+    assertEquals(new Pair(1, 2), ji.parseObject(new Pair.Parser()));
+
+    ji = factory.create("""
+        {"x":1,"unknown":true,"y":2}""");
+    assertEquals(new Pair(1, 2), ji.parseObject(new Pair.Parser(), Pair.Parser::create));
+  }
+
+  @Test
+  void test_parse_object_matcher() {
+    var ji = factory.create("""
+        {"x":1,"unknown":true,"y":2}""");
+    assertEquals(new Pair(1, 2), ji.parseObject(Pair.Parser.FIELDS, new Pair.Parser()));
+
+    ji = factory.create("""
+        {"x":1,"unknown":true,"y":2}""");
+    assertEquals(new Pair(1, 2), ji.parseObject(Pair.Parser.FIELDS, new Pair.Parser(), Pair.Parser::create));
+  }
+
+  @Test
+  void test_parse_object_null_and_empty() {
+    // testObject consumes a JSON null or empty object without invoking the
+    // predicate; the finisher still runs over the untouched parser state.
+    assertEquals(new Pair(0, 0), factory.create("null").parseObject(new Pair.Parser()));
+    assertEquals(new Pair(0, 0), factory.create("{}").parseObject(new Pair.Parser()));
+    assertEquals(new Pair(0, 0), factory.create("null").parseObject(Pair.Parser.FIELDS, new Pair.Parser()));
+    assertEquals(new Pair(0, 0), factory.create("null").parseObject(new Pair.Parser(), Pair.Parser::create));
+  }
+
+  @Test
+  void test_parse_object_as_field_value() {
+    final var ji = factory.create("""
+        {"pair":{"y":4,"x":3},"after":5}""");
+    assertEquals(
+        new Pair(3, 4),
+        ji.skipUntil("pair").parseObject(Pair.Parser.FIELDS, new Pair.Parser())
+    );
+    assertEquals(5, ji.skipUntil("after").readInt());
   }
 }

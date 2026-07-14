@@ -53,4 +53,31 @@ final class TestNull {
     ji.readObject();
     assertNull(ji.readBigInteger());
   }
+
+  @Test
+  void test_read_or_null() {
+    var ji = factory.create("null");
+    assertNull(ji.readOrNull(JsonIterator::readString));
+
+    ji = factory.create("\"value\"");
+    assertEquals("value", ji.readOrNull(JsonIterator::readString));
+
+    ji = factory.create("42");
+    assertEquals(42, ji.readOrNull(JsonIterator::readInt));
+  }
+
+  @Test
+  void test_read_or_null_consumes_null_field_value() {
+    final var ji = factory.create("{\"a\":null,\"b\":7}");
+    assertNull(ji.skipUntil("a").readOrNull(JsonIterator::readString));
+    assertEquals(7, (int) ji.skipUntil("b").readOrNull(JsonIterator::readInt));
+  }
+
+  @Test
+  void test_read_or_null_object_value() {
+    final var ji = factory.create("{\"a\":null,\"b\":{\"x\":1}}");
+    assertNull(ji.skipUntil("a").readOrNull(jsonIterator -> jsonIterator.readMap(String::new, (key, inner) -> inner.readInt())));
+    final var map = ji.skipUntil("b").readOrNull(jsonIterator -> jsonIterator.readMap(String::new, (key, inner) -> inner.readInt()));
+    assertEquals(1, map.get("x"));
+  }
 }

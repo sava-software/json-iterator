@@ -52,6 +52,29 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
 
 ## Settled design decisions — don't re-propose without new evidence
 
+**Library javadoc never names downstream consumers.** This is a core library; its
+public docs must not reference consumer projects or their types (a `JupiterPrice`,
+a sava RPC parser) — users of this library don't know or care about its other
+consumers, and such references rot silently when the consumer changes. Javadoc
+examples use generic placeholder types (`Entry::parse`, `Token::address`,
+`KEY_PARSER`). The one place consumer names belong is `jmh/README.md`'s migration
+notes, where sava/idl-src-gen are the measured subjects.
+
+**The known consumers are not the only consumers.** This library is published to
+Maven Central; unknown users exist. The local repos (sava, idl-src-gen, idl-clients,
+…) are a survey sample that informs API priorities — they are not an inventory of
+usage. "No local consumer calls this" justifies a deprecation cycle, never an
+outright removal or a silent behavior change; and workload assumptions measured from
+local consumers (all-`byte[]` input, field-name lengths, dispatch widths) are
+defaults to optimize for, not invariants to depend on for correctness.
+
+**`FieldMatcher` fields sit directly above the predicate that consumes them**, not at
+the top of the class with the other static fields. The matcher's declaration order
+defines the `case` indices of the switch that dispatches on it — that coupling is
+positional and silent, so the two must be readable (and reviewable) as one unit.
+This deliberately overrides the fields-first class layout convention; it applies to
+migration examples in these docs and to consumer parsers written from them.
+
 **Dispatch API verdicts** live in `jmh/README.md`'s decision table, measured with the
 full suite. The headline: `FieldMatcher` wins big on large unions (~40% at 37–52 names)
 and on kind/discriminator dispatch (~10% and zero allocation), but the char

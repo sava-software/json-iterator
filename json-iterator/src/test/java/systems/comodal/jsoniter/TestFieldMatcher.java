@@ -214,4 +214,51 @@ final class TestFieldMatcher {
         }
     );
   }
+
+  private enum Mode {
+    ExactIn, ExactOut
+  }
+
+  private enum Encoding {
+    BASE_64("base64"), BASE_64_ZSTD("base64+zstd");
+
+    private final String wireName;
+
+    Encoding(final String wireName) {
+      this.wireName = wireName;
+    }
+
+    String wireName() {
+      return wireName;
+    }
+  }
+
+  @Test
+  void test_enum_matcher_by_name() {
+    final var parser = FieldMatcher.enumMatcher(Mode.values());
+
+    assertEquals(Mode.ExactIn, factory.create("\"ExactIn\"").applyChars(parser));
+    assertEquals(Mode.ExactOut, factory.create("\"ExactOut\"").applyChars(parser));
+    assertNull(factory.create("\"exactin\"").applyChars(parser));
+    assertNull(factory.create("\"unknown\"").applyChars(parser));
+    assertNull(factory.create("null").applyChars(parser));
+  }
+
+  @Test
+  void test_enum_matcher_wire_names() {
+    final var parser = FieldMatcher.enumMatcher(Encoding.values(), Encoding::wireName);
+
+    assertEquals(Encoding.BASE_64, factory.create("\"base64\"").applyChars(parser));
+    assertEquals(Encoding.BASE_64_ZSTD, factory.create("\"base64+zstd\"").applyChars(parser));
+    assertNull(factory.create("\"BASE_64\"").applyChars(parser));
+
+    final var ji = factory.create("{\"encoding\":\"base64+zstd\",\"after\":1}");
+    assertEquals(Encoding.BASE_64_ZSTD, ji.skipUntil("encoding").applyChars(parser));
+    assertEquals(1, ji.skipUntil("after").readInt());
+  }
+
+  @Test
+  void test_enum_matcher_duplicate_wire_names() {
+    assertThrows(IllegalArgumentException.class, () -> FieldMatcher.enumMatcher(Mode.values(), _ -> "same"));
+  }
 }

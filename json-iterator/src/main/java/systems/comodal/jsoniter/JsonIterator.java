@@ -6,13 +6,10 @@ import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public interface JsonIterator {
 
@@ -216,7 +213,7 @@ public interface JsonIterator {
   /// [#notNull()]:
   ///
   /// ```java
-  /// this.routePlan = ji.notNull() ? ji.readList(JupiterRoute::parse) : null;
+  /// this.entries = ji.notNull() ? ji.readList(Entry::parse) : null;
   /// ```
   default <T, C extends Collection<? super T>> C readCollection(final C collection,
                                                                 final Function<JsonIterator, T> parser) {
@@ -233,11 +230,69 @@ public interface JsonIterator {
     return readCollection(new ArrayList<>(), parser);
   }
 
+  /// Reads an array of numbers into an `int[]`. A JSON `null` value reads as
+  /// an empty array, consistent with [#readArray()].
+  default int[] readIntArray() {
+    int[] array = new int[8];
+    int i = 0;
+    while (readArray()) {
+      if (i == array.length) {
+        array = Arrays.copyOf(array, i << 1);
+      }
+      array[i++] = readInt();
+    }
+    return i == array.length ? array : Arrays.copyOf(array, i);
+  }
+
+  /// Reads an array of numbers into a `long[]`. A JSON `null` value reads as
+  /// an empty array, consistent with [#readArray()].
+  default long[] readLongArray() {
+    long[] array = new long[8];
+    int i = 0;
+    while (readArray()) {
+      if (i == array.length) {
+        array = Arrays.copyOf(array, i << 1);
+      }
+      array[i++] = readLong();
+    }
+    return i == array.length ? array : Arrays.copyOf(array, i);
+  }
+
+  /// Reads an array of numbers into a `byte[]`, narrowing each element via
+  /// [#readInt()] — values outside the byte range are truncated, not
+  /// validated. A JSON `null` value reads as an empty array, consistent with
+  /// [#readArray()]. Distinct from [#decodeBase64String()], which reads a
+  /// base64 string value.
+  default byte[] readByteArray() {
+    byte[] array = new byte[8];
+    int i = 0;
+    while (readArray()) {
+      if (i == array.length) {
+        array = Arrays.copyOf(array, i << 1);
+      }
+      array[i++] = (byte) readInt();
+    }
+    return i == array.length ? array : Arrays.copyOf(array, i);
+  }
+
+  /// Fills `into` from an array of numbers, narrowing each element via
+  /// [#readInt()], and returns the number of elements read — for fixed-size
+  /// targets such as 32-byte keys. Elements beyond `into.length` throw
+  /// [ArrayIndexOutOfBoundsException] with the iterator mid-array.
+  default int readByteArray(final byte[] into) {
+    int i = 0;
+    while (readArray()) {
+      into[i++] = (byte) readInt();
+    }
+    return i;
+  }
+
   /// Reads each object field as a map entry: the key is parsed from the field
   /// name span and passed to `valueParser` along with this iterator, so value
-  /// factories that carry their key map directly, e.g.
-  /// `ji.readMap(PARSE_BASE58_PUBLIC_KEY, JupiterPrice::parsePrice)`. For
-  /// String keys, `String::new` is a [CharBufferFunction].
+  /// factories that carry their key map directly, e.g., a
+  /// `static Entry parse(Key key, JsonIterator ji)` factory as
+  /// `ji.readMap(KEY_PARSER, Entry::parse)`. For String keys, `String::new`
+  /// is a [CharBufferFunction].
   ///
   /// A JSON `null` value reads as an empty map, consistent with [#readArray()]
   /// and [#testObject(Object, ContextFieldBufferPredicate)]; callers that must
@@ -247,10 +302,11 @@ public interface JsonIterator {
                                                                 final CharBufferFunction<K> keyParser,
                                                                 final BiFunction<K, JsonIterator, V> valueParser) {
     return testObject(map, (m, buf, offset, len, ji) -> {
-      final var key = keyParser.apply(buf, offset, len);
-      m.put(key, valueParser.apply(key, ji));
-      return true;
-    });
+          final var key = keyParser.apply(buf, offset, len);
+          m.put(key, valueParser.apply(key, ji));
+          return true;
+        }
+    );
   }
 
   /// [HashMap] convenience over
@@ -262,7 +318,8 @@ public interface JsonIterator {
 
   /// Reads an array of values into a map, each keyed by `keyExtractor`
   /// applied to the parsed value, e.g.
-  /// `ji.readMap(JupiterTokenV2::parseToken, JupiterTokenV2::address)`.
+  /// `ji.readMap(JsonIterator::readString, String::length)` — typically the
+  /// value's parse factory paired with the accessor of its identifying field.
   ///
   /// A JSON `null` value reads as an empty map, consistent with
   /// [#readArray()]; callers that must distinguish `null` should guard with
@@ -340,6 +397,12 @@ public interface JsonIterator {
   /// @return true if a value other than `null` is next.
   default boolean notNull() {
     return !readNull();
+  }
+
+  /// Returns `null` after consuming a JSON `null`; otherwise applies `reader`
+  /// to this iterator, e.g. `ji.readOrNull(Entry::parse)`.
+  default <T> T readOrNull(final Function<JsonIterator, T> reader) {
+    return notNull() ? reader.apply(this) : null;
   }
 
   String readString();
@@ -507,6 +570,46 @@ public interface JsonIterator {
   <C> C testObject(final C context,
                    final FieldMatcher matcher,
                    final ContextFieldIndexMaskedPredicate<C> fieldPredicate);
+
+  /// Collapses the parse-and-finish triad — construct a stateful parser,
+  /// [#testObject(FieldBufferPredicate)] it over the object, finish it into
+  /// the result. A parser declaring `implements FieldBufferPredicate,
+  /// Supplier<Entry>` parses with:
+  ///
+  /// ```java
+  /// return ji.parseObject(new Parser());
+  /// ```
+  default <R, P extends FieldBufferPredicate & Supplier<R>> R parseObject(final P parser) {
+    testObject(parser);
+    return parser.get();
+  }
+
+  /// [#parseObject(FieldBufferPredicate)] over the
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)] index-dispatch form.
+  default <R, P extends FieldIndexPredicate & Supplier<R>> R parseObject(final FieldMatcher matcher, final P parser) {
+    testObject(matcher, parser);
+    return parser.get();
+  }
+
+  /// [#parseObject(FieldBufferPredicate)] with an explicit finisher, for
+  /// parsers whose finishing method is named differently or takes arguments:
+  ///
+  /// ```java
+  /// return ji.parseObject(new Parser(), parser -> parser.create(context));
+  /// ```
+  default <P extends FieldBufferPredicate, R> R parseObject(final P parser, final Function<P, R> finisher) {
+    testObject(parser);
+    return finisher.apply(parser);
+  }
+
+  /// [#parseObject(FieldBufferPredicate, Function)] over the
+  /// [#testObject(FieldMatcher, FieldIndexPredicate)] index-dispatch form.
+  default <P extends FieldIndexPredicate, R> R parseObject(final FieldMatcher matcher,
+                                                           final P parser,
+                                                           final Function<P, R> finisher) {
+    testObject(matcher, parser);
+    return finisher.apply(parser);
+  }
 
   /// Reads the next string value and resolves it through the matcher on the
   /// same zero-copy fast path as field-name dispatch — for enum values and
