@@ -7,6 +7,8 @@ import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
@@ -42,16 +44,18 @@ final class TestObject {
 
     ji = factory.create(json);
     assertNull(ji.applyObject(TRUE, ((context, buf, offset, len, jsonIterator) -> {
-      assertEquals(TRUE, context);
-      assertEquals("field1", new String(buf, offset, len));
-      assertEquals("hello", jsonIterator.readString());
-      return jsonIterator.applyObject(FALSE, (_context, _buf, _, _len, _) -> {
-        assertEquals(FALSE, _context);
-        assertEquals(-1, _len);
-        assertNull(_buf);
-        return null;
-      });
-    })));
+          assertEquals(TRUE, context);
+          assertEquals("field1", new String(buf, offset, len));
+          assertEquals("hello", jsonIterator.readString());
+          return jsonIterator.applyObject(FALSE, (_context, _buf, _, _len, _) -> {
+                assertEquals(FALSE, _context);
+                assertEquals(-1, _len);
+                assertNull(_buf);
+                return null;
+              }
+          );
+        })
+    ));
 
     ji = factory.create(json);
     assertEquals(ji, ji.skipObjField());
@@ -114,5 +118,101 @@ final class TestObject {
   void test_read_null() {
     var ji = factory.create("null");
     assertTrue(ji.readNull());
+  }
+
+  @Test
+  void test_read_map() {
+    final var ji = factory.create("""
+        {"a":1,"b":2}""");
+    assertEquals(
+        Map.of("a", 1, "b", 2),
+        ji.readMap(String::new, (_, jsonIterator) -> jsonIterator.readInt())
+    );
+  }
+
+  @Test
+  void test_read_map_key_passed_to_value_parser() {
+    final var ji = factory.create("""
+        {"a":1,"b":2}""");
+    assertEquals(
+        Map.of("a", "a=1", "b", "b=2"),
+        ji.readMap(String::new, (key, jsonIterator) -> key + "=" + jsonIterator.readInt())
+    );
+  }
+
+  @Test
+  void test_read_map_span_parsed_keys() {
+    final var ji = factory.create("""
+        {"1":"one","2":"two"}""");
+    assertEquals(
+        Map.of(1, "one", 2, "two"),
+        ji.readMap(
+            (buf, offset, len) -> Integer.parseInt(new String(buf, offset, len)),
+            (_, jsonIterator) -> jsonIterator.readString()
+        )
+    );
+  }
+
+  @Test
+  void test_read_map_empty() {
+    final var ji = factory.create("{}");
+    assertTrue(ji.readMap(String::new, (_, jsonIterator) -> jsonIterator.readInt()).isEmpty());
+  }
+
+  @Test
+  void test_read_map_null() {
+    var ji = factory.create("null");
+    assertTrue(ji.readMap(String::new, (_, jsonIterator) -> jsonIterator.readInt()).isEmpty());
+
+    ji = factory.create("null");
+    assertNull(ji.notNull() ? ji.readMap(String::new, (_, jsonIterator) -> jsonIterator.readInt()) : null);
+  }
+
+  @Test
+  void test_read_map_duplicate_key_last_wins() {
+    final var ji = factory.create("""
+        {"a":1,"a":2}""");
+    assertEquals(
+        Map.of("a", 2),
+        ji.readMap(String::new, (_, jsonIterator) -> jsonIterator.readInt())
+    );
+  }
+
+  @Test
+  void test_read_map_supplied_map() {
+    final var ji = factory.create("""
+        {"A":1,"a":2}""");
+    final var map = ji.readMap(
+        new TreeMap<>(String.CASE_INSENSITIVE_ORDER),
+        String::new,
+        (_, jsonIterator) -> jsonIterator.readInt()
+    );
+    assertEquals(1, map.size());
+    assertEquals(2, map.get("a"));
+    assertEquals(2, map.get("A"));
+  }
+
+  @Test
+  void test_read_map_nested_values() {
+    final var ji = factory.create("""
+        {"outer":{"inner":1}}""");
+    assertEquals(
+        Map.of("outer", Map.of("inner", 1)),
+        ji.readMap(
+            String::new,
+            (_, jsonIterator) -> jsonIterator.readMap(String::new, (_, innerJi) -> innerJi.readInt())
+        )
+    );
+  }
+
+  @Test
+  void test_read_map_as_field_value() {
+    final var ji = factory.create("""
+        {"m":{"x":1},"after":2}""");
+    assertEquals(
+        Map.of("x", 1),
+        ji.skipUntil("m").readMap(String::new, (_, jsonIterator) -> jsonIterator.readInt())
+    );
+    assertEquals(2, ji.skipUntil("after").readInt());
   }
 }

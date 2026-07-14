@@ -6,6 +6,13 @@ import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 public interface JsonIterator {
 
@@ -203,6 +210,80 @@ public interface JsonIterator {
 
   boolean readArray();
 
+  /// Reads each array element with `parser` and adds it to `collection`.
+  /// A JSON `null` value reads as an empty array, consistent with
+  /// [#readArray()]; callers that must distinguish `null` should guard with
+  /// [#notNull()]:
+  ///
+  /// ```java
+  /// this.routePlan = ji.notNull() ? ji.readList(JupiterRoute::parse) : null;
+  /// ```
+  default <T, C extends Collection<? super T>> C readCollection(final C collection,
+                                                                final Function<JsonIterator, T> parser) {
+    while (readArray()) {
+      collection.add(parser.apply(this));
+    }
+    return collection;
+  }
+
+  /// Reads an array into a [List], one element per `parser` application, e.g.
+  /// `ji.readList(JsonIterator::readString)`. A JSON `null` value reads as an
+  /// empty list; see [#readCollection(Collection, Function)].
+  default <T> List<T> readList(final Function<JsonIterator, T> parser) {
+    return readCollection(new ArrayList<>(), parser);
+  }
+
+  /// Reads each object field as a map entry: the key is parsed from the field
+  /// name span and passed to `valueParser` along with this iterator, so value
+  /// factories that carry their key map directly, e.g.
+  /// `ji.readMap(PARSE_BASE58_PUBLIC_KEY, JupiterPrice::parsePrice)`. For
+  /// String keys, `String::new` is a [CharBufferFunction].
+  ///
+  /// A JSON `null` value reads as an empty map, consistent with [#readArray()]
+  /// and [#testObject(Object, ContextFieldBufferPredicate)]; callers that must
+  /// distinguish `null` should guard with [#notNull()]. Duplicate field names
+  /// follow [Map#put] semantics: the last entry wins.
+  default <K, V, M extends Map<? super K, ? super V>> M readMap(final M map,
+                                                                final CharBufferFunction<K> keyParser,
+                                                                final BiFunction<K, JsonIterator, V> valueParser) {
+    return testObject(map, (m, buf, offset, len, ji) -> {
+      final var key = keyParser.apply(buf, offset, len);
+      m.put(key, valueParser.apply(key, ji));
+      return true;
+    });
+  }
+
+  /// [HashMap] convenience over
+  /// [#readMap(Map, CharBufferFunction, BiFunction)].
+  default <K, V> Map<K, V> readMap(final CharBufferFunction<K> keyParser,
+                                   final BiFunction<K, JsonIterator, V> valueParser) {
+    return readMap(new HashMap<>(), keyParser, valueParser);
+  }
+
+  /// Reads an array of values into a map, each keyed by `keyExtractor`
+  /// applied to the parsed value, e.g.
+  /// `ji.readMap(JupiterTokenV2::parseToken, JupiterTokenV2::address)`.
+  ///
+  /// A JSON `null` value reads as an empty map, consistent with
+  /// [#readArray()]; callers that must distinguish `null` should guard with
+  /// [#notNull()]. Duplicate keys follow [Map#put] semantics: the last
+  /// element wins.
+  default <K, V, M extends Map<? super K, ? super V>> M readMap(final M map,
+                                                                final Function<JsonIterator, V> valueParser,
+                                                                final Function<V, K> keyExtractor) {
+    while (readArray()) {
+      final var value = valueParser.apply(this);
+      map.put(keyExtractor.apply(value), value);
+    }
+    return map;
+  }
+
+  /// [HashMap] convenience over [#readMap(Map, Function, Function)].
+  default <K, V> Map<K, V> readMap(final Function<JsonIterator, V> valueParser,
+                                   final Function<V, K> keyExtractor) {
+    return readMap(new HashMap<>(), valueParser, keyExtractor);
+  }
+
   JsonIterator openArray();
 
   JsonIterator continueArray();
@@ -355,7 +436,6 @@ public interface JsonIterator {
   void consumeChars(final CharBufferConsumer testChars);
 
   <C> void consumeChars(final C context, final ContextCharBufferConsumer<C> testChars);
-
 
   // IOC Field Methods
 

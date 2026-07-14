@@ -10,6 +10,7 @@ import java.time.Instant;
 
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ParameterizedClass
@@ -71,6 +72,65 @@ final class TestInteger {
     assertEquals(9223372036854775807L, factory.create("\"9223372036854775807\"").readLong());
     assertEquals(-4321L, factory.create("\"-4321\"").readLong());
     assertEquals(-9223372036854775808L, factory.create("\"-9223372036854775808\"").readLong());
+  }
+
+  @Test
+  void test_positive_negative_short() {
+    assertEquals((short) 0, factory.create("0").readShort());
+    assertEquals((short) 1, factory.create("1").readShort());
+    assertEquals((short) 321, factory.create("321").readShort());
+    assertEquals((short) 4321, factory.create("4321").readShort());
+    assertEquals((short) -4321, factory.create("-4321").readShort());
+
+    assertEquals((short) 0, factory.create("\"0\"").readShort());
+    assertEquals((short) 1, factory.create("\"1\"").readShort());
+    assertEquals((short) 321, factory.create("\"321\"").readShort());
+    assertEquals((short) 4321, factory.create("\"4321\"").readShort());
+    assertEquals((short) -4321, factory.create("\"-4321\"").readShort());
+  }
+
+  @Test
+  void test_max_min_short() {
+    assertEquals(Short.MAX_VALUE, factory.create(Short.toString(Short.MAX_VALUE)).readShort());
+    assertEquals((short) (Short.MAX_VALUE - 1), factory.create(Short.toString((short) (Short.MAX_VALUE - 1))).readShort());
+    assertEquals((short) (Short.MIN_VALUE + 1), factory.create(Short.toString((short) (Short.MIN_VALUE + 1))).readShort());
+    assertEquals(Short.MIN_VALUE, factory.create(Short.toString(Short.MIN_VALUE)).readShort());
+
+    assertEquals(Short.MAX_VALUE, factory.create(String.format("\"%d\"", Short.MAX_VALUE)).readShort());
+    assertEquals((short) (Short.MAX_VALUE - 1), factory.create(String.format("\"%d\"", Short.MAX_VALUE - 1)).readShort());
+    assertEquals((short) (Short.MIN_VALUE + 1), factory.create(String.format("\"%d\"", Short.MIN_VALUE + 1)).readShort());
+    assertEquals(Short.MIN_VALUE, factory.create(String.format("\"%d\"", Short.MIN_VALUE)).readShort());
+  }
+
+  @Test
+  void test_short_overflow() {
+    var ji = factory.create("32768");
+    assertThrows(JsonException.class, ji::readShort);
+
+    ji = factory.create("-32769");
+    assertThrows(JsonException.class, ji::readShort);
+
+    ji = factory.create("2147483647");
+    assertThrows(JsonException.class, ji::readShort);
+
+    ji = factory.create("-2147483648");
+    assertThrows(JsonException.class, ji::readShort);
+
+    ji = factory.create("\"32768\"");
+    assertThrows(JsonException.class, ji::readShort);
+
+    ji = factory.create("\"-32769\"");
+    assertThrows(JsonException.class, ji::readShort);
+  }
+
+  @Test
+  void test_max_min_short_array() {
+    final var ji = factory.create("[32767,-32768]");
+    ji.readArray();
+    assertEquals(Short.MAX_VALUE, ji.readShort());
+    ji.readArray();
+    assertEquals(Short.MIN_VALUE, ji.readShort());
+    assertFalse(ji.readArray());
   }
 
   @Test
