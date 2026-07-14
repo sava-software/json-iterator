@@ -1,5 +1,12 @@
 # Changelog
 
+## [25.1.2](https://github.com/sava-software/json-iterator/compare/25.1.1...25.1.2) (2026-07-14)
+
+
+### Features
+
+* **jsoniter:** add primitive array parsing and enum matcher support ([8fc0f60](https://github.com/sava-software/json-iterator/commit/8fc0f60b3402863805b123bf4e55a73cdaa0258b))
+
 ## [25.1.1](https://github.com/sava-software/json-iterator/compare/25.1.0...25.1.1) (2026-07-14)
 
 
