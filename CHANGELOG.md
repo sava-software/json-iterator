@@ -1,5 +1,14 @@
 # Changelog
 
+## [25.1.1](https://github.com/sava-software/json-iterator/compare/25.1.0...25.1.1) (2026-07-14)
+
+
+### Features
+
+* **jmh:** add `SourceBench` for data source comparisons and processing costs ([3247f73](https://github.com/sava-software/json-iterator/commit/3247f73cd4295b1b36e27c032d098529c87a5a34))
+* **jsoniter:** add `notNull` method to complement `readNull` ([7c68b70](https://github.com/sava-software/json-iterator/commit/7c68b709c299289852ad7e6c66f101edce6b8546))
+* **jsoniter:** add collection and map parsing methods ([6cd97dd](https://github.com/sava-software/json-iterator/commit/6cd97ddb89c5255432974a1d304618bada175d44))
+
 ## [25.1.0](https://github.com/sava-software/json-iterator/compare/21.1.0...25.1.0) (2026-07-12)
 
 
