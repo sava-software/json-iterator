@@ -405,6 +405,21 @@ public interface JsonIterator {
     return notNull() ? reader.apply(this) : null;
   }
 
+  /// Type-tolerant [#readOrNull(Function)]: applies `reader` only if the next
+  /// value is of the expected type; otherwise — JSON `null` included — skips
+  /// the value and returns `null`. For sources that substitute a `null`,
+  /// placeholder, or mistyped value where a specific type is expected, e.g.
+  /// `ji.readOrNull(ValueType.STRING, JsonIterator::decodeBase64String)` or
+  /// element-wise `ji.readList(j -> j.readOrNull(ValueType.OBJECT, Entry::parse))`.
+  default <T> T readOrNull(final ValueType type, final Function<JsonIterator, T> reader) {
+    if (whatIsNext() == type) {
+      return reader.apply(this);
+    } else {
+      skip();
+      return null;
+    }
+  }
+
   String readString();
 
   byte[] decodeBase64String();

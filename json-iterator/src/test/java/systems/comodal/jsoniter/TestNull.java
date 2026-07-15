@@ -80,4 +80,37 @@ final class TestNull {
     final var map = ji.skipUntil("b").readOrNull(jsonIterator -> jsonIterator.readMap(String::new, (key, inner) -> inner.readInt()));
     assertEquals(1, map.get("x"));
   }
+
+  @Test
+  void test_read_or_null_typed() {
+    assertEquals("s", factory.create("\"s\"").readOrNull(ValueType.STRING, JsonIterator::readString));
+    assertNull(factory.create("null").readOrNull(ValueType.STRING, JsonIterator::readString));
+    assertNull(factory.create("42").readOrNull(ValueType.STRING, JsonIterator::readString));
+    assertNull(factory.create("{\"x\":1}").readOrNull(ValueType.STRING, JsonIterator::readString));
+
+    assertEquals(42, factory.create("42").readOrNull(ValueType.NUMBER, JsonIterator::readInt));
+    assertNull(factory.create("\"42\"").readOrNull(ValueType.NUMBER, JsonIterator::readInt));
+  }
+
+  @Test
+  void test_read_or_null_typed_skips_and_positions() {
+    final var ji = factory.create("{\"a\":\"nope\",\"b\":7}");
+    assertNull(ji.skipUntil("a").readOrNull(ValueType.NUMBER, JsonIterator::readInt));
+    assertEquals(7, (int) ji.skipUntil("b").readOrNull(JsonIterator::readInt));
+  }
+
+  @Test
+  void test_read_or_null_typed_list_elements() {
+    // Mixed-type array: non-objects are skipped and padded as null entries.
+    final var ji = factory.create("[{\"x\":1},null,\"junk\",{\"x\":2}]");
+    final var list = ji.readList(jsonIterator -> jsonIterator.readOrNull(
+        ValueType.OBJECT,
+        inner -> inner.readMap(String::new, (_, valueJi) -> valueJi.readInt())
+    ));
+    assertEquals(4, list.size());
+    assertEquals(1, list.get(0).get("x"));
+    assertNull(list.get(1));
+    assertNull(list.get(2));
+    assertEquals(2, list.get(3).get("x"));
+  }
 }
