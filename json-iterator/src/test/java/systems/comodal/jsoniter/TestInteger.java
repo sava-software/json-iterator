@@ -288,4 +288,31 @@ final class TestInteger {
     instant = Instant.ofEpochSecond(seconds.longValue(), nanos.longValue());
     assertEquals(expected, instant);
   }
+
+  @Test
+  void test_non_ascii_terminates_or_rejects() {
+    // fuzz-hardening regression: digit resolution indexed a 127-entry table
+    // with the raw source value — a multibyte char or negative byte faulted
+    // instead of terminating the scan or rejecting the token
+    assertEquals(12, factory.create("12é").readInt());
+    assertEquals(12L, factory.create("12é").readLong());
+    assertEquals(12, factory.create("12中3").readInt());
+    assertEquals(12345678901L, factory.create("12345678901é").readLong());
+    assertThrows(JsonException.class, () -> factory.create("é").readInt());
+    assertThrows(JsonException.class, () -> factory.create("中").readLong());
+    // a lone minus at end-of-input rejects instead of reading past the buffer
+    assertThrows(JsonException.class, () -> factory.create("-").readInt());
+    assertThrows(JsonException.class, () -> factory.create("-").readLong());
+  }
+
+  @Test
+  void test_number_chars_leading_whitespace() {
+    // the applyNumberChars family enters the number scan without a peekToken;
+    // every whitespace char skips ahead of the token, not just a space
+    for (final var ws : new String[]{"", " ", "\t", "\n", "\r", " \t\r\n "}) {
+      final var ji = factory.create("{\"n\":" + ws + "123}");
+      ji.skipObjField();
+      assertEquals("123", ji.readNumberAsString(), "'" + ws + "'");
+    }
+  }
 }

@@ -111,4 +111,33 @@ final class TestSkip {
     ji = factory.create("{\"o\":" + inner + ",\"z\":3}");
     assertEquals(3, ji.skipUntil("z").readInt());
   }
+
+  @Test
+  void test_skip_validates_escapes() {
+    // fuzz-hardening regression: the char source skipped strings without
+    // decoding escapes, accepting documents the byte source rejects
+    for (final var value : new String[]{
+        "\"a\\uZZZZ\"", "\"a\\u00\", 0]", "\"a\\q\"", "\"\\ude0a\""
+    }) {
+      assertThrows(JsonException.class, () -> factory.create("[" + value + ", 1]").skipRestOfArray(), value);
+    }
+    // well-formed escapes and surrogate pairs skip cleanly on every source
+    var ji = factory.create("[\"a\\u0041\\ud83d\\ude00\\n\\\\\", 2]");
+    assertTrue(ji.readArray());
+    ji.skip();
+    assertTrue(ji.readArray());
+    assertEquals(2, ji.readInt());
+    assertFalse(ji.readArray());
+  }
+
+  @Test
+  void test_truncated_documents_reject() {
+    // fuzz-hardening regression: the char source read past its logical tail on
+    // truncated input instead of rejecting
+    for (final var json : new String[]{
+        "", " ", "tru", "fals", "nul", "\"abc", "\"abc\\", "[1,", "{\"a\":", "{\"a\""
+    }) {
+      assertThrows(JsonException.class, () -> factory.create(json).skip(), "'" + json + "'");
+    }
+  }
 }

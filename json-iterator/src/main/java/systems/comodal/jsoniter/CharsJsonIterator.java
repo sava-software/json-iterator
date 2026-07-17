@@ -58,6 +58,9 @@ final class CharsJsonIterator extends BaseJsonIterator {
   char nextToken() {
     char c;
     for (int i = head; ; ) {
+      if (i == tail) {
+        throw reportError("nextToken", "unexpected end");
+      }
       c = buf[i++];
       switch (c) {
         case ' ', '\n', '\r', '\t' -> {
@@ -74,6 +77,9 @@ final class CharsJsonIterator extends BaseJsonIterator {
   char peekToken() {
     char c;
     for (int i = head; ; i++) {
+      if (i == tail) {
+        throw reportError("peekToken", "unexpected end");
+      }
       c = buf[i];
       switch (c) {
         case ' ', '\n', '\r', '\t' -> {
@@ -88,11 +94,17 @@ final class CharsJsonIterator extends BaseJsonIterator {
 
   @Override
   char readChar() {
+    if (head == tail) {
+      throw reportError("readChar", "unexpected end");
+    }
     return buf[head++];
   }
 
   @Override
   char peekChar() {
+    if (head == tail) {
+      throw reportError("peekChar", "unexpected end");
+    }
     return buf[head];
   }
 
@@ -103,7 +115,7 @@ final class CharsJsonIterator extends BaseJsonIterator {
 
   @Override
   int peekIntDigitChar(final int offset) {
-    return INT_DIGITS[buf[offset]];
+    return intDigit(buf[offset]);
   }
 
   @Override
@@ -131,15 +143,56 @@ final class CharsJsonIterator extends BaseJsonIterator {
     }
   }
 
+  // Escape validation mirrors BytesJsonIterator#skipPastMultiByteEndQuote so
+  // both sources reject the same malformed documents when a value is skipped
+  // rather than read.
   @Override
   void skipPastEndQuote() {
     char c;
+    boolean isExpectingLowSurrogate = false;
     while (head < tail) {
       c = buf[head++];
       if (c == '"') {
         return;
       } else if (c == '\\') {
-        ++head;
+        if (head == tail) {
+          break;
+        }
+        c = buf[head++];
+        switch (c) {
+          case 'b', 't', 'n', 'f', 'r', '"', '/', '\\' -> {
+          }
+          case 'u' -> {
+            if (head == tail) {
+              throw reportError("skipPastEndQuote", "incomplete string");
+            }
+            int bc = JHex.decode(buf[head++]) << 12;
+            if (head == tail) {
+              throw reportError("skipPastEndQuote", "incomplete string");
+            }
+            bc += JHex.decode(buf[head++]) << 8;
+            if (head == tail) {
+              throw reportError("skipPastEndQuote", "incomplete string");
+            }
+            bc += JHex.decode(buf[head++]) << 4;
+            if (head == tail) {
+              throw reportError("skipPastEndQuote", "incomplete string");
+            }
+            bc += JHex.decode(buf[head++]);
+            if (isExpectingLowSurrogate) {
+              if (Character.isLowSurrogate((char) bc)) {
+                isExpectingLowSurrogate = false;
+              } else {
+                throw new JsonException("invalid surrogate");
+              }
+            } else if (Character.isHighSurrogate((char) bc)) {
+              isExpectingLowSurrogate = true;
+            } else if (Character.isLowSurrogate((char) bc)) {
+              throw new JsonException("invalid surrogate");
+            }
+          }
+          default -> throw reportError("skipPastEndQuote", "invalid escape character: " + c);
+        }
       }
     }
     throw reportError("skipPastEndQuote", "incomplete string");
@@ -153,7 +206,16 @@ final class CharsJsonIterator extends BaseJsonIterator {
         return len;
       }
       switch (peekChar(i)) {
-        case ' ' -> {
+        // entered without a peekToken from the applyNumberChars family, so
+        // leading whitespace is this scan's job — but past the first token
+        // char whitespace must terminate: consumers slice this buffer as
+        // [head - len, head), and a swallowed char shifts that window over
+        // the leading digits
+        case ' ', '\t', '\n', '\r' -> {
+          if (len != 0) {
+            head = i;
+            return len;
+          }
         }
         case '.', 'e', 'E', '-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> len++;
         default -> {

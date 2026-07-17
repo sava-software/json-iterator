@@ -130,6 +130,21 @@ final class TestString {
   }
 
   @Test
+  void test_invalid_hex_escape_digits() {
+    // fuzz regression: JHex faulted with IndexOutOfBoundsException instead of
+    // rejecting. The invalid digit may sit in any nibble, exceed 'f' (bounds,
+    // not just table lookup), or be a multibyte char — negative as a raw byte
+    // on the bytes source and above the table range on the chars source.
+    final var invalid = new String[]{
+        "\"\\uFFMF\"", "\"\\ug000\"", "\"\\u000z\"", "\"\\uzzzz\"",
+        "\"\\u00!0\"", "\"\\u0 41\"", "\"\\u0é41\"", "\"\\u中中中中\""
+    };
+    for (final var json : invalid) {
+      assertThrows(JsonException.class, () -> factory.create(json).readString(), json);
+    }
+  }
+
+  @Test
   void test_ascii_string_with_escape() {
     var json = "\"he\tllo\"";
     var ji = factory.create(json);

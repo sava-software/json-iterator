@@ -7,7 +7,7 @@ import java.time.chrono.IsoChronology;
 import java.time.format.DateTimeParseException;
 
 import static java.time.Instant.ofEpochSecond;
-import static systems.comodal.jsoniter.BaseJsonIterator.INT_DIGITS;
+import static systems.comodal.jsoniter.BaseJsonIterator.intDigit;
 import static systems.comodal.jsoniter.BaseJsonIterator.INVALID_CHAR_FOR_NUMBER;
 
 public final class InstantParser {
@@ -67,11 +67,16 @@ public final class InstantParser {
                                  final int offset,
                                  final int len,
                                  final int max) {
-    int hourOffset = INT_DIGITS[buf[++i]];
+    // each field is read at fixed positions past the sign or separator, so a
+    // truncated tail must reject before indexing past the value
+    if (i + 2 >= max) {
+      throw throwDateTimeParseException("Invalid offset ", buf, offset, len, len);
+    }
+    int hourOffset = intDigit(buf[++i]);
     if (hourOffset == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid offset ", buf, offset, len, i - offset);
     }
-    int ind = INT_DIGITS[buf[++i]];
+    int ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid offset ", buf, offset, len, i - offset);
     }
@@ -79,11 +84,14 @@ public final class InstantParser {
     if (++i == max) {
       return hourOffset;
     }
-    int minuteOffset = INT_DIGITS[buf[++i]];
+    if (i + 2 >= max) {
+      throw throwDateTimeParseException("Invalid offset ", buf, offset, len, len);
+    }
+    int minuteOffset = intDigit(buf[++i]);
     if (minuteOffset == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid offset ", buf, offset, len, i - offset);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid offset ", buf, offset, len, i - offset);
     }
@@ -92,12 +100,18 @@ public final class InstantParser {
   }
 
   public static final CharBufferFunction<Instant> RFC_1123_INSTANT_PARSER = (buf, offset, len) -> {
+    // fields sit at fixed positions through offset + 24 and the zone begins at
+    // offset + 26; anything shorter cannot hold the format and would read past
+    // the value (or size the zone String negatively)
+    if (len < 27) {
+      throw throwDateTimeParseException(String.format("Invalid length, %d, expected at least 27 characters", len), buf, offset, len, 0);
+    }
     int i = offset + 5;
-    int day = INT_DIGITS[buf[i]];
+    int day = intDigit(buf[i]);
     if (day == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid day ", buf, offset, len, i - offset);
     }
-    int ind = INT_DIGITS[buf[++i]];
+    int ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid day ", buf, offset, len, i - offset);
     }
@@ -155,52 +169,52 @@ public final class InstantParser {
       throw throwDateTimeParseException("Invalid month ", buf, offset, len, i - offset);
     }
     i += 2;
-    int year = INT_DIGITS[buf[i]];
+    int year = intDigit(buf[i]);
     if (year == INVALID_CHAR_FOR_NUMBER) {
 
       throw throwDateTimeParseException("Invalid year ", buf, offset, len, 0);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid year ", buf, offset, len, i - offset);
     }
     year = (year << 3) + (year << 1) + ind;
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid year ", buf, offset, len, i - offset);
     }
     year = (year << 3) + (year << 1) + ind;
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid year ", buf, offset, len, i - offset);
     }
     year = (year << 3) + (year << 1) + ind;
     i += 2;
-    int hour = INT_DIGITS[buf[i]];
+    int hour = intDigit(buf[i]);
     if (hour == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid hour ", buf, offset, len, i - offset);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid hour ", buf, offset, len, i - offset);
     }
     hour = (hour << 3) + (hour << 1) + ind;
     i += 2;
-    int minute = INT_DIGITS[buf[i]];
+    int minute = intDigit(buf[i]);
     if (minute == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid minute ", buf, offset, len, i - offset);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid minute ", buf, offset, len, i - offset);
     }
     minute = (minute << 3) + (minute << 1) + ind;
     i += 2;
-    int second = INT_DIGITS[buf[i]];
+    int second = intDigit(buf[i]);
     if (second == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid second ", buf, offset, len, i - offset);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid second ", buf, offset, len, i - offset);
     }
@@ -227,7 +241,7 @@ public final class InstantParser {
     }
     int i = offset;
     char c = buf[i];
-    int year = INT_DIGITS[c];
+    int year = intDigit(c);
     if (year == INVALID_CHAR_FOR_NUMBER) {
       if (c == 'S' || c == 'T' || c == 'M' || c == 'W' || c == 'F') {
         return RFC_1123_INSTANT_PARSER.apply(buf, offset, len);
@@ -235,67 +249,67 @@ public final class InstantParser {
         throw throwDateTimeParseException("Invalid year ", buf, offset, len, 0);
       }
     }
-    int ind = INT_DIGITS[buf[++i]];
+    int ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid year ", buf, offset, len, i - offset);
     }
     year = (year << 3) + (year << 1) + ind;
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid year ", buf, offset, len, i - offset);
     }
     year = (year << 3) + (year << 1) + ind;
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid year ", buf, offset, len, i - offset);
     }
     year = (year << 3) + (year << 1) + ind;
     i += 2;
-    int month = INT_DIGITS[buf[i]];
+    int month = intDigit(buf[i]);
     if (month == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid month ", buf, offset, len, i - offset);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid month ", buf, offset, len, i - offset);
     }
     month = (month << 3) + (month << 1) + ind;
     i += 2;
-    int day = INT_DIGITS[buf[i]];
+    int day = intDigit(buf[i]);
     if (day == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid day ", buf, offset, len, i - offset);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid day ", buf, offset, len, i - offset);
     }
     day = (day << 3) + (day << 1) + ind;
     i += 2;
-    int hour = INT_DIGITS[buf[i]];
+    int hour = intDigit(buf[i]);
     if (hour == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid hour ", buf, offset, len, i - offset);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid hour ", buf, offset, len, i - offset);
     }
     hour = (hour << 3) + (hour << 1) + ind;
     i += 2;
-    int minute = INT_DIGITS[buf[i]];
+    int minute = intDigit(buf[i]);
     if (minute == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid minute ", buf, offset, len, i - offset);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid minute ", buf, offset, len, i - offset);
     }
     minute = (minute << 3) + (minute << 1) + ind;
     i += 2;
-    int second = INT_DIGITS[buf[i]];
+    int second = intDigit(buf[i]);
     if (second == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid second ", buf, offset, len, i - offset);
     }
-    ind = INT_DIGITS[buf[++i]];
+    ind = intDigit(buf[++i]);
     if (ind == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid second ", buf, offset, len, i - offset);
     }
@@ -306,7 +320,10 @@ public final class InstantParser {
     }
     c = buf[i];
     if (c == '.') {
-      c = buf[++i];
+      if (++i == max) {
+        throw throwDateTimeParseException("Invalid fraction ", buf, offset, len, i - offset);
+      }
+      c = buf[i];
     } else {
       final int offsetSeconds;
       if (c == 'Z') {
@@ -320,7 +337,7 @@ public final class InstantParser {
       }
       return ofEpochSecond(toEpochSecond(year, month, day, hour, minute, second) - offsetSeconds, 0);
     }
-    int nano = INT_DIGITS[c];
+    int nano = intDigit(c);
     if (nano == INVALID_CHAR_FOR_NUMBER) {
       throw throwDateTimeParseException("Invalid offset ", buf, offset, len, i - offset);
     }
@@ -328,7 +345,7 @@ public final class InstantParser {
     int offsetSeconds = 0;
     while (++i < max) {
       c = buf[i];
-      ind = INT_DIGITS[c];
+      ind = intDigit(c);
       if (ind == INVALID_CHAR_FOR_NUMBER) {
         if (c == 'Z') {
           break;

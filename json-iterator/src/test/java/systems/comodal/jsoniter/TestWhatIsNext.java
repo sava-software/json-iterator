@@ -8,6 +8,7 @@ import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ParameterizedClass
 @FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
@@ -30,5 +31,19 @@ final class TestWhatIsNext {
     assertEquals(ValueType.NUMBER, factory.create("-").whatIsNext());
     IntStream.rangeClosed(0, 9)
         .forEach(i -> assertEquals(ValueType.NUMBER, factory.create(Integer.toString(i)).whatIsNext()));
+  }
+
+  @Test
+  void test_invalid_leading_tokens() {
+    // fuzz-hardening regression: chars above the token table's byte range must
+    // resolve INVALID, not fault; multibyte lead bytes resolve INVALID on the
+    // byte source the same way
+    for (final var json : new String[]{"中文", "é1", "😀", "x", "@"}) {
+      assertEquals(ValueType.INVALID, factory.create(json).whatIsNext(), json);
+    }
+    // and end-of-input rejects on every source, including whitespace-only
+    for (final var json : new String[]{"", " ", " \t\n\r "}) {
+      assertThrows(JsonException.class, () -> factory.create(json).whatIsNext(), "'" + json + "'");
+    }
   }
 }

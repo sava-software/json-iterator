@@ -140,11 +140,17 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   @Override
   final char readChar() {
+    if (head == tail) {
+      throw reportError("readChar", "unexpected end");
+    }
     return (char) (read() & 0xff);
   }
 
   @Override
   final char peekChar() {
+    if (head == tail) {
+      throw reportError("peekChar", "unexpected end");
+    }
     return (char) (buf[head] & 0xff);
   }
 
@@ -155,7 +161,7 @@ class BytesJsonIterator extends BaseJsonIterator {
 
   @Override
   final int peekIntDigitChar(final int offset) {
-    return INT_DIGITS[buf[offset]];
+    return intDigit(buf[offset]);
   }
 
   private void doubleReusableCharBuffer() {
@@ -816,7 +822,14 @@ class BytesJsonIterator extends BaseJsonIterator {
         doubleReusableCharBuffer();
       }
       switch ((c = peekChar(i))) {
-        case ' ' -> {
+        // entered without a peekToken from the applyNumberChars family, so
+        // leading whitespace is this scan's job — but past the first token
+        // char whitespace terminates, it must not splice "1 2" into "12"
+        case ' ', '\t', '\n', '\r' -> {
+          if (len != 0) {
+            head = i;
+            return len;
+          }
         }
         case '.', 'e', 'E', '-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> charBuf[len++] = c;
         default -> {

@@ -32,9 +32,11 @@ final class JHex {
   }
 
   static int decode(final int b) {
-    final int val = DIGITS[b];
+    // Sources index with raw values: a signed byte is negative for multibyte
+    // content, and a char may exceed 'f' — both must reject, not fault.
+    final int val = b >= '0' && b <= 'f' ? DIGITS[b] : INVALID;
     if (val == INVALID) {
-      throw new IndexOutOfBoundsException(b + " is not valid hex digit");
+      throw new JsonException(b + " is not a valid hex digit");
     }
     return val;
   }

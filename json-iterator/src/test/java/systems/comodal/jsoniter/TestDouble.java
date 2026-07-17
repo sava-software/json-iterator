@@ -10,7 +10,9 @@ import java.util.Random;
 import static java.lang.Double.doubleToLongBits;
 import static java.lang.Float.floatToIntBits;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ParameterizedClass
 @FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
@@ -58,6 +60,30 @@ final class TestDouble {
     for (final var edge : edges) {
       assertParses(edge);
     }
+  }
+
+  @Test
+  void test_space_terminates_number_token() {
+    // fuzz regression: the chars source slices its token window as
+    // [head - len, head), so a space swallowed mid-scan shifted the window
+    // and dropped leading digits — "9007199254740993993 " read as
+    // 7.199254740993993E15. A space now terminates the token on both sources.
+    assertEquals(
+        doubleToLongBits(9.007199254740994E18),
+        doubleToLongBits(factory.create("9007199254740993993 ").readDouble()));
+    assertEquals("9007199254740993993", factory.create("9007199254740993993 ").readNumberAsString());
+    for (final var padded : new String[]{"12.5 ", "12.5  ", "12.5 ,", "12.5 }", "12.5 ]"}) {
+      assertEquals(12.5d, factory.create(padded).readDouble(), padded);
+    }
+    // an interior space no longer splices "1 2" into 12
+    assertEquals(1.0d, factory.create("1 2").readDouble());
+    assertEquals("1", factory.create("1 2").readNumberAsString());
+    var ji = factory.create("[1 , 2.5 ]");
+    assertTrue(ji.readArray());
+    assertEquals(1.0d, ji.readDouble());
+    assertTrue(ji.readArray());
+    assertEquals(2.5d, ji.readDouble());
+    assertFalse(ji.readArray());
   }
 
   @Test

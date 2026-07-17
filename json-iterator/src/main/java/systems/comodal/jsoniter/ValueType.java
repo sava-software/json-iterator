@@ -14,6 +14,12 @@ public enum ValueType {
 
   static final ValueType[] VALUE_TYPES = INIT_TYPES.initValueTypes();
 
+  /// The table covers the byte range; a chars source can peek any char, and
+  /// anything past the table is by definition not a value-leading token.
+  static ValueType of(final char c) {
+    return c < VALUE_TYPES.length ? VALUE_TYPES[c] : INVALID;
+  }
+
   private static final class INIT_TYPES {
 
     private INIT_TYPES() {

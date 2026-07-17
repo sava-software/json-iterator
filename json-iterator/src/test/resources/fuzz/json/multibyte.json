@@ -1,0 +1,1 @@
+{"two-byte":"éèêëéèêëéèêë","three-byte":"日本語のテキストで八文字以上","four-byte":"😀😁😂🤣😀😁","pad-u0080":"literalpadbytes","mixed run":"ascii然后是中文then ASCII again é😀 end","field名":"multibyte in the field name","long":"a long ascii prefix before the multibyte tail 統一碼統一碼統一碼統一碼"}

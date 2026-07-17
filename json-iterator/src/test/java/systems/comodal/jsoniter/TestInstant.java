@@ -95,4 +95,27 @@ final class TestInstant {
     assertThrows(DateTimeParseException.class, () -> factory.create("\"2018-03-15T01:23:4xZ\"").readDateTime());
     assertThrows(DateTimeParseException.class, () -> factory.create("\"tooshort\"").readDateTime());
   }
+
+  @Test
+  void testTruncatedInstants() {
+    // fuzz-hardening regression: fixed-position field reads ran past the end
+    // of a truncated value — a negative-length zone String on the RFC form,
+    // stale buffer chars elsewhere — instead of rejecting
+    for (final var dateTime : new String[]{
+        // RFC-1123 cut off before, inside, and just after the seconds; no zone
+        "Fri, 04 Oct 2019 16", "Fri, 04 Oct 2019 16:06", "Fri, 04 Oct 2019 16:06:36",
+        "Fri, 04 Oct 2019 16:06:36 ",
+        // ISO with a bare trailing fraction dot
+        "2019-10-04T16:06:36.",
+        // ISO offsets truncated mid-field
+        "2019-10-04T16:06:36+", "2019-10-04T16:06:36+1",
+        "2019-10-04T16:06:36+02:", "2019-10-04T16:06:36+02:3",
+        "2019-10-04T16:06:36.5+", "2019-10-04T16:06:36.5+02:3"
+    }) {
+      assertThrows(DateTimeParseException.class, () -> factory.create('"' + dateTime + '"').readDateTime(), dateTime);
+    }
+    // the short hour-only offset form still parses
+    assertEquals(Instant.parse("2019-10-04T14:06:36Z"), factory.create("\"2019-10-04T16:06:36+02\"").readDateTime());
+    assertEquals(Instant.parse("2019-10-04T14:06:36.5Z"), factory.create("\"2019-10-04T16:06:36.5+02\"").readDateTime());
+  }
 }

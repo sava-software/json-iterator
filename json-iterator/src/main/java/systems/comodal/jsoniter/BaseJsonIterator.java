@@ -14,7 +14,14 @@ abstract class BaseJsonIterator implements JsonIterator {
   protected static final CharBufferFunction<String> READ_STRING_FUNCTION = String::new;
 
   static final int INVALID_CHAR_FOR_NUMBER = -1;
-  static final int[] INT_DIGITS = INIT_INT_DIGITS.initIntDigits();
+
+  /// Digit resolution takes the raw source value: a signed byte is negative
+  /// for multibyte content and a char is unbounded, so this must range-check
+  /// rather than index a table.
+  static int intDigit(final int c) {
+    final int digit = c - '0';
+    return digit >= 0 && digit <= 9 ? digit : INVALID_CHAR_FOR_NUMBER;
+  }
 
   private static final CharBufferFunction<BigDecimal> READ_BIG_DECIMAL_FUNCTION = (chars, offset, len) -> len == 0 ? null : new BigDecimal(chars, offset, len);
 
@@ -1239,7 +1246,7 @@ abstract class BaseJsonIterator implements JsonIterator {
   @Override
   public final long readUnscaledAsLong(final int scale) {
     char c = nextToken();
-    final var valueType = VALUE_TYPES[c];
+    final var valueType = ValueType.of(c);
     final boolean closeString = valueType == STRING;
     if (closeString) {
       c = nextToken();
@@ -1354,7 +1361,7 @@ abstract class BaseJsonIterator implements JsonIterator {
 
   @Override
   public final ValueType whatIsNext() {
-    return VALUE_TYPES[peekToken()];
+    return ValueType.of(peekToken());
   }
 
   private void skipUntilBreak() {
@@ -1465,7 +1472,7 @@ abstract class BaseJsonIterator implements JsonIterator {
       return;
     }
     final int peek = peekChar();
-    if (peek < INT_DIGITS.length && INT_DIGITS[peek] != INVALID_CHAR_FOR_NUMBER) {
+    if (intDigit(peek) != INVALID_CHAR_FOR_NUMBER) {
       throw reportError("assertNotLeadingZero", "leading zero is invalid");
     }
   }
@@ -1493,7 +1500,7 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   private int readInt(final char c) {
-    final int ind = INT_DIGITS[c];
+    final int ind = intDigit(c);
     if (ind == 0) {
       assertNotLeadingZero();
       return 0;
@@ -1601,7 +1608,7 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   private long readLong(final char c) {
-    final long ind = INT_DIGITS[c];
+    final long ind = intDigit(c);
     if (ind == 0) {
       assertNotLeadingZero();
       return 0;
@@ -1753,19 +1760,4 @@ abstract class BaseJsonIterator implements JsonIterator {
   abstract <C> long parseNumber(final C context,
                                 final ContextCharBufferToLongFunction<C> applyChars,
                                 final int len);
-
-  private static final class INIT_INT_DIGITS {
-
-    private INIT_INT_DIGITS() {
-    }
-
-    private static int[] initIntDigits() {
-      final int[] intDigits = new int[127];
-      Arrays.fill(intDigits, INVALID_CHAR_FOR_NUMBER);
-      for (int i = '0'; i <= '9'; ++i) {
-        intDigits[i] = (i - '0');
-      }
-      return intDigits;
-    }
-  }
 }
