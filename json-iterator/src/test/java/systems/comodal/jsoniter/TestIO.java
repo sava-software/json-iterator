@@ -52,6 +52,44 @@ final class TestIO {
   }
 
   @Test
+  void test_sub_range_reuse_with_mark_reset() {
+    // The websocket-router shape: one reused iterator, reset onto a sub-range
+    // of a larger buffer whose content beyond tail is stale, with mark/reset
+    // to revisit out-of-order fields. Nothing past tail may be read.
+    final var doc = "{\"b\":2,\"a\":1}";
+    final var padded = " " + doc + "{\"stale\":9}";
+    final int head = 1;
+    final int tail = head + doc.length();
+
+    final byte[] bytes = padded.getBytes();
+    var ji = JsonIterator.parse("[]").reset(bytes, head, tail);
+    final int mark = ji.mark();
+    assertEquals(1, ji.skipUntil("a").readInt());
+    ji.reset(mark);
+    assertEquals(2, ji.skipUntil("b").readInt());
+    // the sub-range ends after the document: seeking a missing field must not
+    // walk into the stale content beyond tail
+    ji.reset(mark);
+    assertNull(ji.skipUntil("stale"));
+
+    final char[] chars = padded.toCharArray();
+    ji = JsonIterator.parse(new char[]{'[', ']'}).reset(chars, head, tail);
+    final int charMark = ji.mark();
+    assertEquals(1, ji.skipUntil("a").readInt());
+    ji.reset(charMark);
+    assertEquals(2, ji.skipUntil("b").readInt());
+    ji.reset(charMark);
+    assertNull(ji.skipUntil("stale"));
+
+    // a sub-range cut mid-field rejects instead of completing from the stale
+    // content beyond tail
+    final var truncated = JsonIterator.parse(bytes, head, tail - 5);
+    assertThrows(JsonException.class, () -> truncated.skipUntil("a"));
+    final var truncatedChars = JsonIterator.parse(chars, head, tail - 5);
+    assertThrows(JsonException.class, () -> truncatedChars.skipUntil("a"));
+  }
+
+  @Test
   void test_utf8() {
     byte[] bytes = {'"', (byte) 0xe4, (byte) 0xb8, (byte) 0xad, (byte) 0xe6, (byte) 0x96, (byte) 0x87, '"'};
     var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), 2);
