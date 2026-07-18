@@ -133,7 +133,7 @@ final class TestDouble {
 
   @Test
   void test_float_random_round_trip() {
-    final long seed = new Random().nextLong();
+    final long seed = 0x5EEDD0B1E5A1L; // fixed: the mutation baseline needs deterministic kills; exploration belongs to the fuzz targets
     final var random = new Random(seed);
     for (int i = 0; i < 20_000; ++i) {
       final float value = Float.intBitsToFloat(random.nextInt());
@@ -147,7 +147,7 @@ final class TestDouble {
 
   @Test
   void test_float_random_decimals_match_parse_float() {
-    final long seed = new Random().nextLong();
+    final long seed = 0x5EEDF10A75L; // fixed: the mutation baseline needs deterministic kills; exploration belongs to the fuzz targets
     final var random = new Random(seed);
     final var sb = new StringBuilder(64);
     for (int i = 0; i < 20_000; ++i) {
@@ -178,7 +178,7 @@ final class TestDouble {
 
   @Test
   void test_random_round_trip() {
-    final long seed = new Random().nextLong();
+    final long seed = 0x5EEDDEC13A15L; // fixed: the mutation baseline needs deterministic kills; exploration belongs to the fuzz targets
     final var random = new Random(seed);
     for (int i = 0; i < 20_000; ++i) {
       final double value = Double.longBitsToDouble(random.nextLong());
@@ -193,7 +193,7 @@ final class TestDouble {
 
   @Test
   void test_random_decimals_match_parse_double() {
-    final long seed = new Random().nextLong();
+    final long seed = 0x5EEDF10A7DECL; // fixed: the mutation baseline needs deterministic kills; exploration belongs to the fuzz targets
     final var random = new Random(seed);
     final var sb = new StringBuilder(64);
     for (int i = 0; i < 20_000; ++i) {

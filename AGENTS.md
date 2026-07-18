@@ -30,9 +30,36 @@ Build and test with `./gradlew check`. Dependencies resolve from GitHub Packages
 (sava-build's `hardening` extension in `json-iterator/build.gradle.kts`): PIT mutation
 suites `pitestIterator` / `pitestNumbers` / `pitestUtil` (reports under
 `build/reports/pitest/<suite>/`) and the Jazzer fuzz targets described under
-correctness landmines. A standing task: the iterator suite's surviving/uncovered
-mutants are to be revisited only after the `readObject`/`readObjField` removal (see
-settled decisions) — most of them live in that deprecated plumbing.
+correctness landmines. A standing task: the iterator suite's baseline-carried
+surviving/uncovered mutants are to be revisited only after the
+`readObject`/`readObjField` removal (see settled decisions) — most of them live in
+that deprecated plumbing.
+
+## Quality gate & mutation ratchet
+
+The process contract for any change to main sources (full policy: sava-build's
+`HARDENING.md`):
+
+- **Run `./gradlew qualityGate` after changing main sources** — unit tests plus every
+  PIT suite, each diffed against its accepted baseline in `config/pitest/`. It is the
+  definition of "safe to commit".
+- A new unkilled mutant has exactly three legal outcomes: **kill it** with a test
+  (prefer asserting the property it breaks — position after a skip, exact error
+  context, allocation bounds — over restating the implementation), **refactor** it
+  out of existence, or **accept it** with a written reason in
+  `config/pitest/README.md`. Never run `-PupdateMutationBaseline` just to make the
+  build pass.
+- Line-number churn from editing a mutated file shows up as paired stale + "new"
+  baseline entries; confirm they're the shifted old ones before refreshing.
+- **Randomized tests use fixed seeds** (`TestDouble`, `TestString`): the ratchet
+  needs deterministic kills, and per-run exploration is the fuzz targets' job. Don't
+  reintroduce `new Random().nextLong()` seeding.
+- **Allocation guarantees are asserted, not assumed**: `TestAllocation` pins the
+  zero/exact-allocation contracts via `ThreadMXBean` allocation counters. New API
+  whose point is allocation behavior needs the same treatment — that's also how
+  otherwise-"equivalent" mutants get killed.
+- Pre-release ritual (in addition to the gate): long fuzz runs
+  (`-PmaxFuzzTime=600`+) and a change-scoped jmh A/B per benchmark discipline below.
 
 ## Correctness landmines
 

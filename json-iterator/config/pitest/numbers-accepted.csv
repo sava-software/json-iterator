@@ -1,6 +1,7 @@
 systems.comodal.jsoniter.DoubleParser,computeDouble,181,ConditionalsBoundaryMutator,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeDouble,181,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeDouble,184,ConditionalsBoundaryMutator,SURVIVED
+systems.comodal.jsoniter.DoubleParser,computeDouble,192,ConditionalsBoundaryMutator,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeDouble,194,ConditionalsBoundaryMutator,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeDouble,207,RemoveConditionalMutator_EQUAL_IF,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeDouble,210,ConditionalsBoundaryMutator,SURVIVED
@@ -15,9 +16,15 @@ systems.comodal.jsoniter.DoubleParser,computeFloat,273,ConditionalsBoundaryMutat
 systems.comodal.jsoniter.DoubleParser,computeFloat,273,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeFloat,275,ConditionalsBoundaryMutator,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeFloat,283,ConditionalsBoundaryMutator,SURVIVED
+systems.comodal.jsoniter.DoubleParser,computeFloat,294,MathMutator,SURVIVED
+systems.comodal.jsoniter.DoubleParser,computeFloat,295,MathMutator,SURVIVED
+systems.comodal.jsoniter.DoubleParser,computeFloat,295,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeFloat,295,RemoveConditionalMutator_EQUAL_IF,SURVIVED
+systems.comodal.jsoniter.DoubleParser,computeFloat,296,MathMutator,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeFloat,298,ConditionalsBoundaryMutator,SURVIVED
+systems.comodal.jsoniter.DoubleParser,computeFloat,298,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeFloat,298,RemoveConditionalMutator_ORDER_IF,SURVIVED
+systems.comodal.jsoniter.DoubleParser,computeFloat,299,MathMutator,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeFloat,308,ConditionalsBoundaryMutator,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeFloat,319,ConditionalsBoundaryMutator,SURVIVED
 systems.comodal.jsoniter.DoubleParser,computeFloat,319,RemoveConditionalMutator_ORDER_IF,SURVIVED

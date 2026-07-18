@@ -41,7 +41,7 @@ final class TestString {
 
   @Test
   void testRandomBase64Data() {
-    final long seed = new Random().nextLong();
+    final long seed = 0x5EEDBA5E64L; // fixed: the mutation baseline needs deterministic kills; exploration belongs to the fuzz targets
     final var random = new Random(seed);
     var data = new byte[4_096];
     random.nextBytes(data);
@@ -64,7 +64,7 @@ final class TestString {
     // Bare documents, so nothing follows the string: the closing quote walks
     // across every position relative to the byte path's 8-byte scan words and
     // the end of the buffer.
-    final long seed = new Random().nextLong();
+    final long seed = 0x5EEDE5CA9E5L; // fixed: the mutation baseline needs deterministic kills; exploration belongs to the fuzz targets
     final var random = new Random(seed);
     for (int len = 0; len <= 18; ++len) {
       final var data = new byte[len];
