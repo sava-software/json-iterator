@@ -43,6 +43,10 @@ The process contract for any change to main sources (full policy: sava-build's
 - **Run `./gradlew qualityGate` after changing main sources** — unit tests plus every
   PIT suite, each diffed against its accepted baseline in `config/pitest/`. It is the
   definition of "safe to commit".
+- **While iterating, run only the suite that owns the code you touched**:
+  `pitestNumbers` (DoubleParser) and `pitestUtil` (JHex/JIUtil/InstantParser/
+  FieldMatcher) finish in ~10s; `pitestIterator` (everything else) costs ~90s.
+  `qualityGate` is the before-commit command, not the inner-loop one.
 - A new unkilled mutant has exactly three legal outcomes: **kill it** with a test
   (prefer asserting the property it breaks — position after a skip, exact error
   context, allocation bounds — over restating the implementation), **refactor** it

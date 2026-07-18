@@ -5,7 +5,7 @@ import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 /// [JsonIterator#readUnscaledAsLong(int)] requires mark/reset support, so only
 /// markable factories are exercised here.
@@ -118,5 +118,66 @@ final class TestUnscaledLong {
     ji = factory.create("[\"1.45e-2\",1.45E-2]");
     assertEquals(14L, ji.openArray().readUnscaledAsLong(3));
     assertEquals(14L, ji.continueArray().readUnscaledAsLong(3));
+  }
+
+  @Test
+  void testNegative() {
+    assertEquals(-12345L, factory.create("-123.45").readUnscaledAsLong(2));
+    assertEquals(-12345L, factory.create("\"-123.45\"").readUnscaledAsLong(2));
+  }
+
+  @Test
+  void testBareAndTrailingZero() {
+    // a bare zero ends the buffer at the integer, a zero inside an array does
+    // not; both short-circuit without scaling
+    assertEquals(0L, factory.create("0").readUnscaledAsLong(2));
+
+    var ji = factory.create("[0,7]");
+    ji.openArray();
+    assertEquals(0L, ji.readUnscaledAsLong(2));
+    assertEquals(7, ji.continueArray().readInt());
+    ji.closeArray();
+
+    ji = factory.create("[\"0\",7]");
+    ji.openArray();
+    assertEquals(0L, ji.readUnscaledAsLong(2));
+    assertEquals(7, ji.continueArray().readInt());
+    ji.closeArray();
+  }
+
+  @Test
+  void testNegativeExponentWithoutFraction() {
+    assertEquals(15L, factory.create("1500e-2").readUnscaledAsLong(0));
+    assertEquals(15L, factory.create("\"1500e-2\"").readUnscaledAsLong(0));
+  }
+
+  @Test
+  void testExponentBelowScale() {
+    // exponent more negative than the scale: the fraction digits must be
+    // divided away, not re-parsed under a negative scale limit
+    assertEquals(0L, factory.create("1.5e-3").readUnscaledAsLong(1));
+    assertEquals(0L, factory.create("\"1.5e-3\"").readUnscaledAsLong(1));
+  }
+
+  @Test
+  void testLongBoundaries() {
+    assertEquals(Long.MAX_VALUE, factory.create("9.223372036854775807").readUnscaledAsLong(18));
+    assertEquals(9223372036854775800L, factory.create("922337203685477580").readUnscaledAsLong(1));
+
+    // one past Long.MAX_VALUE in unscaled digits, through each overflow arm
+    assertThrows(JsonException.class, () -> factory.create("9.223372036854775809").readUnscaledAsLong(18));
+    assertThrows(JsonException.class, () -> factory.create("1.8446744073709551620").readUnscaledAsLong(19));
+    assertThrows(JsonException.class, () -> factory.create("1844674407370955162").readUnscaledAsLong(1));
+    assertThrows(JsonException.class, () -> factory.create("922337203685477580.8").readUnscaledAsLong(1));
+
+    final var overflow = assertThrows(JsonException.class, () -> factory.create("9223372036854775808").readUnscaledAsLong(2));
+    assertEquals("readUnscaledAsLong", overflow.op());
+  }
+
+  @Test
+  void testRejectsNonNumericValue() {
+    final var ex = assertThrows(JsonException.class, () -> factory.create("true").readUnscaledAsLong(2));
+    assertEquals("readUnscaledAsLong", ex.op());
+    assertTrue(ex.getMessage().contains("Must be a number"), ex.getMessage());
   }
 }

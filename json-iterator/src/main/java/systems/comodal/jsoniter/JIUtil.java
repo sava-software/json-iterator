@@ -97,7 +97,9 @@ public final class JIUtil {
     char c;
     for (int escapes = 0, dest = to; ; ++to) {
       if (to == chars.length) {
-        if (from == 0) {
+        // dest distinguishes "no escape emitted" from a flush for a quote at
+        // index 0, which also leaves from == 0
+        if (from == 0 && dest == 0) {
           return str;
         } else {
           final int len = to - from;
@@ -184,7 +186,9 @@ public final class JIUtil {
     char c;
     for (int escapes = 0; ; ++to) {
       if (to == chars.length) {
-        if (from == 0) {
+        // dest distinguishes "nothing emitted" from a flush for a quote at
+        // index 0, which also leaves from == 0
+        if (from == 0 && dest == 0) {
           return str;
         } else {
           final int len = to - from;
