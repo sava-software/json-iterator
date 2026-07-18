@@ -77,15 +77,40 @@ abstract class BaseJsonIterator implements JsonIterator {
 
   abstract String getBufferString(final int from, final int to);
 
+  /// Chars of JSON shown on each side of the failure position in
+  /// [JsonException#context()].
+  static final int ERROR_CONTEXT_RADIUS = 60;
+
+  /// Windows the buffer around the parse position with `»` at the position
+  /// and `…` marking a truncated end.
+  private String contextWindow(final int pos) {
+    final int from = Math.max(0, pos - ERROR_CONTEXT_RADIUS);
+    final int to = Math.min(tail, pos + ERROR_CONTEXT_RADIUS);
+    final var context = new StringBuilder(2 + (to - from));
+    if (from > 0) {
+      context.append('…');
+    }
+    context.append(getBufferString(from, pos)).append('»').append(getBufferString(pos, to));
+    if (to < tail) {
+      context.append('…');
+    }
+    return context.toString();
+  }
+
+  /// The thrown exception's message and [JsonException#context()] window the
+  /// buffer around the failure with `»` at the parse position, so the
+  /// offending input is adjacent to the marker: before it when the caller
+  /// consumed the bad token, after it when the caller peeked.
   final JsonException reportError(final String op, final String msg) {
-    final var peek = getBufferString(head <= 10 ? 0 : head - 10, Math.min(head, tail));
-    throw new JsonException(op + ": " + msg + ", head: " + head + ", peek: " + peek + ", buf: " + getBufferString(0, 1_024));
+    final int pos = Math.min(head, tail);
+    final var window = contextWindow(pos);
+    throw new JsonException(op, pos, window, op + ": " + msg + ", offset: " + pos + ", context: " + window);
   }
 
   @Override
   public final String currentBuffer() {
-    final var peek = getBufferString(head <= 10 ? 0 : head - 10, head);
-    return "head: " + head + ", peek: " + peek + ", buf: " + getBufferString(0, 1_024);
+    final int pos = Math.min(head, tail);
+    return "offset: " + pos + ", context: " + contextWindow(pos);
   }
 
   abstract char readChar();
@@ -600,6 +625,10 @@ abstract class BaseJsonIterator implements JsonIterator {
   /// buffer.
   abstract int matchField(final FieldMatcher matcher, final int len);
 
+  /// Decodes the span stashed by [#parseFieldName()] to a String — error
+  /// reporting only, off the match fast path.
+  abstract String fieldString(final int len);
+
   @Override
   public final void testObject(final FieldMatcher matcher, final FieldIndexPredicate fieldPredicate) {
     char c;
@@ -736,6 +765,21 @@ abstract class BaseJsonIterator implements JsonIterator {
       return -1;
     } else {
       throw reportError("matchString", "expected string or null, but " + c);
+    }
+  }
+
+  @Override
+  public final int matchStringOrThrow(final FieldMatcher matcher) {
+    final char c = nextToken();
+    if (c == '"') {
+      final int len = parseFieldName();
+      final int fieldIndex = matchField(matcher, len);
+      if (fieldIndex < 0) {
+        throw reportError("matchStringOrThrow", "unmatched value \"" + fieldString(len) + '"');
+      }
+      return fieldIndex;
+    } else {
+      throw reportError("matchStringOrThrow", "expected string, but " + c);
     }
   }
 

@@ -30,6 +30,18 @@ public final class JsonFuzz {
   /// the library still scans the whole subtree.
   private static final int MAX_DEPTH = 64;
 
+  /// Every string value is additionally resolved through [JsonIterator#matchString]
+  /// and [JsonIterator#matchStringOrThrow] against a linear-scan oracle over these
+  /// names. Chosen to stress the length + first/last-eight-bytes hash: word-load
+  /// boundaries at eight and sixteen bytes, a pair differing only in the middle,
+  /// and multibyte names forcing the char-source UTF-8 fallback.
+  private static final List<String> MATCH_NAMES = List.of(
+      "", "a", "ab", "abcdefg", "abcdefgh", "abcdefghi",
+      "abcdefghijklmnop", "abcdefghijklmnopq",
+      "prefix--MIDDLE--suffix", "prefix--CENTER--suffix",
+      "поле", "值");
+  private static final FieldMatcher MATCHER = FieldMatcher.of(MATCH_NAMES.toArray(String[]::new));
+
   public static void fuzzerTestOneInput(final byte[] data) {
     final var byteEvents = new ArrayList<String>();
     boolean bytesRejected = false;
@@ -65,7 +77,13 @@ public final class JsonFuzz {
 
   private static void walk(final JsonIterator ji, final List<String> events, final int depth) {
     switch (ji.whatIsNext()) {
-      case STRING -> events.add("str:" + ji.readString());
+      case STRING -> {
+        final int start = ji.mark();
+        final var str = ji.readString();
+        final int end = ji.mark();
+        matchDifferentially(ji, str, start, end);
+        events.add("str:" + str);
+      }
       case NUMBER -> events.add("num:" + ji.readNumberAsString());
       case BOOLEAN -> events.add("bool:" + ji.readBoolean());
       case NULL -> {
@@ -103,6 +121,31 @@ public final class JsonFuzz {
         throw new IllegalStateException("skip accepted an invalid leading token");
       }
     }
+  }
+
+  /// Re-reads the string at [start, end) through both matcher entry points and
+  /// checks them against the oracle: the index of the decoded string among
+  /// [#MATCH_NAMES], or -1. A [JsonException] here propagates as an ordinary
+  /// rejection — the byte/char comparison in the caller still applies.
+  private static void matchDifferentially(final JsonIterator ji, final String str, final int start, final int end) {
+    final int expected = MATCH_NAMES.indexOf(str);
+    ji.reset(start);
+    final int matched = ji.matchString(MATCHER);
+    if (matched != expected) {
+      throw new IllegalStateException("matchString resolved \"" + str + "\" to " + matched + ", expected " + expected);
+    }
+    ji.reset(start);
+    try {
+      final int index = ji.matchStringOrThrow(MATCHER);
+      if (index != expected) {
+        throw new IllegalStateException("matchStringOrThrow resolved \"" + str + "\" to " + index + ", expected " + expected);
+      }
+    } catch (final JsonException e) {
+      if (expected >= 0) {
+        throw new IllegalStateException("matchStringOrThrow rejected declared name \"" + str + '"', e);
+      }
+    }
+    ji.reset(end);
   }
 
   private static char[] decodeStrict(final byte[] data) {

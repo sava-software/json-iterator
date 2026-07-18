@@ -5,6 +5,7 @@ import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.TreeSet;
 import java.util.function.Function;
 
 /// Immutable set of expected field names compiled once into a hash table,
@@ -96,6 +97,37 @@ public final class FieldMatcher {
     return (buf, offset, len) -> {
       final int i = matcher.match(buf, offset, len);
       return i < 0 ? null : values[i];
+    };
+  }
+
+  /// Case-insensitive [#enumMatcher(Enum[])] for wire values with case
+  /// variance (e.g. `"Anchor"` vs `"anchor"`). Resolves by linear
+  /// [JsonIterator#fieldEqualsIgnoreCase] scan rather than the hash table —
+  /// suited to the small constant counts of enums. Wire names that collide
+  /// case-insensitively throw [IllegalArgumentException].
+  public static <E extends Enum<E>> CharBufferFunction<E> enumMatcherIgnoreCase(final E[] values) {
+    return enumMatcherIgnoreCase(values, Enum::name);
+  }
+
+  /// [#enumMatcherIgnoreCase(Enum[])] with wire names decoupled from the
+  /// constant names.
+  public static <E extends Enum<E>> CharBufferFunction<E> enumMatcherIgnoreCase(final E[] values,
+                                                                                final Function<E, String> wireName) {
+    final var names = new String[values.length];
+    final var distinct = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+    for (int i = 0; i < values.length; ++i) {
+      names[i] = wireName.apply(values[i]);
+      if (!distinct.add(names[i])) {
+        throw new IllegalArgumentException("case-insensitive duplicate wire name: " + names[i]);
+      }
+    }
+    return (buf, offset, len) -> {
+      for (int i = 0; i < names.length; ++i) {
+        if (JsonIterator.fieldEqualsIgnoreCase(names[i], buf, offset, len)) {
+          return values[i];
+        }
+      }
+      return null;
     };
   }
 

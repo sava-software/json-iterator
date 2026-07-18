@@ -175,6 +175,10 @@ public interface JsonIterator {
   /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
   JsonIterator reset(final InputStream in);
 
+  /// Diagnostic description of the current parse position for embedding in
+  /// application-thrown exceptions: the offset plus a windowed excerpt of the
+  /// surrounding JSON with `»` marking the position, in the same format as
+  /// [JsonException#context()].
   String currentBuffer();
 
   // Object Field & Navigation Methods
@@ -208,32 +212,64 @@ public interface JsonIterator {
     return readCollection(new ArrayList<>(), parser);
   }
 
+  /// [#readList(Function)] with a sized backing [ArrayList] for
+  /// known-cardinality arrays.
+  default <T> List<T> readList(final int initialCapacity, final Function<JsonIterator, T> parser) {
+    return readCollection(new ArrayList<>(initialCapacity), parser);
+  }
+
   /// Reads an array of numbers into an `int[]`. A JSON `null` value reads as
   /// an empty array, consistent with [#readArray()].
   default int[] readIntArray() {
-    int[] array = new int[8];
-    int i = 0;
-    while (readArray()) {
-      if (i == array.length) {
-        array = Arrays.copyOf(array, i << 1);
-      }
-      array[i++] = readInt();
+    return readIntArray(8);
+  }
+
+  /// [#readIntArray()] with a sized initial array: when `initialLength`
+  /// matches the element count, the array is filled and returned with no
+  /// grow or trim copies. The result is always trimmed to the number of
+  /// elements read; an empty or `null` array returns a shared empty array
+  /// without allocating.
+  default int[] readIntArray(final int initialLength) {
+    if (readArray()) {
+      int[] array = new int[initialLength];
+      int i = 0;
+      do {
+        if (i == array.length) {
+          array = Arrays.copyOf(array, Math.max(i << 1, 8));
+        }
+        array[i++] = readInt();
+      } while (readArray());
+      return i == array.length ? array : Arrays.copyOf(array, i);
+    } else {
+      return EmptyArrays.INTS;
     }
-    return i == array.length ? array : Arrays.copyOf(array, i);
   }
 
   /// Reads an array of numbers into a `long[]`. A JSON `null` value reads as
   /// an empty array, consistent with [#readArray()].
   default long[] readLongArray() {
-    long[] array = new long[8];
-    int i = 0;
-    while (readArray()) {
-      if (i == array.length) {
-        array = Arrays.copyOf(array, i << 1);
-      }
-      array[i++] = readLong();
+    return readLongArray(8);
+  }
+
+  /// [#readLongArray()] with a sized initial array: when `initialLength`
+  /// matches the element count, the array is filled and returned with no
+  /// grow or trim copies. The result is always trimmed to the number of
+  /// elements read; an empty or `null` array returns a shared empty array
+  /// without allocating.
+  default long[] readLongArray(final int initialLength) {
+    if (readArray()) {
+      long[] array = new long[initialLength];
+      int i = 0;
+      do {
+        if (i == array.length) {
+          array = Arrays.copyOf(array, Math.max(i << 1, 8));
+        }
+        array[i++] = readLong();
+      } while (readArray());
+      return i == array.length ? array : Arrays.copyOf(array, i);
+    } else {
+      return EmptyArrays.LONGS;
     }
-    return i == array.length ? array : Arrays.copyOf(array, i);
   }
 
   /// Reads an array of numbers into a `byte[]`, narrowing each element via
@@ -242,15 +278,28 @@ public interface JsonIterator {
   /// [#readArray()]. Distinct from [#decodeBase64String()], which reads a
   /// base64 string value.
   default byte[] readByteArray() {
-    byte[] array = new byte[8];
-    int i = 0;
-    while (readArray()) {
-      if (i == array.length) {
-        array = Arrays.copyOf(array, i << 1);
-      }
-      array[i++] = (byte) readInt();
+    return readByteArray(8);
+  }
+
+  /// [#readByteArray()] with a sized initial array: when `initialLength`
+  /// matches the element count, the array is filled and returned with no
+  /// grow or trim copies. The result is always trimmed to the number of
+  /// elements read; an empty or `null` array returns a shared empty array
+  /// without allocating. For fixed-size targets see [#readByteArray(byte[])].
+  default byte[] readByteArray(final int initialLength) {
+    if (readArray()) {
+      byte[] array = new byte[initialLength];
+      int i = 0;
+      do {
+        if (i == array.length) {
+          array = Arrays.copyOf(array, Math.max(i << 1, 8));
+        }
+        array[i++] = (byte) readInt();
+      } while (readArray());
+      return i == array.length ? array : Arrays.copyOf(array, i);
+    } else {
+      return EmptyArrays.BYTES;
     }
-    return i == array.length ? array : Arrays.copyOf(array, i);
   }
 
   /// Fills `into` from an array of numbers, narrowing each element via
@@ -294,6 +343,14 @@ public interface JsonIterator {
     return readMap(new HashMap<>(), keyParser, valueParser);
   }
 
+  /// [#readMap(CharBufferFunction, BiFunction)] with the [HashMap] sized for
+  /// `expectedSize` entries, for known-cardinality objects.
+  default <K, V> Map<K, V> readMap(final int expectedSize,
+                                   final CharBufferFunction<K> keyParser,
+                                   final BiFunction<K, JsonIterator, V> valueParser) {
+    return readMap(HashMap.newHashMap(expectedSize), keyParser, valueParser);
+  }
+
   /// Reads an array of values into a map, each keyed by `keyExtractor`
   /// applied to the parsed value, e.g.
   /// `ji.readMap(JsonIterator::readString, String::length)` — typically the
@@ -317,6 +374,14 @@ public interface JsonIterator {
   default <K, V> Map<K, V> readMap(final Function<JsonIterator, V> valueParser,
                                    final Function<V, K> keyExtractor) {
     return readMap(new HashMap<>(), valueParser, keyExtractor);
+  }
+
+  /// [#readMap(Function, Function)] with the [HashMap] sized for
+  /// `expectedSize` entries, for known-cardinality arrays.
+  default <K, V> Map<K, V> readMap(final int expectedSize,
+                                   final Function<JsonIterator, V> valueParser,
+                                   final Function<V, K> keyExtractor) {
+    return readMap(HashMap.newHashMap(expectedSize), valueParser, keyExtractor);
   }
 
   JsonIterator openArray();
@@ -395,6 +460,77 @@ public interface JsonIterator {
     } else {
       skip();
       return null;
+    }
+  }
+
+  /// Primitive analog of [#readOrNull(ValueType, Function)]: reads the next
+  /// value with [#readLong()] if it is a JSON number; otherwise — JSON `null`
+  /// included — skips the value and returns `other`. Collapses the
+  /// [#whatIsNext()] guard for tolerating bad data:
+  ///
+  /// ```java
+  /// featureSet = ji.readLongOr(-1L);
+  /// ```
+  ///
+  /// Note the type check is strict: a number quoted as a string skips to
+  /// `other`; use [#readNumberOrNumberString()] to accept both forms.
+  default long readLongOr(final long other) {
+    if (whatIsNext() == ValueType.NUMBER) {
+      return readLong();
+    } else {
+      skip();
+      return other;
+    }
+  }
+
+  /// [#readInt()] variant of [#readLongOr(long)].
+  default int readIntOr(final int other) {
+    if (whatIsNext() == ValueType.NUMBER) {
+      return readInt();
+    } else {
+      skip();
+      return other;
+    }
+  }
+
+  /// [#readShort()] variant of [#readLongOr(long)].
+  default short readShortOr(final short other) {
+    if (whatIsNext() == ValueType.NUMBER) {
+      return readShort();
+    } else {
+      skip();
+      return other;
+    }
+  }
+
+  /// [#readDouble()] variant of [#readLongOr(long)].
+  default double readDoubleOr(final double other) {
+    if (whatIsNext() == ValueType.NUMBER) {
+      return readDouble();
+    } else {
+      skip();
+      return other;
+    }
+  }
+
+  /// [#readFloat()] variant of [#readLongOr(long)].
+  default float readFloatOr(final float other) {
+    if (whatIsNext() == ValueType.NUMBER) {
+      return readFloat();
+    } else {
+      skip();
+      return other;
+    }
+  }
+
+  /// [#readBoolean()] variant of [#readLongOr(long)], guarded on
+  /// [ValueType#BOOLEAN].
+  default boolean readBooleanOr(final boolean other) {
+    if (whatIsNext() == ValueType.BOOLEAN) {
+      return readBoolean();
+    } else {
+      skip();
+      return other;
     }
   }
 
@@ -559,4 +695,17 @@ public interface JsonIterator {
   /// null; callers needing the unrecognized text should instead resolve via
   /// [FieldMatcher#match] inside an [#applyChars] callback.
   int matchString(final FieldMatcher matcher);
+
+  /// Strict [#matchString(FieldMatcher)] for discriminator dispatch: an
+  /// unrecognized value — JSON `null` included — throws [JsonException]
+  /// naming the value, instead of returning -1. For tagged-union parsing
+  /// where every value must resolve:
+  ///
+  /// ```java
+  /// return switch (ji.skipObjField().matchStringOrThrow(KINDS)) {
+  ///   case 0 -> FixedCountNode.parse(ji);
+  ///   ...
+  /// };
+  /// ```
+  int matchStringOrThrow(final FieldMatcher matcher);
 }

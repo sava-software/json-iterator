@@ -461,6 +461,11 @@ final class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
+  String fieldString(final int len) {
+    return new String(fieldChars, fieldCharsOffset, len);
+  }
+
+  @Override
   boolean breakOut(final FieldBufferPredicate fieldBufferFunction, final int offset, final int len) {
     if (numEscapes > 0) {
       final char[] chars = handleEscapes(offset, len);

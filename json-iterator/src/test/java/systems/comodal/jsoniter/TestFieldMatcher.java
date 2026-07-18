@@ -160,7 +160,10 @@ final class TestFieldMatcher {
 
     final var ji2 = factory.create("[42]");
     ji2.readArray();
-    assertThrows(JsonException.class, () -> ji2.matchString(matcher));
+    // the message pins the token guard: a mutant routing non-null tokens
+    // through skipNull also throws, but not with this message
+    final var ex = assertThrows(JsonException.class, () -> ji2.matchString(matcher));
+    assertTrue(ex.getMessage().contains("expected string or null, but 4"), ex.getMessage());
   }
 
   @Test
@@ -260,5 +263,63 @@ final class TestFieldMatcher {
   @Test
   void test_enum_matcher_duplicate_wire_names() {
     assertThrows(IllegalArgumentException.class, () -> FieldMatcher.enumMatcher(Mode.values(), _ -> "same"));
+  }
+
+  @Test
+  void test_enum_matcher_ignore_case() {
+    final var parser = FieldMatcher.enumMatcherIgnoreCase(Mode.values());
+
+    assertEquals(Mode.ExactIn, factory.create("\"ExactIn\"").applyChars(parser));
+    assertEquals(Mode.ExactIn, factory.create("\"exactin\"").applyChars(parser));
+    assertEquals(Mode.ExactOut, factory.create("\"EXACTOUT\"").applyChars(parser));
+    assertNull(factory.create("\"unknown\"").applyChars(parser));
+    assertNull(factory.create("null").applyChars(parser));
+
+    final var wireParser = FieldMatcher.enumMatcherIgnoreCase(Encoding.values(), Encoding::wireName);
+    assertEquals(Encoding.BASE_64, factory.create("\"Base64\"").applyChars(wireParser));
+    assertEquals(Encoding.BASE_64_ZSTD, factory.create("\"BASE64+ZSTD\"").applyChars(wireParser));
+    assertNull(factory.create("\"BASE_64\"").applyChars(wireParser));
+  }
+
+  @Test
+  void test_enum_matcher_ignore_case_duplicate_wire_names() {
+    assertThrows(IllegalArgumentException.class,
+        () -> FieldMatcher.enumMatcherIgnoreCase(Mode.values(), mode -> mode == Mode.ExactIn ? "same" : "SAME"));
+  }
+
+  @Test
+  void test_match_string_or_throw() {
+    final var matcher = FieldMatcher.of("processed", "confirmed", "finalized");
+    final var ji = factory.create("""
+        ["confirmed", "finalized", "processed"]""");
+    assertTrue(ji.readArray());
+    assertEquals(1, ji.matchStringOrThrow(matcher));
+    assertTrue(ji.readArray());
+    assertEquals(2, ji.matchStringOrThrow(matcher));
+    assertTrue(ji.readArray());
+    assertEquals(0, ji.matchStringOrThrow(matcher));
+    assertFalse(ji.readArray());
+
+    // an unmatched value throws, naming the value
+    final var unknown = factory.create("\"unknown\"");
+    final var ex = assertThrows(JsonException.class, () -> unknown.matchStringOrThrow(matcher));
+    assertTrue(ex.getMessage().contains("unmatched value \"unknown\""), ex.getMessage());
+
+    // unlike matchString, null is rejected rather than resolved to -1; the
+    // message assertions pin the token guard itself — parsing a non-string as
+    // a field name also throws, but not with this message
+    final var nullJi = factory.create("null");
+    final var nullEx = assertThrows(JsonException.class, () -> nullJi.matchStringOrThrow(matcher));
+    assertTrue(nullEx.getMessage().contains("expected string, but n"), nullEx.getMessage());
+    final var numEx = assertThrows(JsonException.class, () -> factory.create("42").matchStringOrThrow(matcher));
+    assertTrue(numEx.getMessage().contains("expected string, but 4"), numEx.getMessage());
+  }
+
+  @Test
+  void test_match_string_or_throw_multibyte_value_in_message() {
+    final var matcher = FieldMatcher.of("known");
+    final var ji = factory.create("\"поле\"");
+    final var ex = assertThrows(JsonException.class, () -> ji.matchStringOrThrow(matcher));
+    assertTrue(ex.getMessage().contains("поле"), ex.getMessage());
   }
 }

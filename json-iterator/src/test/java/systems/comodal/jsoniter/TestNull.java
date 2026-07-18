@@ -6,8 +6,7 @@ import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
 import static java.lang.Boolean.TRUE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 @ParameterizedClass
 @FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
@@ -97,6 +96,39 @@ final class TestNull {
     final var ji = factory.create("{\"a\":\"nope\",\"b\":7}");
     assertNull(ji.skipUntil("a").readOrNull(ValueType.NUMBER, JsonIterator::readInt));
     assertEquals(7, (int) ji.skipUntil("b").readOrNull(JsonIterator::readInt));
+  }
+
+  @Test
+  void test_read_primitive_or_default() {
+    assertEquals(42L, factory.create("42").readLongOr(-1L));
+    assertEquals(-1L, factory.create("null").readLongOr(-1L));
+    assertEquals(-1L, factory.create("\"42\"").readLongOr(-1L));
+
+    assertEquals(42, factory.create("42").readIntOr(-1));
+    assertEquals(-1, factory.create("\"junk\"").readIntOr(-1));
+
+    assertEquals((short) 42, factory.create("42").readShortOr((short) -1));
+    assertEquals((short) -1, factory.create("null").readShortOr((short) -1));
+
+    assertEquals(1.5, factory.create("1.5").readDoubleOr(Double.NaN));
+    assertEquals(Double.NaN, factory.create("null").readDoubleOr(Double.NaN));
+
+    assertEquals(1.5f, factory.create("1.5").readFloatOr(Float.NaN));
+    assertEquals(Float.NaN, factory.create("null").readFloatOr(Float.NaN));
+
+    assertTrue(factory.create("true").readBooleanOr(false));
+    assertFalse(factory.create("false").readBooleanOr(true));
+    assertTrue(factory.create("null").readBooleanOr(true));
+    assertFalse(factory.create("\"true\"").readBooleanOr(false));
+  }
+
+  @Test
+  void test_read_primitive_or_default_skips_and_positions() {
+    final var ji = factory.create("{\"a\":\"nope\",\"b\":7,\"c\":{\"x\":1},\"d\":8}");
+    assertEquals(-1L, ji.skipUntil("a").readLongOr(-1L));
+    assertEquals(7L, ji.skipUntil("b").readLongOr(-1L));
+    assertEquals(-1, ji.skipUntil("c").readIntOr(-1));
+    assertEquals(8, ji.skipUntil("d").readIntOr(-1));
   }
 
   @Test

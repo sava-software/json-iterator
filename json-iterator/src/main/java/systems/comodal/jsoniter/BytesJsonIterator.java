@@ -533,6 +533,11 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
+  final String fieldString(final int len) {
+    return new String(fieldBuf, fieldOffset, len, StandardCharsets.UTF_8);
+  }
+
+  @Override
   final boolean breakOut(final FieldBufferPredicate fieldBufferFunction, final int offset, final int len) {
     return !fieldBufferFunction.test(charBuf, 0, len, this);
   }

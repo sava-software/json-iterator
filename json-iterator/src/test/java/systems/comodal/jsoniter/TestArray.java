@@ -194,6 +194,31 @@ final class TestArray {
   }
 
   @Test
+  void test_read_list_sized() {
+    assertEquals(List.of(1, 2, 3), factory.create("[1,2,3]").readList(3, JsonIterator::readInt));
+    // an undersized or zero capacity only affects allocation, never content
+    assertEquals(List.of(1, 2, 3), factory.create("[1,2,3]").readList(0, JsonIterator::readInt));
+    assertTrue(factory.create("[]").readList(4, JsonIterator::readInt).isEmpty());
+    assertTrue(factory.create("null").readList(4, JsonIterator::readInt).isEmpty());
+  }
+
+  @Test
+  void test_read_map_sized() {
+    final var ji = factory.create("""
+        [{"x":1,"y":2},{"x":3,"y":4}]""");
+    final var map = ji.readMap(2, Point::parse, Point::x);
+    assertEquals(2, map.size());
+    assertEquals(new Point(1, 2), map.get(1));
+    assertEquals(new Point(3, 4), map.get(3));
+
+    final var fieldKeyed = factory.create("""
+        {"a":1,"b":2}""").readMap(2, String::new, (_, valueJi) -> valueJi.readInt());
+    assertEquals(Map.of("a", 1, "b", 2), fieldKeyed);
+
+    assertTrue(factory.create("null").readMap(4, Point::parse, Point::x).isEmpty());
+  }
+
+  @Test
   void test_read_collection() {
     final var ji = factory.create("""
         ["a","b","a"]""");
@@ -329,6 +354,67 @@ final class TestArray {
         ArrayIndexOutOfBoundsException.class,
         () -> factory.create("[1,2,3]").readByteArray(new byte[2])
     );
+  }
+
+  @Test
+  void test_read_primitive_arrays_sized() {
+    // exact size: filled with no grow or trim
+    assertArrayEquals(new int[]{1, 2, 3}, factory.create("[1,2,3]").readIntArray(3));
+    assertArrayEquals(new long[]{1, 2, 3}, factory.create("[1,2,3]").readLongArray(3));
+    assertArrayEquals(new byte[]{1, 2, 3}, factory.create("[1,2,3]").readByteArray(3));
+
+    // oversized: trimmed to the elements read
+    assertArrayEquals(new int[]{1, 2}, factory.create("[1,2]").readIntArray(32));
+    assertArrayEquals(new long[]{1, 2}, factory.create("[1,2]").readLongArray(32));
+    assertArrayEquals(new byte[]{1, 2}, factory.create("[1,2]").readByteArray(32));
+
+    // undersized — including zero — still grows to hold everything
+    for (final int initial : new int[]{0, 1, 2}) {
+      final var expected = new int[20];
+      final var json = new StringBuilder("[");
+      for (int i = 0; i < 20; ++i) {
+        expected[i] = i;
+        json.append(i).append(',');
+      }
+      json.setCharAt(json.length() - 1, ']');
+      assertArrayEquals(expected, factory.create(json.toString()).readIntArray(initial), "initial=" + initial);
+      final var expectedLongs = new long[20];
+      final var expectedBytes = new byte[20];
+      for (int i = 0; i < 20; ++i) {
+        expectedLongs[i] = i;
+        expectedBytes[i] = (byte) i;
+      }
+      assertArrayEquals(expectedLongs, factory.create(json.toString()).readLongArray(initial), "initial=" + initial);
+      assertArrayEquals(expectedBytes, factory.create(json.toString()).readByteArray(initial), "initial=" + initial);
+    }
+
+    // empty and null return the same shared empty array, no allocation
+    assertSame(factory.create("null").readIntArray(4), factory.create("[]").readIntArray(4));
+    assertSame(factory.create("null").readLongArray(4), factory.create("[]").readLongArray(4));
+    assertSame(factory.create("null").readByteArray(4), factory.create("[]").readByteArray(4));
+    assertArrayEquals(new int[0], factory.create("null").readIntArray(4));
+    assertArrayEquals(new long[0], factory.create("[]").readLongArray(4));
+  }
+
+  @Test
+  void test_skip_rest_of_array_positions_after_array() {
+    final var ji = factory.create("""
+        {"a":[1,2,3],"b":4}""");
+    ji.skipUntil("a");
+    assertTrue(ji.readArray());
+    assertEquals(1, ji.readInt());
+    // chained: skipRestOfArray must consume exactly through ']' and return this
+    assertEquals(4, ji.skipRestOfArray().skipUntil("b").readInt());
+  }
+
+  @Test
+  void test_skip_rest_of_object_positions_after_object() {
+    final var ji = factory.create("""
+        [{"x":1,"y":2},9]""");
+    assertTrue(ji.readArray());
+    ji.skipUntil("x").skip();
+    assertEquals(9, ji.skipRestOfObject().continueArray().readInt());
+    assertFalse(ji.readArray());
   }
 
   @Test

@@ -16,6 +16,9 @@ hardening {
       "systems.comodal.jsoniter.BaseJsonIterator",
       "systems.comodal.jsoniter.BytesJsonIterator",
       "systems.comodal.jsoniter.CharsJsonIterator",
+      // the interface carries real logic in its default methods (readXOr
+      // guards, sized array growth, readOrNull dispatch)
+      "systems.comodal.jsoniter.JsonIterator",
       "systems.comodal.jsoniter.ValueType",
       "systems.comodal.jsoniter.ValueType\$*"
     )
