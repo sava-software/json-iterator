@@ -1,5 +1,23 @@
 # Changelog
 
+## [25.2.0](https://github.com/sava-software/json-iterator/compare/25.1.3...25.2.0) (2026-07-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **jsoniter:** Deprecated methods and interfaces have been removed. Consumers must migrate to the corresponding modern APIs like `applyObject`, `testObject`, or new dispatch handlers before updating.
+
+### Features
+
+* **fuzzing:** add fuzz tests for JSON number/instant parsing and edge cases ([fa0c8dc](https://github.com/sava-software/json-iterator/commit/fa0c8dc7ffeb5b6acb45102b6b07d50087b5a119))
+* **jsoniter:** add tests for sub-range reuse with mark/reset ([699726a](https://github.com/sava-software/json-iterator/commit/699726ab936d4012f090452b0c7dc42a8fc120f9))
+* **jsoniter:** remove deprecated API for cleanup and consistency ([1a0f3ff](https://github.com/sava-software/json-iterator/commit/1a0f3ff871b06563e397d46c3db5ee263a41de77))
+
+
+### Miscellaneous Chores
+
+* release 25.2.0 ([016da83](https://github.com/sava-software/json-iterator/commit/016da83ec4df2d48e4184f3420009e9602a56289))
+
 ## [25.1.3](https://github.com/sava-software/json-iterator/compare/25.1.2...25.1.3) (2026-07-15)
 
 
