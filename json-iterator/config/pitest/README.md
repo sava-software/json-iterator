@@ -24,6 +24,10 @@ Incremental analysis (PIT history) is not wired: current PIT releases gate it
 behind the commercial arcmutate history plugin. Suite scoping keeps full runs
 around a minute each; revisit if that grows.
 
+The fuzz seed corpus replays deterministically in the unit suite
+(`TestFuzzCorpusReplay`), so newly committed seeds — including promoted fuzz
+findings — face PIT's mutants automatically.
+
 ## Triaged equivalent mutants (accepted with reasons)
 
 Triaged 2026-07-18 across all three suites; grouped by the principle that
@@ -69,23 +73,30 @@ bail-outs whose slow-path true-return is structurally unreachable;
 `JIUtil.escapeQuotes*` deep-escape branches whose only distinguishing inputs
 strand parity-equivalent increments.
 
-**No longer accepted** (killed via property assertions — keep them dead):
-allocation-shape mutants in the sized array readers (`TestAllocation`
-observes them through the thread-allocation counter), and the
-`JIUtil.escapeQuotes` leading-quote conflation, which turned out to be a real
-bug (fixed 2026-07-18) rather than an equivalent mutant.
+**Multibyte scan paths**:
+- `containsMultiByteOrEscapePattern`: over-detection mutants only route the
+  word loop to the byte-accurate slow path; the under-detection direction is
+  harmless because no UTF-8 lead/continuation byte (0x80–0xF4) aliases the
+  quote (0x22) or escape (0x5C) bytes the word loop acts on — corroborated
+  by the 40-offset content sweeps in `TestMultiByteScanSweep`.
+- `skipPastMultiByteEndQuote` escape-math mutants on the low-byte
+  accumulation terms: the skip path discards the decoded value and surrogate
+  classification depends only on bits 10–15, which the low byte cannot
+  affect. Its supplementary-plane boundary mutants guard checks whose
+  verdicts cannot change for any reachable input (`bc == 0x10000` passes the
+  plane check regardless; overlong values run it harmlessly).
+- `parseMultiByteString` grow-check always-grow mutants: allocation-only,
+  same family as the sized-array-reader equivalents `TestAllocation` kills —
+  the never-grow directions are killed, only always-grow is accepted.
 
 ## Untriaged debt
 
 Remaining backlog, deliberately deferred with owners:
-- `BytesJsonIterator.skipPastMultiByteEndQuote` + `parseMultiByteString`
-  SWAR survivors (~43): owned by a future position-sweep test effort in the
-  style of `test_escape_positions_across_vector_widths`.
 - Deprecated `readObjField`/`readObject` plumbing and `JsonIterParser`
   NO_COVERAGE: gated behind the deprecated-API removal (see AGENTS.md
   standing task) — meaningless to triage before it.
 - Assorted small string-scan survivors (`parseBase64String`, `parseString`,
-  `parseTail`, `skipPastEndQuote`).
+  `skipPastEndQuote` remnants).
 
 Shrinking the baseline is always an improvement; growing it requires a
 reason here.
