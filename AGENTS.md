@@ -17,16 +17,22 @@ are expensive to rediscover, and that the code alone does not explain.
   `*BufferFunction`, `Context*`, `FieldIndex*`) that lets consumers parse without
   allocating per field.
 - `jmh/` — standalone Gradle build (`includeBuild("..")`, so it always benches local
-  sources). `IocBench` and `MigrationBench` over two real documents. Its `README.md`
-  holds the FieldMatcher migration decision table and the measurement methodology —
-  that table is the justification for the current deprecations, so read it before
-  touching the dispatch APIs.
+  sources). `IocBench`, `MigrationBench`, and `SourceBench` over two real documents.
+  Its `README.md` holds the FieldMatcher migration decision table and the measurement
+  methodology — that table is the justification for the current deprecations, so read
+  it before touching the dispatch APIs.
 - Releases are automated: conventional commits → release-please (`always-bump-patch`,
   no `v` prefix in tags) → publish. Don't hand-edit versions or `CHANGELOG.md`.
 
 Build and test with `./gradlew check`. Dependencies resolve from GitHub Packages, so a
 `savaGithubPackagesUsername` / `savaGithubPackagesPassword` pair is needed in
-`~/.gradle/gradle.properties` (see `README.md`).
+`~/.gradle/gradle.properties` (see `README.md`). Beyond `check`, the hardening tasks
+(sava-build's `hardening` extension in `json-iterator/build.gradle.kts`): PIT mutation
+suites `pitestIterator` / `pitestNumbers` / `pitestUtil` (reports under
+`build/reports/pitest/<suite>/`) and the Jazzer fuzz targets described under
+correctness landmines. A standing task: the iterator suite's surviving/uncovered
+mutants are to be revisited only after the `readObject`/`readObjField` removal (see
+settled decisions) — most of them live in that deprecated plumbing.
 
 ## Correctness landmines
 
@@ -42,8 +48,24 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   offset in a window rather than testing one happy path. If you touch string scanning,
   escape decoding, base64, or `skipUntil`, these are the tests that will catch you —
   and if you add a new scan path, it needs a sweep of its own.
+- **The heavier police are the differential fuzz targets** — `fuzzJson` (byte vs char
+  sourced iterators must produce identical event streams or both reject), `fuzzDouble`
+  and `fuzzNumber` (JDK bit-equality oracles), `fuzzInstant`. Run the relevant one for
+  a few minutes after any scan or parse change:
+  `./gradlew :json-iterator:fuzzJson -PmaxFuzzTime=120`. The harness contract is
+  strict — `JsonException` (plus `DateTimeException` for instants) is the only
+  accepted rejection on any source, so crash-class regressions (bounds faults, stale
+  reads past `tail`) surface as findings, not noise. When a run produces a crash
+  input, fix the bug, then promote the input into the seed corpus
+  (`src/test/resources/fuzz/<target>/regression-*`) so it replays forever.
 - Multibyte lead bytes are **negative** as signed `byte`s, and `0x80` appears
   mid-character in ordinary text — neither is a safe sentinel.
+- **Never index a lookup table with a raw source value.** A signed byte is negative on
+  multibyte content and a char exceeds any byte-sized table, so `TABLE[c]` faults with
+  the wrong exception class instead of rejecting. One fuzzing session found this in
+  three separate tables (digit resolution, `VALUE_TYPES`, `JHex`); the surviving
+  shapes are range-checked arithmetic (`BaseJsonIterator.intDigit`) or a guarded
+  accessor (`ValueType.of`) — use those, don't add a fourth table.
 - `\/` is legal JSON, and `/` is in the base64 alphabet. Escape handling and base64
   decoding interact.
 - Surrogate pairs arrive as two separate `\u` escapes and must be validated as a pair.
@@ -68,6 +90,16 @@ outright removal or a silent behavior change; and workload assumptions measured 
 local consumers (all-`byte[]` input, field-name lengths, dispatch widths) are
 defaults to optimize for, not invariants to depend on for correctness.
 
+Removing deprecated surface follows the same doctrine, as a procedure: a
+`@Deprecated(forRemoval = true)` marker must ride at least one published release,
+and removal is cleared per member by re-running the consumer sweep — grep every
+jsoniter-importing `.java` file under `~/src` (skip `forks/`, build output, and dead
+code like idl-clients-drift), then weight each hit by its repo's last commit date.
+Zero hits or dormant-only hits (repos untouched for a year or more) clear removal;
+any actively-committed consumer blocks it until those call sites migrate. Do not
+trust a stale survey — the sweep is cheap, repo activity changes, and the hit list
+rots faster than this file is edited.
+
 **`FieldMatcher` fields sit directly above the predicate that consumes them**, not at
 the top of the class with the other static fields. The matcher's declaration order
 defines the `case` indices of the switch that dispatches on it — that coupling is
@@ -80,10 +112,22 @@ full suite. The headline: `FieldMatcher` wins big on large unions (~40% at 37–
 and on kind/discriminator dispatch (~10% and zero allocation), but the char
 `fieldEquals` **chain is deliberately not deprecated** — it is the fastest option below
 roughly 8–10 names. Don't "modernize" small enums onto the matcher for performance;
-there isn't any. The deprecations (`readObject`/`readObjField`, the
-`testObjField`/`applyObjField*` family, the masked-buffer `testObject` overload) rest on
-API consistency, not on speed — `readObjField`'s String-per-field loop actually measures
-*faster* than the char IOC walk under ZGC.
+there isn't any. The deprecations rest on API consistency, not on speed —
+`readObjField`'s String-per-field loop actually measures *faster* than the char IOC
+walk under ZGC.
+
+**One `forRemoval` door is still open: `readObject`/`readObjField`** (plus
+`JsonIterParser`'s bufSize shim, which goes in the same pass). The rest of the
+deprecated surface was removed in 2026-07 under the sweep procedure above; these two
+stayed because the sweep found five consumers with 2025–2026 commits (glam,
+liquid-stake-serivce, oracle_research, solscripts, rebalance-service — re-sweep
+before acting rather than trusting this list). Closing the door is a sequenced task,
+not a delete: migrate those call sites (they are single-field/config probes; the
+non-deprecated shapes are `applyObject`, `testObject`, or a matcher dispatch), let
+the deprecation ride a published release, remove the members, then re-score
+`pitestIterator` — the suite's uncovered-mutant mass is concentrated in exactly this
+plumbing, so the standing "revisit surviving mutants" task is gated behind this
+removal and is meaningless before it.
 
 **Data source: feed `byte[]`.** Measured in `SourceBench`; the table is in
 `jmh/README.md`. The rule matters more than it looks, because the cost of feeding a
@@ -182,6 +226,16 @@ after each run as a newest-wins merge across all archived runs — so subset run
 on a full scoreboard, but rows can be of mixed vintage. Delete an archive file to drop a
 bad run's rows. Every benchmark cross-checks its variants' checksums at `@Setup`; with
 `-foe true` a disagreement is a hard failure, not noise.
+
+**Scope the run to the change; don't default to the full suite.** A full-suite
+`-PjmhFork=3` run costs hours; a change-scoped `-PjmhIncludes` subset gives
+decision-grade rows in minutes (the 2026-07 scan-path A/B ran
+`SourceBench.(bytes_reset|chars_reset),IocBench.blockParse` — every touched hot path —
+in under five minutes per side). Pick rows by which paths the change touches:
+`bytes_reset`/`chars_reset` isolate the two source walks, `blockParse` adds real
+`readLong` volume, the dispatch rows only matter for `FieldMatcher`/chain changes.
+Reserve the full suite for API-shape verdicts that feed the `jmh/README.md` decision
+table.
 
 A same-session control run matters more than a historical baseline: when judging a
 change, measure `main` and the change back-to-back on the same machine in the same

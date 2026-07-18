@@ -79,18 +79,14 @@ final class TestBoolean {
   }
 
   @Test
-  void test_literals_across_buffer_boundaries() {
-    // InputStream sources are read fully upfront, so the bufSize sweep just
-    // re-verifies literal reads and skips through the deprecated entry points
+  void test_literals_from_stream() {
     final var bytes = "{\"a\":true,\"b\":false,\"c\":null,\"want\":1}".getBytes(StandardCharsets.US_ASCII);
-    for (int bufSize = 4; bufSize <= bytes.length; ++bufSize) {
-      var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), bufSize);
-      assertEquals(1, ji.skipUntil("want").readInt(), "bufSize=" + bufSize);
+    var ji = JsonIterator.parse(new ByteArrayInputStream(bytes));
+    assertEquals(1, ji.skipUntil("want").readInt());
 
-      ji = JsonIterator.parse(new ByteArrayInputStream(bytes), bufSize);
-      assertTrue(ji.skipUntil("a").readBoolean(), "bufSize=" + bufSize);
-      assertFalse(ji.skipUntil("b").readBoolean(), "bufSize=" + bufSize);
-      assertTrue(ji.skipUntil("c").readNull(), "bufSize=" + bufSize);
-    }
+    ji = JsonIterator.parse(new ByteArrayInputStream(bytes));
+    assertTrue(ji.skipUntil("a").readBoolean());
+    assertFalse(ji.skipUntil("b").readBoolean());
+    assertTrue(ji.skipUntil("c").readNull());
   }
 }

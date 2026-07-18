@@ -45,11 +45,6 @@ final class CharsJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  public JsonIterator reset(final InputStream in, final int bufSize) {
-    return JsonIterator.parse(in);
-  }
-
-  @Override
   String getBufferString(final int from, final int to) {
     return new String(buf, from, Math.min(to, tail) - from);
   }
@@ -482,16 +477,6 @@ final class CharsJsonIterator extends BaseJsonIterator {
       return !fieldBufferFunction.test(context, chars, 0, chars.length, this);
     } else {
       return !fieldBufferFunction.test(context, buf, offset, len, this);
-    }
-  }
-
-  @Override
-  <C> long test(final C context, final long mask, final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction, final int offset, final int len) {
-    if (numEscapes > 0) {
-      final char[] chars = handleEscapes(offset, len);
-      return fieldBufferFunction.test(context, mask, chars, 0, chars.length, this);
-    } else {
-      return fieldBufferFunction.test(context, mask, buf, offset, len, this);
     }
   }
 

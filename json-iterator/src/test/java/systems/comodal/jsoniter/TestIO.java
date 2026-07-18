@@ -16,14 +16,14 @@ final class TestIO {
 
   @Test
   void test_read_byte() {
-    final var ji = (BytesJsonIterator) JsonIterator.parse(new ByteArrayInputStream("1".getBytes()), 64);
+    final var ji = (BytesJsonIterator) JsonIterator.parse(new ByteArrayInputStream("1".getBytes()));
     assertEquals('1', ji.read());
     assertThrows(JsonException.class, ji::nextToken);
   }
 
   @Test
   void test_read_bytes() {
-    final var ji = (BytesJsonIterator) JsonIterator.parse(new ByteArrayInputStream("12".getBytes()), 64);
+    final var ji = (BytesJsonIterator) JsonIterator.parse(new ByteArrayInputStream("12".getBytes()));
     assertEquals('1', ji.read());
     assertEquals('2', ji.read());
     assertThrows(JsonException.class, ji::nextToken);
@@ -92,7 +92,7 @@ final class TestIO {
   @Test
   void test_utf8() {
     byte[] bytes = {'"', (byte) 0xe4, (byte) 0xb8, (byte) 0xad, (byte) 0xe6, (byte) 0x96, (byte) 0x87, '"'};
-    var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), 2);
+    var ji = JsonIterator.parse(new ByteArrayInputStream(bytes));
     assertEquals("中文", ji.readString());
 
     ji = JsonIterator.parse(bytes);
@@ -102,7 +102,7 @@ final class TestIO {
   @Test
   void test_normal_escape() {
     byte[] bytes = {'"', (byte) '\\', (byte) 't', '"'};
-    var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), 2);
+    var ji = JsonIterator.parse(new ByteArrayInputStream(bytes));
     assertEquals("\t", ji.readString());
 
     ji = JsonIterator.parse(bytes);
@@ -112,7 +112,7 @@ final class TestIO {
   @Test
   void test_unicode_escape() {
     byte[] bytes = {'"', (byte) '\\', (byte) 'u', (byte) '4', (byte) 'e', (byte) '2', (byte) 'd', '"'};
-    var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), 2);
+    var ji = JsonIterator.parse(new ByteArrayInputStream(bytes));
     assertEquals("中", ji.readString());
 
     ji = JsonIterator.parse(bytes);
@@ -121,7 +121,7 @@ final class TestIO {
 
   @Test
   void test_reset_with_stream() {
-    final var ji = JsonIterator.parse(new ByteArrayInputStream("1".getBytes()), 64);
+    final var ji = JsonIterator.parse(new ByteArrayInputStream("1".getBytes()));
     assertEquals(1, ji.readInt());
     final var reset = ji.reset(new ByteArrayInputStream("2".getBytes()));
     assertEquals(2, reset.readInt());

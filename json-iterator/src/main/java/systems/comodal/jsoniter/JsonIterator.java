@@ -58,18 +58,6 @@ public interface JsonIterator {
     return parse(readFully(in));
   }
 
-  /// @param bufSize ignored; the stream is always read fully.
-  @Deprecated(forRemoval = true)
-  static JsonIterator parse(final InputStream in, final int bufSize) {
-    return parse(readFully(in));
-  }
-
-  /// @param bufSize ignored; the stream is always read fully.
-  @Deprecated(forRemoval = true)
-  static JsonIterator parse(final InputStream in, final int bufSize, final int charBufferLength) {
-    return parse(readFully(in), charBufferLength);
-  }
-
   static boolean fieldEquals(final String field, final char[] buf) {
     return fieldEquals(field, buf, 0, buf.length);
   }
@@ -187,19 +175,9 @@ public interface JsonIterator {
   /// Reads the stream to EOF, closes it, and iterates over the resulting `byte[]`.
   JsonIterator reset(final InputStream in);
 
-  /// @param bufSize ignored; the stream is always read fully.
-  @Deprecated
-  JsonIterator reset(final InputStream in, final int bufSize);
-
   String currentBuffer();
 
   // Object Field & Navigation Methods
-
-  /// All iterators support mark/reset now that InputStream sources are read fully upfront.
-  @Deprecated
-  default boolean supportsMarkReset() {
-    return true;
-  }
 
   int mark();
 
@@ -442,11 +420,6 @@ public interface JsonIterator {
 
   BigDecimal readBigDecimal();
 
-  @Deprecated(forRemoval = true)
-  default BigDecimal readBigDecimalStripTrailingZeroes() {
-    return readBigDecimalDropZeroes();
-  }
-
   /// Drops trailing decimal zeroes.
   BigDecimal readBigDecimalDropZeroes();
 
@@ -517,59 +490,13 @@ public interface JsonIterator {
 
   // IOC Field Methods
 
-  /// @deprecated single-field probes are covered by
-  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
-  /// first field.
-  @Deprecated(forRemoval = true)
-  boolean testObjField(final CharBufferPredicate testField);
-
-  /// @deprecated single-field probes are covered by
-  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
-  /// first field.
-  @Deprecated(forRemoval = true)
-  <R> R applyObjField(final CharBufferFunction<R> applyChars);
-
   <C, R> R applyObject(final C context, final ContextFieldBufferFunction<C, R> fieldBufferFunction);
-
-  /// @deprecated single-field probes are covered by
-  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
-  /// first field.
-  @Deprecated(forRemoval = true)
-  int applyObjFieldAsInt(final CharBufferToIntFunction applyChars, final int terminalSentinel);
-
-  /// @deprecated single-field probes are covered by
-  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
-  /// first field.
-  @Deprecated(forRemoval = true)
-  long applyObjFieldAsLong(final CharBufferToLongFunction applyChars, final long terminalSentinel);
-
-  /// @deprecated single-field probes are covered by
-  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
-  /// first field.
-  @Deprecated(forRemoval = true)
-  <C> int applyObjFieldAsInt(final C context,
-                             final ContextCharBufferToIntFunction<C> applyChars,
-                             final int terminalSentinel);
-
-  /// @deprecated single-field probes are covered by
-  /// [#testObject(FieldMatcher, FieldIndexPredicate)]; break out after the
-  /// first field.
-  @Deprecated(forRemoval = true)
-  <C> long applyObjFieldAsLong(final C context,
-                               final ContextCharBufferToLongFunction<C> applyChars,
-                               final long terminalSentinel);
 
   <R> R applyObject(final FieldBufferFunction<R> fieldBufferFunction);
 
   <C> C testObject(final C context, final ContextFieldBufferPredicate<C> fieldBufferFunction);
 
   void testObject(final FieldBufferPredicate fieldBufferFunction);
-
-  /// @deprecated unused by known consumers and superseded by
-  /// [#testObject(Object, FieldMatcher, ContextFieldIndexMaskedPredicate)],
-  /// whose int index makes the seen-fields mask trivial to manage.
-  @Deprecated(forRemoval = true)
-  <C> C testObject(final C context, final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction);
 
   /// [FieldMatcher]-driven variants: each field name is resolved to its
   /// index in the matcher's declared order (-1 if unknown) with a single

@@ -1,0 +1,8 @@
+Benchmark                          (document)  Mode  Cnt     Score    Error  Units
+IocBench.blockParse_chars                 N/A  avgt   24  2546.089 ± 38.023  us/op
+IocBench.blockParse_matcher               N/A  avgt   24  2515.785 ± 26.194  us/op
+IocBench.blockParse_matcherMasked         N/A  avgt   24  2475.201 ± 31.146  us/op
+SourceBench.bytes_reset               twitter  avgt   24   444.823 ±  2.659  us/op
+SourceBench.bytes_reset                solana  avgt   24  3880.992 ± 28.492  us/op
+SourceBench.chars_reset               twitter  avgt   24   449.167 ±  5.704  us/op
+SourceBench.chars_reset                solana  avgt   24  4727.201 ± 61.005  us/op

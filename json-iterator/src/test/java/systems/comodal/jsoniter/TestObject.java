@@ -105,14 +105,10 @@ final class TestObject {
   }
 
   @Test
-  void test_skip_until_across_buffer_boundaries() {
-    // InputStream sources are read fully upfront, so the bufSize sweep just
-    // re-verifies field matching through the deprecated entry points
+  void test_skip_until_from_stream() {
     final var bytes = TRICKY_FIELDS_JSON.getBytes(StandardCharsets.UTF_8);
-    for (int bufSize = 4; bufSize <= bytes.length; ++bufSize) {
-      final var ji = JsonIterator.parse(new ByteArrayInputStream(bytes), bufSize);
-      assertEquals(42, ji.skipUntil("want").readInt(), "bufSize=" + bufSize);
-    }
+    final var ji = JsonIterator.parse(new ByteArrayInputStream(bytes));
+    assertEquals(42, ji.skipUntil("want").readInt());
   }
 
   @Test

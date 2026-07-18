@@ -94,11 +94,6 @@ class BytesJsonIterator extends BaseJsonIterator {
   }
 
   @Override
-  public JsonIterator reset(final InputStream in, final int bufSize) {
-    return reset(in);
-  }
-
-  @Override
   final String getBufferString(final int from, final int to) {
     return new String(buf, from, Math.min(to, tail) - from);
   }
@@ -545,11 +540,6 @@ class BytesJsonIterator extends BaseJsonIterator {
   @Override
   final <C> boolean breakOut(final C context, final ContextFieldBufferPredicate<C> fieldBufferFunction, final int offset, final int len) {
     return !fieldBufferFunction.test(context, charBuf, 0, len, this);
-  }
-
-  @Override
-  final <C> long test(final C context, final long mask, final ContextFieldBufferMaskedPredicate<C> fieldBufferFunction, final int offset, final int len) {
-    return fieldBufferFunction.test(context, mask, charBuf, 0, len, this);
   }
 
   @Override

@@ -92,7 +92,7 @@ final class TestString {
     final var big = new byte[4_096];
     random.nextBytes(big);
     final var doc = format("{\"data\":\"%s\"}", BASE64_ENCODER.encodeToString(big)).getBytes(StandardCharsets.US_ASCII);
-    final var ji = JsonIterator.parse(new ByteArrayInputStream(doc), 64);
+    final var ji = JsonIterator.parse(new ByteArrayInputStream(doc));
     assertArrayEquals(big, ji.skipUntil("data").decodeBase64String(), "seed=" + seed);
   }
 
