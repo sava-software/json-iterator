@@ -1,5 +1,27 @@
 # Changelog
 
+## [25.3.0](https://github.com/sava-software/json-iterator/compare/25.2.0...25.3.0) (2026-07-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **jsoniter:** JsonIterator.readObject() and readObjField() are removed.
+* **jsoniter:** Default `readArray` and `readMap` methods now utilize an optimized sizing logic. Update any custom implementations relying on previous behaviors. Enriched `JsonException` may impact exception handling logic.
+
+### Features
+
+* **build:** Bump sava-build plugin version ([6eaed15](https://github.com/sava-software/json-iterator/commit/6eaed15407505b09b8b93e67480fe67b16a7342e))
+* **jsoniter:** add quality gate and mutation ratchet process details ([0efe144](https://github.com/sava-software/json-iterator/commit/0efe1445c3b86e48ad7512f50ff5eca7a5ee71e4))
+* **jsoniter:** add quality gate and mutation ratchet process details ([7a3c4eb](https://github.com/sava-software/json-iterator/commit/7a3c4eb05dde14dc629940ef6751e32ccb47c09d))
+* **jsoniter:** enhance parsing with sized array and map methods ([db15a1b](https://github.com/sava-software/json-iterator/commit/db15a1b4aad9e15c0b642b1666a94db0ae5d106a))
+* **jsoniter:** remove deprecated readObject/readObjField ([4db0000](https://github.com/sava-software/json-iterator/commit/4db0000ad553d5655704b5158b942fbc2a07eb8f))
+* **test:** add multibyte scan path and fuzz corpus replay tests ([aa16460](https://github.com/sava-software/json-iterator/commit/aa164606f7b2a55bd7d22c7601565a9e97aa93bc))
+
+
+### Miscellaneous Chores
+
+* release 25.3.0 ([db236fd](https://github.com/sava-software/json-iterator/commit/db236fdb011cbd0819a292618af7e2844d79699b))
+
 ## [25.2.0](https://github.com/sava-software/json-iterator/compare/25.1.3...25.2.0) (2026-07-18)
 
 
