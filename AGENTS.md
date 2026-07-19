@@ -30,10 +30,10 @@ Build and test with `./gradlew check`. Dependencies resolve from GitHub Packages
 (sava-build's `hardening` extension in `json-iterator/build.gradle.kts`): PIT mutation
 suites `pitestIterator` / `pitestNumbers` / `pitestUtil` (reports under
 `build/reports/pitest/<suite>/`) and the Jazzer fuzz targets described under
-correctness landmines. A standing task: the iterator suite's baseline-carried
-surviving/uncovered mutants are to be revisited only after the
-`readObject`/`readObjField` removal (see settled decisions) — most of them live in
-that deprecated plumbing.
+correctness landmines. The PIT baselines are fully triaged — every accepted
+mutant has a written reason in `json-iterator/config/pitest/README.md`; the only
+deferred item is the `JsonIterParser` NO_COVERAGE mass, gated behind that shim's
+removal.
 
 ## Quality gate & mutation ratchet
 
@@ -143,22 +143,17 @@ full suite. The headline: `FieldMatcher` wins big on large unions (~40% at 37–
 and on kind/discriminator dispatch (~10% and zero allocation), but the char
 `fieldEquals` **chain is deliberately not deprecated** — it is the fastest option below
 roughly 8–10 names. Don't "modernize" small enums onto the matcher for performance;
-there isn't any. The deprecations rest on API consistency, not on speed —
-`readObjField`'s String-per-field loop actually measures *faster* than the char IOC
-walk under ZGC.
+there isn't any.
 
-**One `forRemoval` door is still open: `readObject`/`readObjField`** (plus
-`JsonIterParser`'s bufSize shim, which goes in the same pass). The rest of the
-deprecated surface was removed in 2026-07 under the sweep procedure above; these two
-stayed because the sweep found five consumers with 2025–2026 commits (glam,
-liquid-stake-serivce, oracle_research, solscripts, rebalance-service — re-sweep
-before acting rather than trusting this list). Closing the door is a sequenced task,
-not a delete: migrate those call sites (they are single-field/config probes; the
-non-deprecated shapes are `applyObject`, `testObject`, or a matcher dispatch), let
-the deprecation ride a published release, remove the members, then re-score
-`pitestIterator` — the suite's uncovered-mutant mass is concentrated in exactly this
-plumbing, so the standing "revisit surviving mutants" task is gated behind this
-removal and is meaningless before it.
+**One `forRemoval` member is open: `JsonIterParser`'s bufSize `parse` shim.** It must
+ride a published release before removal (per the sweep procedure above); take its
+NO_COVERAGE baseline entries with it and re-score in the same pass.
+
+**Docs carry current state only.** When a surface is removed, delete its
+documentation — decision-table rows, migration examples, standing-task mentions —
+rather than annotating it as removed; git history is the archive. The exception is a
+rationale that still justifies something present (e.g. a PIT acceptance reason for a
+baseline entry, or why an API deliberately does not exist).
 
 **Data source: feed `byte[]`.** Measured in `SourceBench`; the table is in
 `jmh/README.md`. The rule matters more than it looks, because the cost of feeding a

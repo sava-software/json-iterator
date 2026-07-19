@@ -66,8 +66,8 @@ disagreement into a hard failure.
 
 - **`IocBench`** — primitive comparisons over two real documents (a ~4.7 MiB
   Solana `getBlock` response, gzipped in resources, and a ~600 KiB twitter
-  search response): field-name delivery (`fieldWalk*`: char IOC vs the
-  deprecated `readObjField`), dispatch at 94 field names (`dispatchTwitter*`:
+  search response): field-name delivery (`fieldWalk*`: char IOC), dispatch at
+  94 field names (`dispatchTwitter*`:
   linear char chain vs `FieldMatcher`, byte and char inputs), string-value
   dispatch (`valueDispatch*`: `matchString` vs `applyChars` +
   `FieldMatcher.match`), and a sava-style selective DTO parse (`blockParse*`:
@@ -186,17 +186,11 @@ small-win rows — the big wins are GC-robust, the ~3–5% wins are not.
 | Wide DTO with real value reads, 13 fields (`TxMeta`) → `txMetaWalk` | 2856 ± 49 (char chain) | 2838 ± 80 (matcher) | **Migrate for code shape** — a wash to ~3% depending on GC/run; value consumption dominates |
 | Small enum, 3 names (`Commitment`, `RpcEncoding`) → `enumValues` | 468 ± 12 (char chain) | 481 ± 5 (`matchString`) / 748 ± 8 (`applyChars` + `match`) | **Keep the chain — a ~3% edge with overlapping CIs, effectively a tie.** No performance reason to migrate tiny enums, and no penalty if one is migrated for consistency. `applyChars` + `match` stays clearly worst at this size |
 | Selective parse early-out → `blockParse_matcherMasked` | 2544 ± 27 (matcher) | 2537 ± 65 (masked) | **Within error this run; ≤3% at best** — worth it only where the wanted set is small and objects are large |
-| `readObjField()` String loops (idl-src-gen) → `fieldWalkTwitter` | 555 ± 46 | 605 ± 43 (char IOC) | **GC-sensitive: under ZGC + compact headers the String-per-field loop is ~8–12% *faster* than the char IOC walk** (it was ~5% slower under G1). The deprecation stands on API-consistency grounds, not performance |
 
-Deprecations driven by this table (`@Deprecated(forRemoval = true)` in
-`JsonIterator`): `testObject(C, ContextFieldBufferMaskedPredicate)` (unused by
-known consumers; superseded by the index-masked matcher variant),
-`readObject`/`readObjField`, and the `testObjField`/`applyObjField*` family.
 The char `fieldEquals` chain API is deliberately **not** deprecated — it
-remains the fastest dispatch for small field/value sets. The never-released
-byte-chain surface (`testObjectBytes` + `FieldBytesPredicate` family) was
-removed outright before first release: end-to-end it tied the char chain and
-lost to the matcher, which reuses its zero-copy plumbing internally.
+remains the fastest dispatch for small field/value sets. There is no public
+byte-chain surface: end-to-end it tied the char chain and lost to the
+matcher, which reuses its zero-copy plumbing internally.
 
 ## Migration examples
 
@@ -335,10 +329,10 @@ public static final CharBufferFunction<Commitment> PARSER = (buf, offset, len) -
 };
 ```
 
-### Deprecated: `testObject(C, ContextFieldBufferMaskedPredicate)` → index-masked matcher
+### Early-out on large objects — index-masked matcher `testObject`
 
-Also the pattern for early-out on large objects (the `blockParse_matcherMasked`
-benchmark). Note two sharp edges: `testObject` returns identically on
+The pattern for stopping a scan once every wanted field is seen (the
+`blockParse_matcherMasked` benchmark). Note two sharp edges: `testObject` returns identically on
 break-out and normal completion, so record the break-out in the context; and a
 break-out leaves the iterator inside the object, so the caller must
 `skipRestOfObject()`:
@@ -365,52 +359,3 @@ if (parser.complete) {
 }
 ```
 
-### Deprecated: `readObjField()` / `readObject()` loops → matcher `testObject`
-
-```java
-// before — allocates a String per field name (idl-src-gen's converter loops)
-for (var field = ji.readObjField(); field != null; field = ji.readObjField()) {
-  switch (field) {
-    case "name" -> name = ji.readString();
-    case "docs" -> docs = parseDocs(ji);
-    default -> ji.skip();
-  }
-}
-
-// after
-private static final FieldMatcher FIELDS = FieldMatcher.of("name", "docs");
-
-ji.testObject(this, FIELDS, (p, fieldIndex, ji2) -> {
-  switch (fieldIndex) {
-    case 0 -> p.name = ji2.readString();
-    case 1 -> p.docs = parseDocs(ji2);
-    default -> ji2.skip();
-  }
-  return true;
-});
-```
-
-### Deprecated: `testObjField` / `applyObjField*` single-field probes → one-name matcher
-
-Returning `false` breaks out with the iterator positioned at the just-matched
-field's value, mirroring the probe semantics:
-
-```java
-// before — idl-src-gen's TypeNode discriminator probe
-if (ji.testObjField((buf, offset, len) -> fieldEquals("kind", buf, offset, len))) {
-  kind = ji.readString();
-}
-
-// after
-private static final FieldMatcher KIND_FIELD = FieldMatcher.of("kind");
-
-final String[] kind = {null};
-ji.testObject(KIND_FIELD, (fieldIndex, ji2) -> {
-  if (fieldIndex == 0) {
-    kind[0] = ji2.readString();
-    return false; // break out; remaining fields are the caller's to skip
-  }
-  ji2.skip();
-  return true;
-});
-```

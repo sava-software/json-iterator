@@ -21,35 +21,36 @@ final class TestNull {
   @Test
   void test_null_as_String() {
     var ji = factory.create("{\"field\":null}");
-    ji.readObject();
+    ji.skipObjField();
     assertNull(ji.readString());
 
     ji = factory.create("{\"field\":null}");
     assertNull(ji.applyObject(TRUE, ((context, buf, offset, len, jsonIterator) -> {
-      assertEquals("field", new String(buf, offset, len));
-      assertEquals(TRUE, context);
-      return jsonIterator.readString();
-    })));
+          assertEquals("field", new String(buf, offset, len));
+          assertEquals(TRUE, context);
+          return jsonIterator.readString();
+        })
+    ));
   }
 
   @Test
   void test_null_as_Object() {
     var ji = factory.create("{\"field\":null}");
-    ji.readObject();
-    assertNull(ji.readObject());
+    ji.skipObjField();
+    assertNull(ji.skipObjField());
   }
 
   @Test
   void test_null_as_BigDecimal() {
     var ji = factory.create("{\"field\":null}");
-    ji.readObject();
+    ji.skipObjField();
     assertNull(ji.readBigDecimal());
   }
 
   @Test
   void test_null_as_BigInteger() {
     var ji = factory.create("{\"field\":null}");
-    ji.readObject();
+    ji.skipObjField();
     assertNull(ji.readBigInteger());
   }
 
@@ -75,8 +76,8 @@ final class TestNull {
   @Test
   void test_read_or_null_object_value() {
     final var ji = factory.create("{\"a\":null,\"b\":{\"x\":1}}");
-    assertNull(ji.skipUntil("a").readOrNull(jsonIterator -> jsonIterator.readMap(String::new, (key, inner) -> inner.readInt())));
-    final var map = ji.skipUntil("b").readOrNull(jsonIterator -> jsonIterator.readMap(String::new, (key, inner) -> inner.readInt()));
+    assertNull(ji.skipUntil("a").readOrNull(jsonIterator -> jsonIterator.readMap(String::new, (_, inner) -> inner.readInt())));
+    final var map = ji.skipUntil("b").readOrNull(jsonIterator -> jsonIterator.readMap(String::new, (_, inner) -> inner.readInt()));
     assertEquals(1, map.get("x"));
   }
 

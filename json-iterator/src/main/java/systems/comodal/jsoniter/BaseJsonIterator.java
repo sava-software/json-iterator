@@ -3,7 +3,6 @@ package systems.comodal.jsoniter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Base64;
 
 import static systems.comodal.jsoniter.ContextFieldIndexMaskedPredicate.BREAK_OUT;
@@ -435,45 +434,6 @@ abstract class BaseJsonIterator implements JsonIterator {
     return parse(READ_STRING_FUNCTION);
   }
 
-  @Override
-  public final String readObjField() {
-    char c = nextToken();
-    if (c == ',') {
-      c = nextToken();
-      if (c == '"') {
-        final var field = parseString();
-        if ((c = nextToken()) == ':') {
-          return field;
-        } else {
-          throw reportError("readObjField", "expected :, but " + c);
-        }
-      } else {
-        throw reportError("readObjField", "expected field string, but " + c);
-      }
-    } else if (c == '{') {
-      c = nextToken();
-      if (c == '"') {
-        final var field = parseString();
-        if ((c = nextToken()) == ':') {
-          return field;
-        } else {
-          throw reportError("readObjField", "expected :, but " + c);
-        }
-      } else if (c == '}') {
-        return null; // empty object
-      } else {
-        throw reportError("readObjField", "expected \" after {");
-      }
-    } else if (c == '}') {
-      return null; // end of object
-    } else if (c == 'n') {
-      skipNull();
-      return null;
-    } else {
-      throw reportError("readObjField", "expected [\\{\\}n], but found: " + c);
-    }
-  }
-
   public final JsonIterator skipObjField() {
     char c = nextToken();
     if (c == ',') {
@@ -713,7 +673,9 @@ abstract class BaseJsonIterator implements JsonIterator {
   }
 
   @Override
-  public final <C> C testObject(final C context, final FieldMatcher matcher, final ContextFieldIndexMaskedPredicate<C> fieldPredicate) {
+  public final <C> C testObject(final C context,
+                                final FieldMatcher matcher,
+                                final ContextFieldIndexMaskedPredicate<C> fieldPredicate) {
     char c;
     long mask = 0;
     for (int len; ; ) {

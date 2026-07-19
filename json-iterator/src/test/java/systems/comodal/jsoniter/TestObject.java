@@ -28,7 +28,7 @@ final class TestObject {
   @Test
   void test_empty_object() {
     var ji = factory.create("{}");
-    assertNull(ji.readObject());
+    assertNull(ji.skipObjField());
   }
 
   @Test
@@ -39,11 +39,6 @@ final class TestObject {
         \t"hello" }""";
 
     var ji = factory.create(json);
-    assertEquals("field1", ji.readObject());
-    assertEquals("hello", ji.readString());
-    assertNull(ji.readObject());
-
-    ji = factory.create(json);
     assertNull(ji.applyObject(TRUE, ((context, buf, offset, len, jsonIterator) -> {
           assertEquals(TRUE, context);
           assertEquals("field1", new String(buf, offset, len));
@@ -67,11 +62,9 @@ final class TestObject {
   @Test
   void test_two_fields() {
     var ji = factory.create("{ \"field1\" : \"hello\" , \"field2\": \"world\" }");
-    assertEquals("field1", ji.readObject());
-    assertEquals("hello", ji.readString());
-    assertEquals("field2", ji.readObject());
-    assertEquals("world", ji.readString());
-    assertNull(ji.readObject());
+    assertEquals("hello", ji.skipObjField().readString());
+    assertEquals("world", ji.skipObjField().readString());
+    assertNull(ji.skipObjField());
 
     ji = factory.create("{ \"field1\" : \"hello\" , \"field2\": \"world\" }");
     assertEquals("world", ji.skipUntil("field2").readString());

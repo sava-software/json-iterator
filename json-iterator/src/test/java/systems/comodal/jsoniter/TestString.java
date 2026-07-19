@@ -97,6 +97,65 @@ final class TestString {
   }
 
   @Test
+  void test_ascii_strings_at_buffer_tail_across_lengths() {
+    // Pure-ASCII strings walk the closing quote across every alignment of the
+    // byte path's 8-byte scan words, both mid-document and where the word
+    // loop's final partial window must re-align against the buffer tail.
+    for (int len = 0; len <= 40; ++len) {
+      final var expected = "x".repeat(len);
+      var ji = factory.create("{\"s\":\"" + expected + "\"}");
+      assertEquals(expected, ji.skipUntil("s").readString(), "len=" + len);
+
+      // a trailing field pins the exact position after the parse
+      ji = factory.create("{\"s\":\"" + expected + "\",\"z\":5}");
+      assertEquals(expected, ji.skipUntil("s").readString(), "len=" + len);
+      assertEquals(5, ji.skipUntil("z").readInt(), "len=" + len);
+
+      // unterminated at every alignment: must throw, not scan past the tail
+      // or spin on the final window
+      final var truncated = factory.create("\"" + expected);
+      assertThrows(JsonException.class, truncated::readString, "len=" + len);
+    }
+  }
+
+  @Test
+  void test_base64_unterminated_and_positions_across_lengths() {
+    for (int len = 0; len <= 24; ++len) {
+      final var data = new byte[len];
+      for (int i = 0; i < len; ++i) {
+        data[i] = (byte) i;
+      }
+      final var encoded = BASE64_ENCODER.encodeToString(data);
+
+      // a trailing field pins the exact position after the decode
+      final var ji = factory.create("{\"data\":\"" + encoded + "\",\"z\":5}");
+      assertArrayEquals(data, ji.skipUntil("data").decodeBase64String(), "len=" + len);
+      assertEquals(5, ji.skipUntil("z").readInt(), "len=" + len);
+
+      // unterminated at every alignment: must throw, not scan past the tail
+      // or spin on the final window
+      final var truncated = factory.create("\"" + encoded);
+      assertThrows(JsonException.class, truncated::decodeBase64String, "len=" + len);
+    }
+  }
+
+  @Test
+  void test_decode_base64_null_value_positions() {
+    // the null branch must consume the literal: the next field is readable
+    final var ji = factory.create("{\"a\":null,\"b\":7}");
+    assertNull(ji.skipUntil("a").decodeBase64String());
+    assertEquals(7, ji.skipUntil("b").readInt());
+  }
+
+  @Test
+  void test_decode_base64_wrong_token_error_context() {
+    // a non-string, non-null token reports the decode's own expectation, not
+    // a downstream literal-validation error
+    final var ex = assertThrows(JsonException.class, () -> factory.create("123").decodeBase64String());
+    assertTrue(ex.getMessage().contains("expected string or null"), ex.getMessage());
+  }
+
+  @Test
   void test_escapes_string() {
     var ji = factory.create("\"even" + "\\".repeat(42) + '"');
     assertEquals("even" + "\\".repeat(21), ji.readString());

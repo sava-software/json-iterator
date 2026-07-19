@@ -390,18 +390,6 @@ public interface JsonIterator {
 
   JsonIterator closeArray();
 
-  /// @deprecated allocates a String per field name; iterate objects with the
-  /// [#testObject(FieldMatcher, FieldIndexPredicate)] family instead.
-  @Deprecated(forRemoval = true)
-  default String readObject() {
-    return readObjField();
-  }
-
-  /// @deprecated allocates a String per field name; iterate objects with the
-  /// [#testObject(FieldMatcher, FieldIndexPredicate)] family instead.
-  @Deprecated(forRemoval = true)
-  String readObjField();
-
   JsonIterator skipObjField();
 
   JsonIterator skipUntil(final String field);

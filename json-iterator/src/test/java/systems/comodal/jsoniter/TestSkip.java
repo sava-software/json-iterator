@@ -59,6 +59,51 @@ final class TestSkip {
   }
 
   @Test
+  void test_skip_string_at_buffer_tail_across_lengths() {
+    // The skip word-loop twin of the parse sweeps: the closing quote walks
+    // across every 8-byte-word alignment, including the final partial window
+    // against the buffer tail.
+    for (int len = 0; len <= 40; ++len) {
+      final var pad = "x".repeat(len);
+
+      // a trailing field pins the exact position after the skip
+      var ji = factory.create("{\"a\":\"" + pad + "\",\"z\":5}");
+      assertEquals(5, ji.skipUntil("z").readInt(), "len=" + len);
+
+      // the skipped string ends at the buffer tail
+      ji = factory.create("{\"a\":\"" + pad + "\"}");
+      assertNull(ji.skipUntil("z"), "len=" + len);
+
+      // unterminated at every alignment: must throw, not scan past the tail
+      // or spin on the final window
+      final var truncated = factory.create("{\"a\":\"" + pad);
+      assertThrows(JsonException.class, () -> truncated.skipUntil("z"), "len=" + len);
+    }
+  }
+
+  @Test
+  void test_skip_surrogate_escapes() {
+    // a valid escaped pair skips cleanly and lands exactly after the string
+    var ji = factory.create("[\"\\uD801\\uDC37\",7]");
+    assertTrue(ji.readArray());
+    ji.skip();
+    assertTrue(ji.readArray());
+    assertEquals(7, ji.readInt());
+    assertFalse(ji.readArray());
+
+    // a lone low surrogate rejects; \uDC01 and \uDC10 put the deciding bits
+    // in the low hex digits, so the low-digit accumulation must add into the
+    // classification range, and \uD801A breaks the pair on the second
+    // escape
+    for (final var body : new String[]{"\\uDC01", "\\uDC10", "\\uDC00", "\\uD801\\u0041"}) {
+      final var bad = factory.create("[\"" + body + "\",7]");
+      assertTrue(bad.readArray());
+      final var ex = assertThrows(JsonException.class, bad::skip, body);
+      assertTrue(ex.getMessage().contains("invalid surrogate"), body + " -> " + ex.getMessage());
+    }
+  }
+
+  @Test
   void test_skip_object() {
     var ji = factory.create("[{\"hello\": {\"world\": \"a\"}},2]");
     assertTrue(ji.readArray());

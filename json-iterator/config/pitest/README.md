@@ -79,24 +79,51 @@ strand parity-equivalent increments.
   harmless because no UTF-8 lead/continuation byte (0x80–0xF4) aliases the
   quote (0x22) or escape (0x5C) bytes the word loop acts on — corroborated
   by the 40-offset content sweeps in `TestMultiByteScanSweep`.
-- `skipPastMultiByteEndQuote` escape-math mutants on the low-byte
-  accumulation terms: the skip path discards the decoded value and surrogate
-  classification depends only on bits 10–15, which the low byte cannot
-  affect. Its supplementary-plane boundary mutants guard checks whose
-  verdicts cannot change for any reachable input (`bc == 0x10000` passes the
-  plane check regardless; overlong values run it harmlessly).
+- Skip-path `\u` escape accumulation (`skipPastMultiByteEndQuote` bytes,
+  `skipPastEndQuote` chars): the divergent `+ → −` accumulation direction is
+  killed by the lone-low-surrogate skips in `TestSkip`
+  (`test_skip_surrogate_escapes` — borrow propagates into the classification
+  bits, so beware "low bits are harmless" blanket reasoning here). Accepted
+  is the provably inert residue: `head++ → head--` on the digit reads (the
+  re-read hex digit is consumed as ordinary string content, invisible to a
+  skip, and a duplicated low digit perturbs only bits 0–7, below the
+  classification bits), `<< → >>` zeroing of the `<<4`/`<<6` terms (their
+  maximum contribution cannot cross the surrogate or `0x110000` plane
+  verdicts), and the outer `bc >= 0x10000` gate mutants (forced entry or
+  `> 0x10000` boundary — the inner `>= 0x110000` verdict is unchanged either
+  way).
 - `parseMultiByteString` grow-check always-grow mutants: allocation-only,
   same family as the sized-array-reader equivalents `TestAllocation` kills —
   the never-grow directions are killed, only always-grow is accepted.
 
+**ASCII word-loop tail handling** (`skipPastEndQuote`, `parseString`,
+`parseBase64String` in `BytesJsonIterator`): the divergent directions are
+killed by the length sweeps in `TestString`/`TestSkip`
+(`*_at_buffer_tail_across_lengths`: forced word-loop entry reads past an
+exact-sized buffer; disabled or forced re-align corrupts the post-skip
+position, throws on valid input, or spins on the final window until PIT's
+timeout). The accepted remainder is equivalent by construction:
+- entry `head + 8 > tail` mutants ("true"/boundary): route to the
+  byte-accurate scalar/escaped slow path — result-identical, routing only
+  (same family as the slow-path routing group above), likewise the forced
+  multibyte/escape-detection mutants and `skipPastSingleByteEndQuote`'s
+  escape-check mutants.
+- re-align `nextOffset > tail` boundary (`>=`): fires one window early, but
+  `tail - 8` then equals the offset the cursor already holds — identical.
+- final-window `i < tail` boundary (`<=`): at the `i == tail` corner
+  (unterminated input, 8-aligned) the mutant re-scans the final
+  already-scanned window once, then throws the same incomplete-string error.
+- `decodeBase64` trim branch (`limit == length` both directions): the JDK's
+  strict decoder sizes its output exactly for every valid input that reaches
+  it (invalid input throws first), so the copy is defensive; forcing it is
+  allocation-only.
+
 ## Untriaged debt
 
-Remaining backlog, deliberately deferred with owners:
-- Deprecated `readObjField`/`readObject` plumbing and `JsonIterParser`
-  NO_COVERAGE: gated behind the deprecated-API removal (see AGENTS.md
-  standing task) — meaningless to triage before it.
-- Assorted small string-scan survivors (`parseBase64String`, `parseString`,
-  `skipPastEndQuote` remnants).
+One item, deliberately deferred:
+- `JsonIterParser` bufSize-shim NO_COVERAGE: gated behind the shim's removal
+  (deprecated 2026-07-17; must ride a published release first) — meaningless
+  to triage before it. Everything else in the baseline is triaged above.
 
 Shrinking the baseline is always an improvement; growing it requires a
 reason here.

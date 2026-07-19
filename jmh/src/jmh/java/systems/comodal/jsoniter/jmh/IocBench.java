@@ -68,7 +68,6 @@ public class IocBench {
 
     check(blockParse_chars(), blockParse_matcher());
     check(blockParse_chars(), blockParse_matcherMasked());
-    check(fieldWalkTwitter_chars(), fieldWalkTwitter_readObjField());
     check(dispatchTwitter_charsLinear(), dispatchTwitter_matcher());
     check(dispatchTwitter_matcher(), dispatchTwitterChars_matcher());
     check(dispatchTwitter_matcher(), dispatchTwitterChars_charsLinear());
@@ -128,38 +127,6 @@ public class IocBench {
   @Benchmark
   public long fieldWalkSolana_chars() {
     return walkChars(jsonIterator.reset(solanaJson));
-  }
-
-  /// The pre-IOC legacy shape still present in idl-src-gen: readObjField
-  /// allocates a String per field name. Benchmarks the deprecated path on
-  /// purpose — it justifies the deprecation.
-  @SuppressWarnings("removal")
-  private static long walkReadObjField(final JsonIterator ji) {
-    return switch (ji.whatIsNext()) {
-      case OBJECT -> {
-        long sum = 0;
-        for (var field = ji.readObjField(); field != null; field = ji.readObjField()) {
-          sum += field.length() + walkReadObjField(ji);
-        }
-        yield sum;
-      }
-      case ARRAY -> {
-        long sum = 0;
-        while (ji.readArray()) {
-          sum += walkReadObjField(ji);
-        }
-        yield sum;
-      }
-      default -> {
-        ji.skip();
-        yield 1;
-      }
-    };
-  }
-
-  @Benchmark
-  public long fieldWalkTwitter_readObjField() {
-    return walkReadObjField(jsonIterator.reset(twitterJson));
   }
 
   @Benchmark

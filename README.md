@@ -12,7 +12,9 @@ See [JsonIterator.java](json-iterator/src/main/java/systems/comodal/jsoniter/Jso
 
 ```java
 var jsonIterator = JsonIterator.parse("{\"hello\": \"world\"}");
-System.out.println(jsonIterator.readObjField() + ' ' + jsonIterator.readString());
+System.out.println(jsonIterator.applyObject(
+    (buf, offset, len, ji) -> new String(buf, offset, len) + ' ' + ji.readString()
+));
 ```
 
 ## Build
