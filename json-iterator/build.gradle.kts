@@ -21,9 +21,10 @@ hardening {
     // chars-path escape stripping)
     targetClasses = listOf("systems.comodal.jsoniter.*")
     excludedClasses = listOf(
-      // test, fuzz, and factory sources share the recompiled root
+      // test, fuzz, and factory sources share the recompiled root; trailing
+      // wildcard so nested harness helpers (JsonFuzz$Stub) stay excluded too
       "systems.comodal.jsoniter.Test*",
-      "systems.comodal.jsoniter.*Fuzz",
+      "systems.comodal.jsoniter.*Fuzz*",
       "systems.comodal.jsoniter.factories.*",
       // covered by the 'numbers' suite; PowersOfFive deliberately untargeted —
       // constant tables produce slow, low-value mutants and table errors

@@ -149,11 +149,6 @@ systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,176,MathMutator,SURV
 systems.comodal.jsoniter.ValueType$INIT_TYPES,initValueTypes,30,VoidMethodCallMutator,SURVIVED
 systems.comodal.jsoniter.ValueType$INIT_TYPES,initValueTypes,48,NullReturnValsMutator,SURVIVED
 systems.comodal.jsoniter.ValueType,of,20,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.factory.JsonIterParser,parse,13,NullReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.factory.JsonIterParser,parse,19,NullReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.factory.JsonIterParser,parse,23,NullReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.factory.JsonIterParser,parse,27,NullReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.factory.JsonIterParser,parse,31,NullReturnValsMutator,NO_COVERAGE
 systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$0,14,BooleanFalseReturnValsMutator,NO_COVERAGE
 systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$0,14,BooleanTrueReturnValsMutator,NO_COVERAGE
 systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$1,16,NullReturnValsMutator,NO_COVERAGE

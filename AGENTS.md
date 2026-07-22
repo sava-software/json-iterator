@@ -31,39 +31,132 @@ Build and test with `./gradlew check`. Dependencies resolve from GitHub Packages
 suites `pitestIterator` / `pitestNumbers` / `pitestUtil` (reports under
 `build/reports/pitest/<suite>/`) and the Jazzer fuzz targets described under
 correctness landmines. The PIT baselines are fully triaged — every accepted
-mutant has a written reason in `json-iterator/config/pitest/README.md`; the only
-deferred item is the `JsonIterParser` NO_COVERAGE mass, gated behind that shim's
-removal.
+mutant has a written reason in `json-iterator/config/pitest/README.md`, with no
+untriaged debt.
 
-## Quality gate & mutation ratchet
+## Verification & the mutation ratchet
 
-The process contract for any change to main sources (full policy: sava-build's
-`HARDENING.md`):
+The process contract for changes here (full policy: sava-build's `HARDENING.md`):
 
-- **Run `./gradlew qualityGate` after changing main sources** — unit tests plus every
-  PIT suite, each diffed against its accepted baseline in `config/pitest/`. It is the
-  definition of "safe to commit".
-- **While iterating, run only the suite that owns the code you touched**:
+<!-- This section adapts the agent-instructions template in sava-build's
+     HARDENING.md; `agentsTemplateInSync` (wired into `check`) fails when the
+     template changes until the block is re-diffed — sync or ACT on each changed
+     bullet (a new bullet may need code, not prose) — and the digest updated. -->
+<!-- hardening-template sha256:96ddf18dcc3a -->
+
+- **Scale verification to the change; suite choice is reachability, not habit.**
+  Iterate with `test` (or `--tests` for the touched classes). Before handing off,
+  run only the `pitest<Suite>`(s) whose mutated code the change can reach:
   `pitestNumbers` (DoubleParser) and `pitestUtil` (JHex/JIUtil/InstantParser/
   FieldMatcher) finish in ~10s; `pitestIterator` (everything else) costs ~90s.
-  `qualityGate` is the before-commit command, not the inner-loop one.
+  Test-only edits still owe the suite those tests kill mutants in — a weakened or
+  deleted test is exactly what the ratchet catches; doc, build-script, and comment
+  changes owe no suite at all.
+- **`qualityGate` — every suite, serialized, each diffed against its baseline in
+  `config/pitest/` — is the pre-release check, not the inner loop or the per-commit
+  gate.** The pre-release ritual is `qualityGate` plus long fuzz runs
+  (`-PmaxFuzzTime=600`+) plus a change-scoped jmh A/B per benchmark discipline
+  below. CI deliberately runs only `check` (sava-build's shared workflow): the
+  serialized PIT suites are too slow for hosted runners, so the full gate is
+  **owned by the local release checklist** — run before deciding to release, not
+  by CI. Don't wire `qualityGate` into CI to "fix" this; it's a decision.
 - A new unkilled mutant has exactly three legal outcomes: **kill it** with a test
   (prefer asserting the property it breaks — position after a skip, exact error
   context, allocation bounds — over restating the implementation), **refactor** it
   out of existence, or **accept it** with a written reason in
   `config/pitest/README.md`. Never run `-PupdateMutationBaseline` just to make the
-  build pass.
+  build pass. When a claimed equivalence spans a sweepable domain, verify it
+  empirically — reimplement both variants, diff them over the range, record the
+  range in the note; a sweep survives refactors that rot a prose argument.
+- **`SURVIVED` and `NO_COVERAGE` are different problems.** The first means a test
+  executed the line and couldn't tell the difference — a judgment call between a
+  stronger assertion and a written acceptance. The second means no test reached the
+  line — mechanical work, and never acceptable as "equivalent", because unobserved
+  behavior can't be judged equivalent. Suite runs print the split; read it before
+  planning a pass. A third case exists for `SURVIVED`: distinguishable in
+  principle but unreachable through any deterministic harness (an HTTP 1xx the
+  JDK client never surfaces as a final status) — accept as **unreachable
+  in-harness**, naming what would reach it, never as "equivalent".
 - Line-number churn from editing a mutated file shows up as paired stale + "new"
   baseline entries; confirm they're the shifted old ones before refreshing.
-- **Randomized tests use fixed seeds** (`TestDouble`, `TestString`): the ratchet
-  needs deterministic kills, and per-run exploration is the fuzz targets' job. Don't
-  reintroduce `new Random().nextLong()` seeding.
-- **Allocation guarantees are asserted, not assumed**: `TestAllocation` pins the
-  zero/exact-allocation contracts via `ThreadMXBean` allocation counters. New API
-  whose point is allocation behavior needs the same treatment — that's also how
-  otherwise-"equivalent" mutants get killed.
-- Pre-release ritual (in addition to the gate): long fuzz runs
-  (`-PmaxFuzzTime=600`+) and a change-scoped jmh A/B per benchmark discipline below.
+- **Do not rely on PIT's timeout to detect a mutant.** `TIMED_OUT` counts as
+  detected and is not written to the baseline, and it is load-dependent: the same
+  mutant can report `SURVIVED` when its suite runs alone and `TIMED_OUT` under
+  `qualityGate`, so the build flips on how it was invoked. Verify a changed
+  baseline in both modes; union in only rows observed to flip, never every
+  `TIMED_OUT` row; prefer removing the cause (a call budget or bound in the
+  harness) over leaning on the timeout.
+- **Randomized tests use fixed seeds, and never sleep** (`TestDouble`,
+  `TestString`): the ratchet needs deterministic kills, and PIT re-runs the
+  covering tests once per mutant, so a single real wait costs minutes across a
+  suite. Per-run exploration is the fuzz targets' job — don't reintroduce
+  `new Random().nextLong()` seeding.
+- **A flaky harness is worse than recorded debt.** If an interleaving or boundary
+  cannot be made deterministic, accept the mutant with a written reason rather
+  than chasing it with sleeps, spin-waits, or thin-margin bounds.
+- **A wandering unkilled count is a defect to chase, not re-ratchet past** — the
+  baseline records whichever run wrote it, so a lucky run bakes in a row later
+  runs fail on. Beyond `TIMED_OUT` flips (above) and unseeded randomness, two
+  observed causes elsewhere in this process: `@Execution`/`@TestInstance` failing
+  to reach concrete test classes from an abstract base — version-dependent:
+  JUnit 6 marks both `@Inherited`, and `@Execution` is moot without parallel
+  execution; `javap` the resolved jar before restructuring — and
+  coverage attributed to a field or static initializer is unstable — exercise
+  factories from inside a `@Test`. Converged means consecutive runs agree on the
+  per-mutator sub-totals, not just the headline number.
+- **Kill rates are bounded by the mutator set.** `BigInteger`/`BigDecimal`
+  arithmetic is method calls, invisible to `STRONGER`'s arithmetic mutators.
+  Trialed `EXPERIMENTAL_BIG_INTEGER` on 2026-07-21 across all three suites:
+  zero fires (1904/326/335 generated, unchanged) — the readers construct Big
+  values from parsed chars but do no arithmetic on them. Left off; re-trial if
+  Big arithmetic is introduced. Numbers in `config/pitest/README.md`.
+- **A suite's percentage is not a target.** An accepted mutant with a written
+  reason is finished work, not debt. Here every baseline entry is triaged in
+  `config/pitest/README.md` with no untriaged debt. Attention belongs to a
+  growing baseline, not a number below 100%.
+- **Allocation bounds are asserted where allocation is the contract — and only
+  there.** `TestAllocation` pins the zero/exact-allocation contracts via
+  `ThreadMXBean` allocation counters; new API whose *stated design goal* is
+  allocation behavior gets the same treatment, and that is also how
+  otherwise-"equivalent" grow/trim mutants get killed. But the harness is a last
+  resort, not a default: it re-runs once per mutant, every measured result must go
+  to a `static volatile` sink so escape analysis can't delete the allocation under
+  test, and a thin margin (observed: mutant at 88 bytes vs a 90-byte bound) is a
+  flaky harness with extra steps. An incidental micro-optimization that only an
+  allocation bound could observe is a mutant to accept, with "allocation routing
+  only" as the written reason.
+- **When a test you believe in will not go green, suspect the code before you
+  soften the assertion** — that is where this process finds real bugs, not in the
+  mutant kills themselves.
+- **Suite exclusions must cover the test source set, not a naming convention.**
+  All test-source classes here are `Test*` or `*Fuzz*` today, and the `iterator`
+  suite excludes those patterns — but a shared fake extracted to a top-level
+  `RecordingFoo`/`StubFoo` matches neither and silently joins the mutated
+  population. `pitest<Suite>Verify` cross-references mutated classes against the
+  test source set and warns by name; heed that warning, and after registering or
+  widening a suite confirm no mutated class lives under `src/test`.
+- **Verify by the absence of failures, not the presence of passes.** Counting
+  `PASSED` lines hides a failure sitting next to them, and a green `clean build`
+  can mean the build cache short-circuited rather than that tests ran. Check the
+  failure count and confirm the task actually executed. A mutation run has a
+  second version of this: a *failed* PIT run leaves the previous run's report in
+  place, so the summary you read can describe a run that never happened — trust
+  the exit code, and delete report directories when comparing runs.
+- **A suite that got faster without getting narrower is a bug report.** Real
+  speedups come from fewer mutants or faster covering tests; an unexplained one
+  usually means the run did less than you think. (Exception if arcmutate history
+  is ever activated here — `arcmutate-licence.txt` at the repo root, free for
+  OSS: a `[history]` marker on the summary makes fast the expected state, and
+  the pre-release gate then runs `-PnoMutationHistory` to re-earn every status
+  from scratch.)
+- **Transient infra failures are not results.** PIT `MINION_DIED` fails before
+  writing a report, so it cannot corrupt one — re-run the suite; a Gradle-worker
+  `EOFException` death is the same shape, and a per-mutant `RUN_ERROR` under
+  load is the same shape smaller (the summary names it, not counted as
+  detected). The daemon log
+  (`~/.gradle/daemon/<version>/daemon-<pid>.out.log`) keeps a failed build's
+  full output even when the shell discarded it — read it before calling a
+  failure unexplained.
 
 ## Correctness landmines
 
@@ -86,9 +179,11 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   `./gradlew :json-iterator:fuzzJson -PmaxFuzzTime=120`. The harness contract is
   strict — `JsonException` (plus `DateTimeException` for instants) is the only
   accepted rejection on any source, so crash-class regressions (bounds faults, stale
-  reads past `tail`) surface as findings, not noise. When a run produces a crash
-  input, fix the bug, then promote the input into the seed corpus
-  (`src/test/resources/fuzz/<target>/regression-*`) so it replays forever.
+  reads past `tail`) surface as findings, not noise. Every finding becomes **two**
+  artifacts: the minimized input promoted into the seed corpus
+  (`src/test/resources/fuzz/<target>/regression-*`, replayed deterministically by
+  `TestFuzzCorpusReplay`) *and* a named regression unit test asserting the fixed
+  behavior. A crash fixed without both is a crash that can return.
 - Multibyte lead bytes are **negative** as signed `byte`s, and `0x80` appears
   mid-character in ordinary text — neither is a safe sentinel.
 - **Never index a lookup table with a raw source value.** A signed byte is negative on
@@ -144,10 +239,6 @@ and on kind/discriminator dispatch (~10% and zero allocation), but the char
 `fieldEquals` **chain is deliberately not deprecated** — it is the fastest option below
 roughly 8–10 names. Don't "modernize" small enums onto the matcher for performance;
 there isn't any.
-
-**One `forRemoval` member is open: `JsonIterParser`'s bufSize `parse` shim.** It must
-ride a published release before removal (per the sweep procedure above); take its
-NO_COVERAGE baseline entries with it and re-score in the same pass.
 
 **Docs carry current state only.** When a surface is removed, delete its
 documentation — decision-table rows, migration examples, standing-task mentions —

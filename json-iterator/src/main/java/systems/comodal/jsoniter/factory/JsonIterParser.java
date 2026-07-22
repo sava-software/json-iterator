@@ -13,12 +13,6 @@ public interface JsonIterParser<T> {
     return parse(JsonIterator.parse(in));
   }
 
-  /// @param bufSize ignored; the stream is always read fully.
-  @Deprecated(forRemoval = true)
-  default T parse(final InputStream in, final int bufSize) throws IOException {
-    return parse(JsonIterator.parse(in));
-  }
-
   default T parse(final byte[] json) throws IOException {
     return parse(JsonIterator.parse(json));
   }

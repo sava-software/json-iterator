@@ -20,9 +20,12 @@ file can shift entries: the verify task then reports both stale and "new"
 rows. Confirm the new rows are the shifted old ones, then refresh with
 `-PupdateMutationBaseline`.
 
-Incremental analysis (PIT history) is not wired: current PIT releases gate it
-behind the commercial arcmutate history plugin. Suite scoping keeps full runs
-around a minute each; revisit if that grows.
+Incremental analysis (PIT history) is available via arcmutate (free licences
+for open source; the build plugin activates it when `arcmutate-licence.txt`
+sits at the repo root — see sava-build's `HARDENING.md`). Not adopted here
+yet: suite scoping keeps full runs around a minute each. If adopted, the
+pre-release gate, baseline refreshes, and convergence runs all take
+`-PnoMutationHistory`.
 
 The fuzz seed corpus replays deterministically in the unit suite
 (`TestFuzzCorpusReplay`), so newly committed seeds — including promoted fuzz
@@ -83,15 +86,29 @@ strand parity-equivalent increments.
   `skipPastEndQuote` chars): the divergent `+ → −` accumulation direction is
   killed by the lone-low-surrogate skips in `TestSkip`
   (`test_skip_surrogate_escapes` — borrow propagates into the classification
-  bits, so beware "low bits are harmless" blanket reasoning here). Accepted
-  is the provably inert residue: `head++ → head--` on the digit reads (the
-  re-read hex digit is consumed as ordinary string content, invisible to a
-  skip, and a duplicated low digit perturbs only bits 0–7, below the
-  classification bits), `<< → >>` zeroing of the `<<4`/`<<6` terms (their
-  maximum contribution cannot cross the surrogate or `0x110000` plane
-  verdicts), and the outer `bc >= 0x10000` gate mutants (forced entry or
-  `> 0x10000` boundary — the inner `>= 0x110000` verdict is unchanged either
-  way).
+  bits, so beware "low bits are harmless" blanket reasoning here). The rest
+  of the residue was **sweep-verified 2026-07-21**: both variants
+  reimplemented outside the codebase and diffed on observable outcome
+  (return position + exception identity, including `reportError`'s embedded
+  offset; the position-less "invalid surrogate" and `JHex` messages compare
+  on identity alone). Domains: all 65,536 escape values × both surrogate
+  states × every truncation point × an invalid digit in every position (both
+  sources), and the full 4-byte domain lead `F0`–`F7` × 256³ continuation
+  bytes. The killed `<<12`/`<<18` mutants were swept as controls and
+  diverge, cross-validating the model.
+  - **Verified equivalent, accepted**: `head++ → head--` on the digit-4 read
+    (all divergence is post-throw cursor state behind a position-less
+    exception); `<<4 → >>4` zeroing (bits 4–7 sit below every
+    classification bit); `<<6 → >>6` zeroing and both outer `bc >= 0x10000`
+    gate mutants (forced entry and `>` boundary — bits 0–11 and the 0x10000
+    corner sit below every plane verdict).
+  - **Falsified and killed**: `head++ → head--` on the digit-3 read had been
+    accepted as "invisible to a skip"; the sweep found 65,536 observable
+    divergences — on documents truncated mid-escape the lagging cursor
+    misses the tail check, completes the escape from re-read digits, and
+    reports "invalid surrogate" where the real code reports
+    "incomplete string, offset: N". Killed on both sources by
+    `TestSkip.test_skip_truncated_escape_reports_cut_offset`.
 - `parseMultiByteString` grow-check always-grow mutants: allocation-only,
   same family as the sized-array-reader equivalents `TestAllocation` kills —
   the never-grow directions are killed, only always-grow is accepted.
@@ -118,12 +135,46 @@ timeout). The accepted remainder is equivalent by construction:
   it (invalid input throws first), so the copy is defensive; forcing it is
   allocation-only.
 
-## Untriaged debt
+## Mutator-set trial (2026-07-21)
 
-One item, deliberately deferred:
-- `JsonIterParser` bufSize-shim NO_COVERAGE: gated behind the shim's removal
-  (deprecated 2026-07-17; must ride a published release first) — meaningless
-  to triage before it. Everything else in the baseline is triaged above.
+Per HARDENING.md ("the mutator set bounds what the ratchet can see"),
+`EXPERIMENTAL_BIG_INTEGER` was trialed on every suite: `iterator` 1904 → 1904,
+`numbers` 326 → 326, `util` 335 → 335 generated mutants — **zero fires**. The
+`readBigDecimal`/`readBigInteger` paths construct their results from parsed
+chars; no `add`/`multiply`-family arithmetic exists in mutated classes for the
+mutator to rewrite. Left off (enabling a mutator that cannot fire is baseline
+churn for nothing); re-trial if Big arithmetic is ever introduced.
+
+## Convergence check (2026-07-21)
+
+Per HARDENING.md's convergence method: two solo passes per suite and two
+`qualityGate` passes, report directories deleted between runs, diffed on
+per-mutant status keyed `(class, method, line, mutator)` — **zero differences**
+in all nine comparisons (solo-vs-solo, gate-vs-gate, solo-vs-gate, per suite).
+The stale-acceptance sweep (each baseline row against the union of unkilled
+sets across all four runs) matched **every** row in at least one mode — no row
+is widening the gate for nothing. The `TIMED_OUT` rows (7 iterator, 2 util)
+were stable in both modes, so the baselines carry no flip-insurance rows to
+revisit. The abstract-base `@Execution`/`@TestInstance` instability cannot
+apply here: the test suite has no abstract test classes and uses neither
+annotation.
+
+**ServiceLoader factory path — unreachable in-harness**
+(`JsonIterParserFactory`, 5 NO_COVERAGE): the load-success path needs a
+registered provider, and the whitebox test setup patches tests *into* the
+main module — a provider would need a `provides` directive, which cannot come
+from patched-in test sources (the JVM has no `--add-provides`) and does not
+belong in the production `module-info`. What would reach it: a blackbox test
+suite with its own module descriptor providing a test factory. Covering only
+the failure path was considered and rejected — it converts the `loadParser`
+return-value mutants into NC→SURVIVED traps (the call throws before either
+`return` completes) without observing the load behavior. Accepted as
+unreachable in-harness, not as equivalent.
+
+The baseline is otherwise fully triaged; no untriaged debt remains
+(the `JsonIterParser` bufSize-shim family closed 2026-07-21 with the shim's
+removal — 25.3.0 carried the `forRemoval` marker — and `TestJsonIterParser`
+covering the surviving convenience overloads).
 
 Shrinking the baseline is always an improvement; growing it requires a
 reason here.

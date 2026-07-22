@@ -104,6 +104,18 @@ final class TestSkip {
   }
 
   @Test
+  void test_skip_truncated_escape_reports_cut_offset() {
+    // document cut mid-escape after a valid high surrogate: the skip must
+    // report the truncation at the exact offset of the cut — a digit-read
+    // cursor that lags the tail checks instead completes the escape from
+    // re-read digits and misreports it as "invalid surrogate"
+    final var ji = factory.create("[\"\\uD835\\u000");
+    assertTrue(ji.readArray());
+    final var ex = assertThrows(JsonException.class, ji::skip);
+    assertTrue(ex.getMessage().contains("incomplete string, offset: 13"), ex.getMessage());
+  }
+
+  @Test
   void test_skip_object() {
     var ji = factory.create("[{\"hello\": {\"world\": \"a\"}},2]");
     assertTrue(ji.readArray());
