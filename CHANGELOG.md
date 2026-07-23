@@ -1,5 +1,16 @@
 # Changelog
 
+## [25.3.1](https://github.com/sava-software/json-iterator/compare/25.3.0...25.3.1) (2026-07-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **jsoniter:** `JsonIterParser.parse(InputStream, int bufSize)` removed; call `parse(InputStream)` instead.
+
+### Features
+
+* **jsoniter:** remove deprecated JsonIterParser bufSize parse overload ([1ffe455](https://github.com/sava-software/json-iterator/commit/1ffe4557975aef701786eb2fee345fc8071a4741))
+
 ## [25.3.0](https://github.com/sava-software/json-iterator/compare/25.2.0...25.3.0) (2026-07-19)
 
 
