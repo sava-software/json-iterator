@@ -42,7 +42,7 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
      HARDENING.md; `agentsTemplateInSync` (wired into `check`) fails when the
      template changes until the block is re-diffed — sync or ACT on each changed
      bullet (a new bullet may need code, not prose) — and the digest updated. -->
-<!-- hardening-template sha256:96ddf18dcc3a -->
+<!-- hardening-template sha256:e6d8a19c3b67 -->
 
 - **Scale verification to the change; suite choice is reachability, not habit.**
   Iterate with `test` (or `--tests` for the touched classes). Before handing off,
@@ -77,20 +77,60 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   principle but unreachable through any deterministic harness (an HTTP 1xx the
   JDK client never surfaces as a final status) — accept as **unreachable
   in-harness**, naming what would reach it, never as "equivalent".
-- Line-number churn from editing a mutated file shows up as paired stale + "new"
-  baseline entries; confirm they're the shifted old ones before refreshing.
+- **Pure line drift passes on its own.** The verify classifies every paired
+  stale + "new" row: `(shifted from line N)` is a mutant that moved with an
+  edit, and when the whole run is shifts with per-population counts unchanged
+  it passes with a notice — refresh at a convenient moment. A
+  `newly covered` pairing (was `NO_COVERAGE`, now reached) is triage, not a
+  refresh: refreshing there launders a fresh survivor into the baseline.
+  Non-zero *unexplained* rows are the real signal — but pairing is greedy and
+  keys on the method, so a small residue against a heavily edited file (or an
+  extract-method refactor, which needs re-triage at the mutant's new home)
+  reads as "check these", not proof of a regression. `-PlistUnkilled` prints
+  unkilled rows with PIT's mutation descriptions (which sub-condition, which
+  branch direction — the CSV omits them); `-PnoDriftTolerance` restores
+  strict behaviour and belongs in certifying runs alongside
+  `-PnoMutationHistory`.
+- **Iterate with `-PmutateOnly=<class-glob>`** while killing a cluster —
+  seconds instead of a full suite — then re-run unscoped before any refresh;
+  scoped reports are stamped `.scoped` and every baseline-touching consumer
+  (the ratchet, refreshes, mode snapshots) refuses them. `pitest<Suite>Debt`
+  ranks survivors and no-coverage by class with the delta against the
+  baseline — use it to pick the next cluster instead of re-deriving the
+  ranking from the CSV.
+- Identical baseline rows are sibling mutants of one compound condition and
+  the comparison is a multiset — never hand-dedupe (these baselines carry
+  such rows: `matchPattern`, `DoubleParser` scan guards, `INIT_DIGITS`).
+  When one sibling survives, the verify names the killed sibling's test
+  (`[detected sibling at this coordinate: KILLED by <test>]`); the survivor
+  is the opposite branch direction — triage it as its own mutant, not as the
+  one that test was aimed at. The 2026-07-23 multiset re-triage is the
+  proof it pays: two "siblings of accepted equivalents" were real
+  lenient-literal-skip gaps, killed in `TestSkip` along with eight
+  neighboring rows the exact-offset assertions swept up.
 - **Do not rely on PIT's timeout to detect a mutant.** `TIMED_OUT` counts as
   detected and is not written to the baseline, and it is load-dependent: the same
   mutant can report `SURVIVED` when its suite runs alone and `TIMED_OUT` under
   `qualityGate`, so the build flips on how it was invoked. Verify a changed
   baseline in both modes; union in only rows observed to flip, never every
   `TIMED_OUT` row; prefer removing the cause (a call budget or bound in the
-  harness) over leaning on the timeout.
+  harness) over leaning on the timeout. Unions are written with
+  `-PunionMutationBaseline` (append-only, each row annotated
+  `# flip insurance (<per-mode statuses>)`; a full `-PupdateMutationBaseline`
+  names every row it drops), and the verify announces run-to-run status
+  drift from a machine-local stash (`.pitest-history/<suite>.statuses`):
+  `KILLED -> TIMED_OUT` is a benign count, `SURVIVED -> TIMED_OUT` a warning
+  — never let a refresh drop such a row on the strength of a loaded run.
 - **Randomized tests use fixed seeds, and never sleep** (`TestDouble`,
   `TestString`): the ratchet needs deterministic kills, and PIT re-runs the
   covering tests once per mutant, so a single real wait costs minutes across a
   suite. Per-run exploration is the fuzz targets' job — don't reintroduce
   `new Random().nextLong()` seeding.
+- **Time-dependent code takes a clock**, so tests advance time instead of
+  waiting — and test clocks get a non-zero origin, since a clock starting at
+  0 makes every "timestamp mutated to 0" mutant equivalent by accident.
+  Nothing in this library reads a clock today (`InstantParser` parses input,
+  it never asks for *now*); the rule binds any future surface that would.
 - **A flaky harness is worse than recorded debt.** If an interleaving or boundary
   cannot be made deterministic, accept the mutant with a written reason rather
   than chasing it with sleeps, spin-waits, or thin-margin bounds.
@@ -102,14 +142,33 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   JUnit 6 marks both `@Inherited`, and `@Execution` is moot without parallel
   execution; `javap` the resolved jar before restructuring — and
   coverage attributed to a field or static initializer is unstable — exercise
-  factories from inside a `@Test`. Converged means consecutive runs agree on the
-  per-mutator sub-totals, not just the headline number.
+  factories from inside a `@Test`. Convergence is scripted: `pitestConverge`
+  runs every suite twice and diffs per-mutant statuses (two runs can match in
+  total while disagreeing about which mutants died — the headline number is
+  not the check), and `pitestModeSnapshot -PpitestMode=<label>` /
+  `pitestModeCompare` diff solo-vs-`qualityGate` modes, writing observed flips
+  to the baseline with `-PunionModeFlips`.
 - **Kill rates are bounded by the mutator set.** `BigInteger`/`BigDecimal`
   arithmetic is method calls, invisible to `STRONGER`'s arithmetic mutators.
   Trialed `EXPERIMENTAL_BIG_INTEGER` on 2026-07-21 across all three suites:
   zero fires (1904/326/335 generated, unchanged) — the readers construct Big
   values from parsed chars but do no arithmetic on them. Left off; re-trial if
-  Big arithmetic is introduced. Numbers in `config/pitest/README.md`.
+  Big arithmetic is introduced. Fluent calls returning their receiver are
+  expressions, invisible to `VoidMethodCallMutator`: trialed
+  `EXPERIMENTAL_NAKED_RECEIVER` on 2026-07-22 (`pitestMutatorTrial
+  -PtrialMutators=...`) — fired 16 mutants in `iterator` (four exposed
+  genuinely untested skip-branch positions in the `readXOr` defaults, killed
+  by extending `TestNull`), zero in `numbers`/`util`. Enabled on `iterator`
+  only. Numbers for both trials in `config/pitest/README.md`.
+- **PIT minions run on the class path**, even though this repo's tasks run on
+  the module path: `module-info` services are invisible to minions, and a
+  test-resources `META-INF/services` is invisible to the module-path `test`
+  task — a harness whose result depends on which task ran it is never
+  committed. The local instance is `JsonIterParserFactory`'s `ServiceLoader`
+  path, accepted as unreachable in-harness (the whitebox test setup cannot
+  provide a service; see `config/pitest/README.md`). A real (main-source)
+  provider would need the dual declaration — `module-info` *and*
+  `META-INF/services`.
 - **A suite's percentage is not a target.** An accepted mutant with a written
   reason is finished work, not debt. Here every baseline entry is triaged in
   `config/pitest/README.md` with no untriaged debt. Attention belongs to a
@@ -181,9 +240,11 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   accepted rejection on any source, so crash-class regressions (bounds faults, stale
   reads past `tail`) surface as findings, not noise. Every finding becomes **two**
   artifacts: the minimized input promoted into the seed corpus
-  (`src/test/resources/fuzz/<target>/regression-*`, replayed deterministically by
-  `TestFuzzCorpusReplay`) *and* a named regression unit test asserting the fixed
-  behavior. A crash fixed without both is a crash that can return.
+  (`src/test/resources/fuzz/<target>/regression-*`, replayed deterministically inside
+  `check` by the plugin-generated `<Harness>SeedReplayTest` classes — provenance in
+  the README beside the corpus dirs, never inside one, where a file becomes a seed)
+  *and* a named regression unit test asserting the fixed behavior. A crash fixed
+  without both is a crash that can return.
 - Multibyte lead bytes are **negative** as signed `byte`s, and `0x80` appears
   mid-character in ordinary text — neither is a safe sentinel.
 - **Never index a lookup table with a raw source value.** A signed byte is negative on

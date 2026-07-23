@@ -16,9 +16,12 @@ A new unkilled mutant has exactly three legal outcomes:
    respect to observable behavior*, not for "hard to test".
 
 Line numbers are part of the baseline key, so unrelated edits to a mutated
-file can shift entries: the verify task then reports both stale and "new"
-rows. Confirm the new rows are the shifted old ones, then refresh with
-`-PupdateMutationBaseline`.
+file can shift entries: the verify classifies each pairing (`shifted` /
+`newly covered` / unexplained) and pure line drift passes on its own with a
+notice — see sava-build's `HARDENING.md`. The baseline is a **multiset**:
+identical rows are sibling mutants of one compound condition (one per
+operand or branch direction), so duplicate lines are legal and must never be
+hand-deduped.
 
 Incremental analysis (PIT history) is available via arcmutate (free licences
 for open source; the build plugin activates it when `arcmutate-licence.txt`
@@ -27,9 +30,11 @@ yet: suite scoping keeps full runs around a minute each. If adopted, the
 pre-release gate, baseline refreshes, and convergence runs all take
 `-PnoMutationHistory`.
 
-The fuzz seed corpus replays deterministically in the unit suite
-(`TestFuzzCorpusReplay`), so newly committed seeds — including promoted fuzz
-findings — face PIT's mutants automatically.
+The fuzz seed corpora replay deterministically in the unit suite via the
+plugin-generated `<Harness>SeedReplayTest` classes (one per fuzz target), so
+newly committed seeds — including promoted fuzz findings — face PIT's mutants
+automatically. The suites' `targetTests` include `*SeedReplayTest` so the
+replays participate as killers.
 
 ## Triaged equivalent mutants (accepted with reasons)
 
@@ -112,6 +117,21 @@ strand parity-equivalent increments.
 - `parseMultiByteString` grow-check always-grow mutants: allocation-only,
   same family as the sized-array-reader equivalents `TestAllocation` kills —
   the never-grow directions are killed, only always-grow is accepted.
+- `matchPattern` (the Hacker's Delight zero-byte finder): the three surviving
+  MathMutator siblings (`|→&` twice, dropped `~`) each flag a strict superset
+  of lanes — verified per-lane over all 256 byte values (no cross-lane
+  carries: `(x & 0x7F…) + 0x7F…` cannot carry out of a lane, in the real
+  expression or any survivor). The function is shared by the escape/multibyte
+  guard *and* the quote matcher, and every word loop checks the guard first,
+  so an over-detecting mutant trips
+  `containsMultiByteOrEscapePattern` on every word and routes the entire scan
+  to the byte-accurate scalar tails before the corrupted quote match can
+  fire — result-identical, routing only. Confirmed live (2026-07-23): with
+  the `|→&` mutant compiled in, `matchPattern` returns all-lanes-flagged for
+  plain ASCII yet the full unit suite and long-ASCII `readString` probes
+  produce identical results. The under-detecting siblings (`&→|`, `+→−`)
+  corrupt and are killed. Any refactor that gives quote matching its own
+  pattern function or reorders the guard voids this argument.
 
 **ASCII word-loop tail handling** (`skipPastEndQuote`, `parseString`,
 `parseBase64String` in `BytesJsonIterator`): the divergent directions are
@@ -145,6 +165,48 @@ chars; no `add`/`multiply`-family arithmetic exists in mutated classes for the
 mutator to rewrite. Left off (enabling a mutator that cannot fire is baseline
 churn for nothing); re-trial if Big arithmetic is ever introduced.
 
+## Mutator-set trial (2026-07-22)
+
+`EXPERIMENTAL_NAKED_RECEIVER` (fluent calls returning their receiver are
+expressions, invisible to `VoidMethodCallMutator`), via `pitestMutatorTrial
+-PtrialMutators=EXPERIMENTAL_NAKED_RECEIVER`: `iterator` 16 generated — 11
+killed by existing tests, 5 unkilled; `numbers` and `util` cannot fire (no
+receiver-returning calls in their targets). **Enabled on `iterator` only.**
+Of the 5 unkilled: 4 were dropped `skip()` calls on the default branches of
+`readShortOr`/`readDoubleOr`/`readFloatOr`/`readBooleanOr` — genuinely
+untested cursor positions, killed by extending
+`TestNull.test_read_primitive_or_default_skips_and_positions` with
+position-after reads across all widths (the long/int variants already had
+them, which is what killed their mutants in trial); 1 is a `NO_COVERAGE` row
+on `JsonIterParserFactory.loadParser`, joining the unreachable-in-harness
+ServiceLoader family below.
+
+## Multiset re-triage (2026-07-23)
+
+sava-build 21.5.9's verify compares baselines as multisets, which exposed
+sibling survivors the earlier unique-row comparison had collapsed into their
+accepted twins — 4 in `iterator`, 14 in `numbers`, 2 in `util`, every one
+sharing `class,method,line,mutator,status` with an already-accepted row.
+Re-triaged individually:
+
+- **Killed** (real gaps found by the expansion): the lenient-literal-skip
+  directions in `BaseJsonIterator.skipTrue`/`skipLiteral` — leniency on the
+  `'r'`/`'u'` checks silently *accepted* corrupt documents (`tque`, `trqe`),
+  and the truncated-tail `skipLiteral` siblings threw at the wrong offset or
+  through `peekChar`'s EOF funnel instead of `expected <literal>` at the
+  first divergence. All killed by
+  `TestSkip.test_skip_corrupted_literals_reject_at_exact_offset` (every
+  corruption position × every literal × fast and truncated paths, exact
+  message + offset, all sources); the previously accepted rows at those keys
+  died with them and left the baseline.
+- **Accepted**: the `matchPattern` over-detection siblings (see the
+  multibyte-scan family note above) and the `DoubleParser` /
+  `JHex$INIT_DIGITS` sibling occurrences, whose family arguments
+  (slow-path routing to the `Double.parseDouble` oracle with the dangerous
+  directions observably killed; static-initializer tables built before
+  mutants activate) are line-level and cover every operand direction at
+  their coordinates. The baselines now carry one row per sibling mutant.
+
 ## Convergence check (2026-07-21)
 
 Per HARDENING.md's convergence method: two solo passes per suite and two
@@ -160,7 +222,9 @@ apply here: the test suite has no abstract test classes and uses neither
 annotation.
 
 **ServiceLoader factory path — unreachable in-harness**
-(`JsonIterParserFactory`, 5 NO_COVERAGE): the load-success path needs a
+(`JsonIterParserFactory`, 6 NO_COVERAGE — 5 original plus the 2026-07-22
+`NakedReceiverMutator` on the `ServiceLoader.load(...).stream()` chain): the
+load-success path needs a
 registered provider, and the whitebox test setup patches tests *into* the
 main module — a provider would need a `provides` directive, which cannot come
 from patched-in test sources (the JVM has no `--add-provides`) and does not

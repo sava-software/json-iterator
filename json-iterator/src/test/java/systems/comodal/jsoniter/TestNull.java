@@ -130,6 +130,19 @@ final class TestNull {
     assertEquals(7L, ji.skipUntil("b").readLongOr(-1L));
     assertEquals(-1, ji.skipUntil("c").readIntOr(-1));
     assertEquals(8, ji.skipUntil("d").readIntOr(-1));
+
+    // each defaulted read is followed by a successful one, so a dropped skip()
+    // on the default branch cannot leave the cursor behind unnoticed
+    final var ji2 = factory.create(
+        "{\"a\":[1,2],\"b\":9,\"c\":{\"x\":1},\"d\":1.5,\"e\":\"nope\",\"f\":2.5,\"g\":null,\"h\":true}");
+    assertEquals((short) -1, ji2.skipUntil("a").readShortOr((short) -1));
+    assertEquals((short) 9, ji2.skipUntil("b").readShortOr((short) -1));
+    assertEquals(-1.0, ji2.skipUntil("c").readDoubleOr(-1.0));
+    assertEquals(1.5, ji2.skipUntil("d").readDoubleOr(-1.0));
+    assertEquals(-1.0f, ji2.skipUntil("e").readFloatOr(-1.0f));
+    assertEquals(2.5f, ji2.skipUntil("f").readFloatOr(-1.0f));
+    assertFalse(ji2.skipUntil("g").readBooleanOr(false));
+    assertTrue(ji2.skipUntil("h").readBooleanOr(false));
   }
 
   @Test

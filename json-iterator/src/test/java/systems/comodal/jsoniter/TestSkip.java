@@ -197,4 +197,42 @@ final class TestSkip {
       assertThrows(JsonException.class, () -> factory.create(json).skip(), "'" + json + "'");
     }
   }
+
+  @Test
+  void test_skip_corrupted_literals_reject_at_exact_offset() {
+    // a skipped literal must be validated at every character, and the error
+    // must name the first divergence: leniency on any single position — or a
+    // throw at the wrong position — silently accepts corrupt documents. The
+    // full-length documents take the word-count fast path; the truncated ones
+    // take the char-at-a-time skipLiteral tail, whose only legal outcomes are
+    // "expected <literal>" at the first mismatch or at the cut
+    record Case(String json, String expect) {
+    }
+    for (final var c : new Case[]{
+        // fast path: the check reads ahead without moving head, so every
+        // corruption reports at the literal body's start
+        new Case("tque", "expected true, offset: 1"),
+        new Case("trqe", "expected true, offset: 1"),
+        new Case("truq", "expected true, offset: 1"),
+        new Case("fqlse", "expected false, offset: 1"),
+        new Case("faqse", "expected false, offset: 1"),
+        new Case("falqe", "expected false, offset: 1"),
+        new Case("falsq", "expected false, offset: 1"),
+        new Case("nqll", "expected null, offset: 1"),
+        new Case("nuql", "expected null, offset: 1"),
+        new Case("nulq", "expected null, offset: 1"),
+        // truncated tail, valid prefix: reject at the cut, not before it
+        new Case("tru", "expected true, offset: 3"),
+        new Case("fals", "expected false, offset: 4"),
+        new Case("nul", "expected null, offset: 3"),
+        // truncated tail, corrupt prefix: reject at the mismatch, not the cut
+        new Case("tq", "expected true, offset: 1"),
+        new Case("trq", "expected true, offset: 2"),
+        new Case("faq", "expected false, offset: 2"),
+        new Case("nuq", "expected null, offset: 2")
+    }) {
+      final var ex = assertThrows(JsonException.class, () -> factory.create(c.json).skip(), "'" + c.json + "'");
+      assertTrue(ex.getMessage().contains(c.expect), "'" + c.json + "' -> " + ex.getMessage());
+    }
+  }
 }

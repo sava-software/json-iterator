@@ -39,13 +39,16 @@ hardening {
       "systems.comodal.jsoniter.FieldMatcher",
       "systems.comodal.jsoniter.FieldMatcher\$*"
     )
-    targetTests = "systems.comodal.jsoniter.Test*"
+    targetTests = "systems.comodal.jsoniter.Test*,systems.comodal.jsoniter.*SeedReplayTest"
+    // STRONGER misses dropped fluent calls (receiver-returning expressions);
+    // NAKED_RECEIVER fired 16 mutants here in trial — numbers in config/pitest/README.md
+    mutators = "STRONGER,EXPERIMENTAL_NAKED_RECEIVER"
   }
   mutation.register("numbers") {
     // PowersOfFive is deliberately not a target: constant tables produce slow,
     // low-value mutants; table errors surface as killed DoubleParser mutants anyway
     targetClasses = listOf("systems.comodal.jsoniter.DoubleParser")
-    targetTests = "systems.comodal.jsoniter.Test*"
+    targetTests = "systems.comodal.jsoniter.Test*,systems.comodal.jsoniter.*SeedReplayTest"
   }
   mutation.register("util") {
     targetClasses = listOf(
@@ -56,7 +59,7 @@ hardening {
       "systems.comodal.jsoniter.FieldMatcher",
       "systems.comodal.jsoniter.FieldMatcher\$*"
     )
-    targetTests = "systems.comodal.jsoniter.Test*"
+    targetTests = "systems.comodal.jsoniter.Test*,systems.comodal.jsoniter.*SeedReplayTest"
   }
   fuzz.register("json") {
     targetClass = "systems.comodal.jsoniter.JsonFuzz"

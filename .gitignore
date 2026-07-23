@@ -4,5 +4,6 @@ out/
 build/
 *.iml
 
-# arcmutate rolling per-suite mutation history (machine-local; see sava-build HARDENING.md)
+# machine-local per-suite mutation state: arcmutate rolling history and the
+# verify's run-to-run status stash (see sava-build HARDENING.md)
 .pitest-history/

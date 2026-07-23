@@ -15,9 +15,11 @@ systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,21,ConditionalsBoundaryMuta
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,21,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,21,RemoveConditionalMutator_ORDER_IF,SURVIVED
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,22,MathMutator,SURVIVED
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,22,MathMutator,SURVIVED
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,24,ConditionalsBoundaryMutator,SURVIVED
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,24,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,24,RemoveConditionalMutator_ORDER_IF,SURVIVED
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,25,MathMutator,SURVIVED
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,25,MathMutator,SURVIVED
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,27,NullReturnValsMutator,SURVIVED
 systems.comodal.jsoniter.JIUtil,escapeQuotes,102,RemoveConditionalMutator_EQUAL_IF,SURVIVED

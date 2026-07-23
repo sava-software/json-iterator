@@ -5,12 +5,14 @@ import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.FieldSource;
 import systems.comodal.jsoniter.factories.JsonIteratorFactory;
 
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.time.Instant;
 
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ParameterizedClass
@@ -303,6 +305,23 @@ final class TestInteger {
     // a lone minus at end-of-input rejects instead of reading past the buffer
     assertThrows(JsonException.class, () -> factory.create("-").readInt());
     assertThrows(JsonException.class, () -> factory.create("-").readLong());
+  }
+
+  @Test
+  void test_read_big_integer() {
+    // value, null, and wrong-type cases on both the number and string branches
+    final var past2p63 = new BigInteger("9223372036854775808");
+    assertEquals(past2p63, factory.create("9223372036854775808").readBigInteger());
+    assertEquals(past2p63, factory.create("\"9223372036854775808\"").readBigInteger());
+    assertEquals(BigInteger.valueOf(-42), factory.create("-42").readBigInteger());
+    assertNull(factory.create("null").readBigInteger());
+    assertThrows(JsonException.class, () -> factory.create("true").readBigInteger());
+    // position after: the null branch skips its token, every branch consumes it
+    final var ji = factory.create("{\"a\":123,\"b\":\"456\",\"c\":null,\"d\":789}");
+    assertEquals(BigInteger.valueOf(123), ji.skipUntil("a").readBigInteger());
+    assertEquals(BigInteger.valueOf(456), ji.skipUntil("b").readBigInteger());
+    assertNull(ji.skipUntil("c").readBigInteger());
+    assertEquals(BigInteger.valueOf(789), ji.skipUntil("d").readBigInteger());
   }
 
   @Test
