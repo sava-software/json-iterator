@@ -284,7 +284,17 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   caps have ~20× headroom over the largest seeds). Corpus dedup is
   `fuzz<Target>Minimize` — committed seeds keep their meaningful names;
   `-PadoptLocalCorpus` opts in the local `build/` corpus, and anything adopted or
-  removed updates the provenance README.
+  removed updates the provenance README (it folds in *every* local file — thousands
+  of hash-named ones against a handful of curated seeds — so adopt for a finding
+  worth keeping, not as corpus hygiene).
+- **Three of the four targets are saturated; don't budget hours of wall clock.**
+  Measured 2026-07-24 at 600s per target: `fuzzDouble`, `fuzzNumber`, and
+  `fuzzInstant` each ended with edge *and* feature counts identical to their seeded
+  start (401/962, 374/831, 326/832) across 38–130M executions — more time buys
+  nothing there, and new coverage needs a harness or oracle change instead. Only
+  `fuzzJson` still moves, and barely (two new feature buckets, flat edge coverage).
+  The 600s legs remain the pre-release ritual; treat a *longer* run as a decision
+  needing a reason.
 - Multibyte lead bytes are **negative** as signed `byte`s, and `0x80` appears
   mid-character in ordinary text — neither is a safe sentinel.
 - **Never index a lookup table with a raw source value.** A signed byte is negative on
