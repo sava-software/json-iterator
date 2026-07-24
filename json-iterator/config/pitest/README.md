@@ -3,7 +3,8 @@
 Each `pitest<Suite>` run is finalized by `pitest<Suite>Verify`, which diffs the
 run's unkilled mutants (`SURVIVED` and `NO_COVERAGE`) against the accepted
 baseline in `<suite>-accepted.csv` and **fails on anything new**. Baseline row
-format: `class,method,line,mutator,status`.
+format: `class,method,line,mutator,status`, optionally followed by a
+`# <label>` note naming the row's acceptance family.
 
 A new unkilled mutant has exactly three legal outcomes:
 
@@ -13,7 +14,15 @@ A new unkilled mutant has exactly three legal outcomes:
 2. **Refactor** — restructure so the mutant cannot exist.
 3. **Accept it knowingly** — re-run with `-PupdateMutationBaseline` and record
    the reason below. Acceptance is for mutants that are *equivalent with
-   respect to observable behavior*, not for "hard to test".
+   respect to observable behavior*, not for "hard to test". The refresh seeds
+   each new row `# untriaged`; finishing triage means replacing that with a
+   short family label whose argument lives in a section below (mentioned there
+   as `# <label>` — the verify and debt listing warn on labels with no such
+   mention, so a typo can't open a phantom family). Rows accepted before label
+   seeding arrived (sava-build 21.5.10) carry no label and print as
+   `unlabeled` in the verify's per-label counts — their arguments are complete
+   below; label a row with its family when touching it rather than by bulk
+   inference.
 
 Line numbers are part of the baseline key, so unrelated edits to a mutated
 file can shift entries: the verify classifies each pairing (`shifted` /

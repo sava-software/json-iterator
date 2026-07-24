@@ -42,7 +42,7 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
      HARDENING.md; `agentsTemplateInSync` (wired into `check`) fails when the
      template changes until the block is re-diffed — sync or ACT on each changed
      bullet (a new bullet may need code, not prose) — and the digest updated. -->
-<!-- hardening-template sha256:e6d8a19c3b67 -->
+<!-- hardening-template sha256:7f9eb869ee7e -->
 
 - **Scale verification to the change; suite choice is reachability, not habit.**
   Iterate with `test` (or `--tests` for the touched classes). Before handing off,
@@ -64,10 +64,19 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   (prefer asserting the property it breaks — position after a skip, exact error
   context, allocation bounds — over restating the implementation), **refactor** it
   out of existence, or **accept it** with a written reason in
-  `config/pitest/README.md`. Never run `-PupdateMutationBaseline` just to make the
-  build pass. When a claimed equivalence spans a sweepable domain, verify it
-  empirically — reimplement both variants, diff them over the range, record the
-  range in the note; a sweep survives refactors that rot a prose argument.
+  `config/pitest/README.md` **and a short family label on the row itself**
+  (`# slow-path routing`) — refreshes seed every genuinely new row `# untriaged`,
+  and triage means replacing that label, so the baseline says which rows are
+  argued and which are debt. The verify and `pitest<Suite>Debt` count rows per
+  label and warn when a family label has no `# <label>` mention in
+  `config/pitest/README.md` (`# untriaged` exempt). These baselines' rows predate
+  label seeding (21.5.10) and print as `unlabeled` — that is recorded state, not
+  new debt; label a row with its README family when you touch it, never by bulk
+  inference (a misassigned label reads as finished triage). Never run
+  `-PupdateMutationBaseline` just to make the build pass. When a claimed
+  equivalence spans a sweepable domain, verify it empirically — reimplement both
+  variants, diff them over the range, record the range in the note; a sweep
+  survives refactors that rot a prose argument.
 - **`SURVIVED` and `NO_COVERAGE` are different problems.** The first means a test
   executed the line and couldn't tell the difference — a judgment call between a
   stronger assertion and a written acceptance. The second means no test reached the
@@ -90,7 +99,16 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   unkilled rows with PIT's mutation descriptions (which sub-condition, which
   branch direction — the CSV omits them); `-PnoDriftTolerance` restores
   strict behaviour and belongs in certifying runs alongside
-  `-PnoMutationHistory`.
+  `-PnoMutationHistory`. Refreshes carry row notes: verbatim across a pure
+  line shift, annotated `(carried across NO_COVERAGE -> SURVIVED)` on a
+  status flip — re-read those, an argument for an unreached mutant isn't
+  automatically one for an observable mutant — and the dropped-rows listing
+  names each note's fate. A third, always-safe refresh exists:
+  `-PpruneMutationBaseline` only drops rows matching nothing this run (keeps
+  `TIMED_OUT` coordinates and cross-status unkilled ones, naming them) —
+  prefer it after a killing pass over hand-rolled cleanup scripts, and note
+  the three refresh flags are mutually exclusive. All baseline rewrites are
+  atomic, so an interrupted refresh cannot truncate the file.
 - **Iterate with `-PmutateOnly=<class-glob>`** while killing a cluster —
   seconds instead of a full suite — then re-run unscoped before any refresh;
   scoped reports are stamped `.scoped` and every baseline-touching consumer
@@ -102,9 +120,10 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   the comparison is a multiset — never hand-dedupe (these baselines carry
   such rows: `matchPattern`, `DoubleParser` scan guards, `INIT_DIGITS`).
   When one sibling survives, the verify names the killed sibling's test
-  (`[detected sibling at this coordinate: KILLED by <test>]`); the survivor
-  is the opposite branch direction — triage it as its own mutant, not as the
-  one that test was aimed at. The 2026-07-23 multiset re-triage is the
+  (`[detected sibling at this line: KILLED by <test>]` — in the failure
+  listing, scoped runs, and `-PlistUnkilled` alike); the survivor is the
+  opposite branch direction — triage it as its own mutant, not as the one
+  that test was aimed at. The 2026-07-23 multiset re-triage is the
   proof it pays: two "siblings of accepted equivalents" were real
   lenient-literal-skip gaps, killed in `TestSkip` along with eight
   neighboring rows the exact-offset assertions swept up.
@@ -131,6 +150,16 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   0 makes every "timestamp mutated to 0" mutant equivalent by accident.
   Nothing in this library reads a clock today (`InstantParser` parses input,
   it never asks for *now*); the rule binds any future surface that would.
+  The non-zero-origin rule generalized: **any stub or fixture returns
+  distinguishable, non-default values** — a canned null/0/`""`/true/empty
+  makes the matching return-value mutant equivalent by accident of the
+  fixture (no stubs exist in this suite today; binds any future fake). Same
+  future-binding shape for **copy-on-write routing** (`size() > 1 ?
+  unmodifiableCopy : as-is`): assert immutability of returned collections
+  (`assertThrows(UnsupportedOperationException, ...)`) at every size — the
+  mutable-escape direction is a kill, only content-equal siblings are
+  family-accepted (no collection-returning API routes through unmodifiable
+  copies here today).
 - **A flaky harness is worse than recorded debt.** If an interleaving or boundary
   cannot be made deterministic, accept the mutant with a written reason rather
   than chasing it with sleeps, spin-waits, or thin-margin bounds.
@@ -142,7 +171,11 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   JUnit 6 marks both `@Inherited`, and `@Execution` is moot without parallel
   execution; `javap` the resolved jar before restructuring — and
   coverage attributed to a field or static initializer is unstable — exercise
-  factories from inside a `@Test`. Convergence is scripted: `pitestConverge`
+  factories from inside a `@Test`, and build any subject under test inside
+  the test body, not in a test field: under `PER_CLASS` lifecycle a
+  field-initialized subject's construction coverage attaches to whichever
+  test runs first, so its wiring mutants can never pair with the test that
+  drives what they wire. Convergence is scripted: `pitestConverge`
   runs every suite twice and diffs per-mutant statuses (two runs can match in
   total while disagreeing about which mutants died — the headline number is
   not the check), and `pitestModeSnapshot -PpitestMode=<label>` /
@@ -244,7 +277,14 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   `check` by the plugin-generated `<Harness>SeedReplayTest` classes — provenance in
   the README beside the corpus dirs, never inside one, where a file becomes a seed)
   *and* a named regression unit test asserting the fixed behavior. A crash fixed
-  without both is a crash that can return.
+  without both is a crash that can return. Fuzz and minimize tasks refuse when a
+  committed seed exceeds its target's `maxLen` (libFuzzer would silently truncate
+  it, exploring a clip of what the seed pins — raise the cap in
+  `json-iterator/build.gradle.kts` or re-minimize the seed deliberately; current
+  caps have ~20× headroom over the largest seeds). Corpus dedup is
+  `fuzz<Target>Minimize` — committed seeds keep their meaningful names;
+  `-PadoptLocalCorpus` opts in the local `build/` corpus, and anything adopted or
+  removed updates the provenance README.
 - Multibyte lead bytes are **negative** as signed `byte`s, and `0x80` appears
   mid-character in ordinary text — neither is a safe sentinel.
 - **Never index a lookup table with a raw source value.** A signed byte is negative on
