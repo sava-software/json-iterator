@@ -126,6 +126,28 @@ strand parity-equivalent increments.
 - `parseMultiByteString` grow-check always-grow mutants: allocation-only,
   same family as the sized-array-reader equivalents `TestAllocation` kills —
   the never-grow directions are killed, only always-grow is accepted.
+- `escapeJson` / `ensureCapacity` buffer sizing.
+  Label: `# allocation routing`, triaged 2026-07-25 with the `char[]` rewrite.
+  Four rows, all
+  producing byte-identical output because every shortfall is corrected by
+  `ensureCapacity` before anything is written:
+  - `escapeJson:68` `new char[len + 8 + (len >> 3)]`, two MathMutator siblings.
+    Only the *initial* capacity moves; a smaller one just grows sooner and a
+    larger one wastes a little. The third sibling (`len - 8`) is killed — it
+    goes negative on short input and throws.
+  - `ensureCapacity:120` `needed <= out.length` → `<`: at exact equality the
+    mutant grows a buffer that already fits. Same array contents.
+  - `ensureCapacity:123` `out.length << 1` → `>> 1`: `Math.max(needed, half)`
+    is then always `needed`, so the buffer is sized exactly instead of doubled —
+    correct output, just more frequent growth.
+  Deliberately not chased with `TestAllocation`: per AGENTS.md the allocation
+  harness is a last resort, and these are precisely the "incidental
+  micro-optimization only an allocation bound could observe" case it names as
+  accept-worthy. The *observable* directions here are killed —
+  `TestJIUtil.testEscapeJsonGrowsPastInitialCapacity` kills both under-request
+  mutants on line 77 (`n + span - 6` runs off the end of a 64-control-character
+  buffer; `n - span + 6` off a 15-char one where a 13-char span meets the first
+  growth point).
 - `matchPattern` (the Hacker's Delight zero-byte finder): the three surviving
   MathMutator siblings (`|→&` twice, dropped `~`) each flag a strict superset
   of lanes — verified per-lane over all 256 byte values (no cross-lane

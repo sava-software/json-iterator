@@ -85,7 +85,17 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   planning a pass. A third case exists for `SURVIVED`: distinguishable in
   principle but unreachable through any deterministic harness (an HTTP 1xx the
   JDK client never surfaces as a final status) — accept as **unreachable
-  in-harness**, naming what would reach it, never as "equivalent".
+  in-harness**, naming what would reach it, never as "equivalent". Before
+  accepting any survivor, ask whether the mutated line still *executes*: PIT
+  reuses minion JVMs across mutants, so process-lifetime state left by an
+  earlier mutant's run of the same test is still there, and a memoizing
+  `computeIfAbsent` over a static cache — keyed by a constant the test
+  hard-codes — never re-invokes the mutated lambda again. An unkillable mutant
+  on a cache-miss path is a **fixture bug until proven otherwise** (mint a
+  fresh key per invocation), and it reads exactly like equivalence, because
+  "no test can observe this" is the same sentence either way. Nothing here
+  memoizes today — `JHex$INIT_DIGITS` is a static table with its own family
+  argument, not a cache — so this binds any future one.
 - **Pure line drift passes on its own.** The verify classifies every paired
   stale + "new" row: `(shifted from line N)` is a mutant that moved with an
   edit, and when the whole run is shifts with per-population counts unchanged
@@ -186,7 +196,18 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   Trialed `EXPERIMENTAL_BIG_INTEGER` on 2026-07-21 across all three suites:
   zero fires (1904/326/335 generated, unchanged) — the readers construct Big
   values from parsed chars but do no arithmetic on them. Left off; re-trial if
-  Big arithmetic is introduced. Fluent calls returning their receiver are
+  Big arithmetic is introduced. Each `pitest<Suite>` run now looks for that
+  blind spot directly, scanning the recompiled classes' constant pools for
+  arithmetic calls on those types and printing the trial command when the
+  mutator is off. It is **silent on all three suites here**, confirming the
+  2026-07-21 trial from the other direction: every Big reference in main is a
+  constructor, `stripTrailingZeros()`, or `BigDecimal.ZERO`, and none of those
+  is an operation the mutators rewrite. Do *not* add a `declineMutator(...)`
+  to memorialize that — a decline is reported stale when nothing is left for
+  it to suppress, so recording one here would *add* a warning rather than
+  silence one. The decline becomes the right artifact only if Big arithmetic
+  lands, the scan starts firing, and a trial then measures it not worth
+  enabling. Fluent calls returning their receiver are
   expressions, invisible to `VoidMethodCallMutator`: trialed
   `EXPERIMENTAL_NAKED_RECEIVER` on 2026-07-22 (`pitestMutatorTrial
   -PtrialMutators=...`) — fired 16 mutants in `iterator` (four exposed
@@ -286,7 +307,24 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   `-PadoptLocalCorpus` opts in the local `build/` corpus, and anything adopted or
   removed updates the provenance README (it folds in *every* local file — thousands
   of hash-named ones against a handful of curated seeds — so adopt for a finding
-  worth keeping, not as corpus hygiene).
+  worth keeping, not as corpus hygiene). All four targets declare a `seedCorpus`,
+  so none is named by `generateFuzzReplayTests`' corpus-less advice and no
+  `declineSeedCorpus(...)` is recorded here. A new target owes one or the other:
+  a corpus does two independent jobs, and "a mutator reaches this format from
+  scratch" answers only the bootstrap one — a target with nowhere to put a
+  finding cannot satisfy the two-artifact rule above, whatever its input format
+  looks like.
+- **A long campaign writes to a file, and a fuzzer that stopped printing may be
+  frozen, not finished.** Route `-PmaxFuzzTime=600` output straight to a file —
+  never through `tee`, a pager, or a filtering pipe whose consumer can die
+  mid-run. libFuzzer writes progress to that pipe, and when the reader goes away
+  the next write blocks forever inside native code with the JVM parked
+  `RUNNABLE` in `startLibFuzzer`, which by thread state alone is
+  indistinguishable from a healthy quiet stretch. Diagnose by **CPU delta**, not
+  thread state: a live fuzzing JVM accumulates CPU continuously, a frozen one
+  stops cold. And a killed campaign dumps each in-flight input as a
+  `crash-<hash>` artifact stamped the kill moment — dump-on-death, not findings.
+  Replay them against the harness before treating any as a crash.
 - **Three of the four targets are saturated; don't budget hours of wall clock.**
   Measured 2026-07-24 at 600s per target: `fuzzDouble`, `fuzzNumber`, and
   `fuzzInstant` each ended with edge *and* feature counts identical to their seeded
@@ -310,6 +348,21 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   build or, worse, change a string literal's meaning.
 
 ## Settled design decisions — don't re-propose without new evidence
+
+**`escapeJson` keeps three comparisons, not a lookup table.** The obvious
+optimization — `private static final boolean[] SPECIAL` sized to `'\\' + 1`, tested
+as `c < SPECIAL.length && SPECIAL[c]` — was measured on 2026-07-25 and **rejected**.
+It is 2.9× faster on all-lowercase text (0x61–0x7A, every character above the guard,
+which is therefore always false and perfectly predicted, and the table never read),
+but **8–9% slower than the shipped code on realistic mixed-case text**, where the
+guard becomes an unpredictable branch. The full picture, `clean_long` / `mixed_long`
+/ `low_long` in ns/op: table 92 / 293 / 268, three comparisons 268 / 268 / 269. The
+table's cost tracks the *predictability* of its guard, worst at a 41/59 split; the
+comparisons are flat across every alphabet. A table would also add
+static-initializer mutants that are unkillable by construction (see
+`JHex$INIT_DIGITS`). Don't re-propose without a measurement on a realistic alphabet.
+A branchless `c < 0x20 | c == '"' | c == '\\'` was measured too and is no better
+than the short-circuit form (269.8 vs 268.5).
 
 **Library javadoc never names downstream consumers.** This is a core library; its
 public docs must not reference consumer projects or their types (a `JupiterPrice`,
@@ -481,6 +534,63 @@ error bars to match. Note this is invisible without the control row — the abso
 number looked plausible. Contamination also moves between rows run to run (it hit
 `stream_reset` in three sessions, then `bytes_reset` in the next), so a row being clean
 last time is no reason to trust it this time.
+
+**The criterion is free cores, not load average.** A JMH run here is single-threaded and
+forks run one at a time, so it needs *one* core, not an idle machine. This box has 10
+(8 performance + 2 efficiency), and a load average is meaningless without that
+denominator — worse, during Spotlight indexing load is inflated by I/O wait rather than
+CPU (observed 2026-07-25: load 9.0 with roughly 1.6 cores actually busy, so ~8 free).
+Read per-process CPU, not just `uptime`:
+
+```sh
+uptime
+ps -Ao pcpu,comm -r | head -12
+```
+
+**A background daemon pegging one core does not invalidate a single-threaded
+microbenchmark — measure, then judge by the error bars.** Refusing to run until the
+machine is pristine costs more than it saves when eight cores are idle; the 10%-of-score
+error rule already catches contamination after the fact, and it catches it *specifically*
+rather than by proxy. What actually competes is a workload that wants many cores at once:
+your own Gradle build, a test task, a PIT suite, a second benchmark. Keep those off; let
+`spotlightknowledged.updater` have its core.
+
+Sharpen the judgment with what the run reports rather than what the machine looked like
+beforehand — an error bar over 10% of score, or the same row disagreeing across forks,
+is the signal to re-run. The known distortions still stand as priors: open JetBrains IDEs
+are the largest lever a human controls (one measured 50% → 8.5% CPU on close), and the
+23% `bytes_reset` inflation on record came from IDEs *plus* indexing on a far busier
+machine than one hot daemon.
+
+**`spotlightknowledged.updater` does not "finish" — don't wait it out.** It starts at
+boot and can sit pegged near 100% indefinitely (observed alive 11d22h *and* hot), so
+treating it as a transient burst to be waited through stalls indefinitely. If it does
+need clearing, `sudo killall spotlightknowledged.updater` (launchd respawns it) or
+suspending indexing around the run with `sudo mdutil -a -i off` … `sudo mdutil -a -i on`
+both work — but both need sudo, so they belong to the human, not the agent, and neither
+is a precondition for measuring.
+
+Send a long run's output straight to a file — never through `tee` or a filter, for the
+same reason a long fuzz campaign doesn't.
+
+**While a run is pending or measuring, make only cheap edits.** Docs, comments, and code
+you will compile later are fine; a Gradle build, a test task, or a PIT suite is not — it
+lands in whichever row happens to be measuring, and since contamination moves between
+rows the damage is not even reproducible.
+
+**A benchmark's input alphabet is part of its design, not a detail.** Where a
+candidate's cost depends on a branch, the *distribution* of inputs decides whether
+that branch predicts — and a generator written for convenience will quietly pick the
+friendly distribution. `EscapeBench` originally built inputs from `'a' + rnd(26)`;
+every character landed above the `c < 0x5D` guard of a candidate lookup table, so the
+guard was always false, perfectly predicted, and the table never read. That reported a
+2.9× win for a change that is 8–9% **slower** on realistic mixed-case text. The tell
+was a third variant behaving identically to the shipped code when it should have been
+faster — a result that only makes sense if the thing being measured wasn't what the
+name said. When a candidate branches on character values, ranges, or lengths, add a
+shape whose distribution *straddles* the branch, and one at each extreme: predictable-
+true and predictable-false both flatter it, and the realistic middle is where it is
+worst.
 
 Do not invent a mechanism to explain a contaminated row. The bogus solana stream tax got
 a confident, plausible explanation — a "large-object ZGC allocation path" — that was pure

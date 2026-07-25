@@ -40,6 +40,101 @@ public final class JIUtil {
   }
 
 
+  private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
+
+  /// Escapes a raw string for embedding inside a JSON string literal:
+  /// `"` and `\` are backslash-escaped, and control characters below 0x20
+  /// are emitted as their short escape (`\n`, `\r`, `\t`, `\b`, `\f`) or
+  /// a four-hex-digit unicode escape. Unlike [#escapeQuotesChecked(String)], the input is treated
+  /// as raw text — a backslash already followed by a quote is itself
+  /// escaped rather than interpreted as an existing escape sequence.
+  /// Returns the same instance when no escaping is needed.
+  ///
+  /// Only `"`, `\` and 0x00-0x1F are escaped. Everything else — non-ASCII,
+  /// DEL, and surrogates alike — is passed through unchanged, and UTF-16
+  /// pairing is not validated: a well-formed pair survives intact, and so does
+  /// a lone surrogate. Whether an unpaired one reaches its destination
+  /// therefore depends on how the caller encodes the result, since UTF-8
+  /// cannot represent one (Java's default encoder substitutes it silently).
+  /// Callers that can receive unpaired surrogates should reject or replace
+  /// them upstream. Note this differs from a well-formed `JSON.stringify`,
+  /// which escapes lone surrogates instead.
+  public static String escapeJson(final String str) {
+    final int len = str.length();
+    int from = 0;
+    while (from < len && !needsEscape(str.charAt(from))) {
+      ++from;
+    }
+    if (from == len) {
+      return str;
+    }
+
+    // Ordinary characters move in bulk (`getChars` over the span since the last
+    // escape) rather than one append per character, which is what halves the
+    // sparse-escape case; the escapes themselves are written straight into the
+    // buffer. Measured 2026-07-25 against the previous StringBuilder version:
+    // -50% on 512 chars with 8 escapes, -20% on control-heavy input, and within
+    // 1% everywhere else. See EscapeBench.
+    char[] out = new char[len + 8 + (len >> 3)];
+    str.getChars(0, from, out, 0);
+    int n = from;
+    int run = from;
+    for (int i = from; i < len; ++i) {
+      final char c = str.charAt(i);
+      if (needsEscape(c)) {
+        final int span = i - run;
+        // one escape expands to at most the six characters of \\u00XX
+        out = ensureCapacity(out, n + span + 6);
+        // unguarded: a zero-length getChars is a no-op, so `span > 0` would be
+        // pure optimization — measured free, and the guard only added equivalent
+        // mutants (its `>= 0` and always-true directions are indistinguishable)
+        str.getChars(run, i, out, n);
+        n += span;
+        out[n++] = '\\';
+        switch (c) {
+          case '"' -> out[n++] = '"';
+          case '\\' -> out[n++] = '\\';
+          case '\n' -> out[n++] = 'n';
+          case '\r' -> out[n++] = 'r';
+          case '\t' -> out[n++] = 't';
+          case '\b' -> out[n++] = 'b';
+          case '\f' -> out[n++] = 'f';
+          default -> {
+            out[n++] = 'u';
+            out[n++] = '0';
+            out[n++] = '0';
+            out[n++] = HEX_DIGITS[c >> 4];
+            out[n++] = HEX_DIGITS[c & 0xF];
+          }
+        }
+        run = i + 1;
+      }
+    }
+    final int tail = len - run;
+    out = ensureCapacity(out, n + tail);
+    str.getChars(run, len, out, n);
+    return new String(out, 0, n + tail);
+  }
+
+  /// The three characters that cannot appear raw inside a JSON string literal.
+  /// Deliberately three comparisons rather than a lookup table: a guarded table
+  /// (`c < TABLE.length && TABLE[c]`) measured 2.9x faster on all-lowercase text,
+  /// where the guard is always false and the table never read — but 8-9% *slower*
+  /// on realistic mixed-case text, where the guard becomes an unpredictable
+  /// branch. These comparisons are insensitive to the alphabet.
+  private static boolean needsEscape(final char c) {
+    return c == '"' || c == '\\' || c < 0x20;
+  }
+
+  private static char[] ensureCapacity(final char[] out, final int needed) {
+    if (needed <= out.length) {
+      return out;
+    }
+    final var grown = new char[Math.max(needed, out.length << 1)];
+    System.arraycopy(out, 0, grown, 0, out.length);
+    return grown;
+  }
+
   public static String escapeQuotesChecked(final String str) {
     final int len = str.length();
     int from = 0;

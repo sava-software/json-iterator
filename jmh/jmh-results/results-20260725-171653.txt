@@ -1,0 +1,22 @@
+Benchmark                     (shape)  Mode  Cnt    Score   Error  Units
+EscapeBench.charsNoTable  clean_short  avgt   24   15.266 ± 0.164  ns/op
+EscapeBench.charsNoTable   clean_long  avgt   24  270.113 ± 0.602  ns/op
+EscapeBench.charsNoTable   mixed_long  avgt   24  269.960 ± 0.422  ns/op
+EscapeBench.charsNoTable     low_long  avgt   24  269.946 ± 0.440  ns/op
+EscapeBench.charsNoTable       sparse  avgt   24  412.905 ± 6.119  ns/op
+EscapeBench.charsNoTable        dense  avgt   24  247.139 ± 0.355  ns/op
+EscapeBench.charsNoTable     controls  avgt   24  250.845 ± 2.828  ns/op
+EscapeBench.current       clean_short  avgt   24   15.084 ± 0.018  ns/op
+EscapeBench.current        clean_long  avgt   24  269.921 ± 1.604  ns/op
+EscapeBench.current        mixed_long  avgt   24  269.563 ± 0.221  ns/op
+EscapeBench.current          low_long  avgt   24  269.769 ± 0.460  ns/op
+EscapeBench.current            sparse  avgt   24  831.837 ± 1.264  ns/op
+EscapeBench.current             dense  avgt   24  245.213 ± 0.617  ns/op
+EscapeBench.current          controls  avgt   24  314.311 ± 0.579  ns/op
+EscapeBench.runsClean     clean_short  avgt   24   14.471 ± 0.030  ns/op
+EscapeBench.runsClean      clean_long  avgt   24  268.536 ± 0.664  ns/op
+EscapeBench.runsClean      mixed_long  avgt   24  268.271 ± 0.158  ns/op
+EscapeBench.runsClean        low_long  avgt   24  269.246 ± 1.691  ns/op
+EscapeBench.runsClean          sparse  avgt   24  588.678 ± 0.849  ns/op
+EscapeBench.runsClean           dense  avgt   24  266.167 ± 0.613  ns/op
+EscapeBench.runsClean        controls  avgt   24  323.572 ± 2.784  ns/op
