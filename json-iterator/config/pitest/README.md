@@ -205,7 +205,9 @@ mutant timing out that is *not* on this list is something a reviewer stops on.
 Members flip `KILLED`↔`TIMED_OUT` run to run — the covering test reaching a
 failure races the watchdog over a dead mutant, benign in both directions — so
 per-run counts sit at or below the set size. (The 2026-07-21 convergence check
-recorded 7 iterator members; one has since settled to `KILLED`.)
+recorded 7 iterator members; one has since settled to `KILLED`.) Membership is
+machine-checked: `iterator-timeouts.csv` / `util-timeouts.csv` hold the
+`class,method,mutator` keys, and the verify warns on any timeout outside them.
 
 As of 2026-07-26 — 8 members, 6 iterator + 2 util, numbers none:
 

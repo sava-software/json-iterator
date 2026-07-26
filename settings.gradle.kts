@@ -13,10 +13,18 @@ pluginManagement {
   val savaBuildLocalRepo = providers.gradleProperty("savaBuildLocalRepo")
     .orNull?.takeIf { it.isNotBlank() }
   if (savaBuildLocalRepo != null) {
+    val metadata = settingsDir.resolve(savaBuildLocalRepo)
+      .resolve("software/sava/sava-build/maven-metadata.xml")
+    val age = if (metadata.isFile) {
+      val minutes = (System.currentTimeMillis() - metadata.lastModified()) / 60_000
+      "0.0.0-test published ${if (minutes < 60) "$minutes min" else "${minutes / 60} h ${minutes % 60} min"} ago"
+    } else {
+      "NO 0.0.0-test PUBLISH FOUND — run sava-build's publish task"
+    }
     // Loud on purpose: with the property set in ~/.gradle/gradle.properties, nothing in
     // this file would otherwise reveal that the versions in the plugins block are ignored.
     logger.warn(
-      "sava-build: resolving 'software.sava.build*' plugins from LOCAL repo $savaBuildLocalRepo"
+      "sava-build: resolving 'software.sava.build*' plugins from LOCAL repo $savaBuildLocalRepo ($age)"
     )
     resolutionStrategy.eachPlugin {
       if (requested.id.id.startsWith("software.sava.build")) {
