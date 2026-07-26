@@ -34,6 +34,22 @@ correctness landmines. The PIT baselines are fully triaged — every accepted
 mutant has a written reason in `json-iterator/config/pitest/README.md`, with no
 untriaged debt.
 
+To build against an unpublished sava-build change, publish sava-build to its local test
+repo and point this build (or `jmh/`) at it — the property belongs in
+`~/.gradle/gradle.properties` or on the CLI, never in `settings.gradle.kts`:
+
+```sh
+(cd ../sava-build; ./gradlew publishSavaBuildTestPublicationToSavaTestRepoRepository)
+./gradlew check -PsavaBuildLocalRepo=../sava-build/build/sava-test-repo
+```
+
+While set, every `software.sava.build*` plugin id resolves to the `0.0.0-test` module
+from that repo and the pinned versions are ignored (a warning is logged). **The publish
+is not automatic** — re-run it after every sava-build edit, or the build silently keeps
+the previously published jar. When done, drop the property and bump the pinned versions
+(the `plugins {}` block in `settings.gradle.kts` *and* the `useModule` version in
+`jmh/settings.gradle.kts`) to the released sava-build.
+
 ## Verification & the mutation ratchet
 
 The process contract for changes here (full policy: sava-build's `HARDENING.md`):

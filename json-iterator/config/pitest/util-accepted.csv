@@ -22,42 +22,22 @@ systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,24,RemoveConditionalMutator
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,25,MathMutator,SURVIVED
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,25,MathMutator,SURVIVED
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,27,NullReturnValsMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,ensureCapacity,130,ConditionalsBoundaryMutator,SURVIVED # allocation routing
-systems.comodal.jsoniter.JIUtil,ensureCapacity,133,MathMutator,SURVIVED # allocation routing
-systems.comodal.jsoniter.JIUtil,escapeJson,78,MathMutator,SURVIVED # allocation routing
-systems.comodal.jsoniter.JIUtil,escapeJson,78,MathMutator,SURVIVED # allocation routing
-systems.comodal.jsoniter.JIUtil,escapeQuotes,178,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,178,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,181,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,181,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,197,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,208,IncrementsMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,143,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,152,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,152,IncrementsMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,152,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,153,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,154,IncrementsMutator,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,159,MathMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,159,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,160,EmptyObjectReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,165,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,165,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,264,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,264,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,286,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,297,IncrementsMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,230,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,230,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,233,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,235,ConditionalsBoundaryMutator,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,235,IncrementsMutator,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,235,RemoveConditionalMutator_ORDER_ELSE,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,235,RemoveConditionalMutator_ORDER_IF,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,236,RemoveConditionalMutator_EQUAL_ELSE,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,236,RemoveConditionalMutator_EQUAL_IF,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,237,IncrementsMutator,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,242,MathMutator,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,242,RemoveConditionalMutator_EQUAL_ELSE,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,242,RemoveConditionalMutator_EQUAL_IF,NO_COVERAGE
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,243,EmptyObjectReturnValsMutator,NO_COVERAGE
+systems.comodal.jsoniter.JIUtil,ensureCapacity,135,ConditionalsBoundaryMutator,SURVIVED # allocation routing
+systems.comodal.jsoniter.JIUtil,ensureCapacity,138,MathMutator,SURVIVED # allocation routing
+systems.comodal.jsoniter.JIUtil,escapeJson,83,MathMutator,SURVIVED # allocation routing
+systems.comodal.jsoniter.JIUtil,escapeJson,83,MathMutator,SURVIVED # allocation routing
+systems.comodal.jsoniter.JIUtil,escapeQuotes,183,ConditionalsBoundaryMutator,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotes,183,RemoveConditionalMutator_ORDER_IF,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotes,186,ConditionalsBoundaryMutator,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotes,186,RemoveConditionalMutator_ORDER_IF,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotes,202,RemoveConditionalMutator_EQUAL_IF,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotes,213,IncrementsMutator,SURVIVED # escape parity
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,148,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,159,IncrementsMutator,SURVIVED # escape parity
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,170,ConditionalsBoundaryMutator,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,170,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,269,ConditionalsBoundaryMutator,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,269,RemoveConditionalMutator_ORDER_IF,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,302,IncrementsMutator,SURVIVED # escape parity
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,235,ConditionalsBoundaryMutator,SURVIVED
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,242,IncrementsMutator,SURVIVED # escape parity

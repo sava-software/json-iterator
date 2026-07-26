@@ -69,8 +69,10 @@ mutant only changes which one runs (performance/allocation, not behavior):
 - `DoubleParser` `×10⁰ ≡ ÷10⁰`, Eisel–Lemire vs Clinger agreement at the
   2⁵³−1/2²⁴−1 boundaries, refinement/tie-range guards gated by exactness
   tests, `reduceScale(v, 0)` identity; the escape-parity `Incr` mutants in
-  `JIUtil` (the counter is consumed only via `& 1`, decrement preserves
-  parity).
+  `JIUtil`, label `# escape parity`: every `escapes` counter is consumed only
+  via `(escapes & 1) == 0`, and flipping the increment direction maps a run
+  of n to −n (scan loops) or 2−n (checked backward counts) — same parity
+  either way, so the direction is unobservable.
 
 **Unreachable defense-in-depth** — the guarded state cannot arise because an
 earlier limit check already rejected it: slow-path wrapped-accumulator
@@ -86,9 +88,14 @@ construction. The per-call `decode` mutants all die.
 **NC→SURVIVED traps** — covering the line would convert provably-equivalent
 mutants on it into new SURVIVED entries: `DoubleParser` `return slow(...)`
 sites whose inputs always throw inside `slow`; `parseFieldEquals` truncation
-bail-outs whose slow-path true-return is structurally unreachable;
-`JIUtil.escapeQuotes*` deep-escape branches whose only distinguishing inputs
-strand parity-equivalent increments.
+bail-outs whose slow-path true-return is structurally unreachable. The
+`JIUtil.escapeQuotes*` deep-escape branches were deliberately taken out of
+this set on 2026-07-26: the backslash-run tests
+(`testEscapeQuotes*BackslashRunBeforeQuote`, `...LeadingNewlineOnly`) killed
+20 accepted mutants — 11 of the 13 NO_COVERAGE entries plus 9 SURVIVED rows
+(util 331→351 of 394 detected) — at the cost of the two remaining
+NO_COVERAGE mutants surfacing as stranded `# escape parity` increments.
+Public-API branches with no test were worth more than the trap avoided.
 
 **Multibyte scan paths**:
 - `containsMultiByteOrEscapePattern`: over-detection mutants only route the

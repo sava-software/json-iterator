@@ -294,6 +294,49 @@ final class TestJIUtil {
   }
 
   @Test
+  void testEscapeQuotesCheckedBackslashRunBeforeQuote() {
+    // The checked scan counts the whole backslash run, not just the adjacent
+    // char: an even run means the quote itself is unescaped and must gain a
+    // backslash, an odd run means it is already escaped and the input comes
+    // back as the same instance.
+    assertEquals("a\\\\\\\"", JIUtil.escapeQuotesChecked("a\\\\\""));
+    final var oddRun = "a\\\\\\\"";
+    assertSame(oddRun, JIUtil.escapeQuotesChecked(oddRun));
+    // A run reaching index 0 exercises the count's lower bound.
+    assertEquals("\\\\\\\"", JIUtil.escapeQuotesChecked("\\\\\""));
+    final var oddRunAtStart = "\\\\\\\"";
+    assertSame(oddRunAtStart, JIUtil.escapeQuotesChecked(oddRunAtStart));
+  }
+
+  @Test
+  void testEscapeQuotesRemoveNewLinesCheckedBackslashRunBeforeQuote() {
+    // Same run-parity contract as escapeQuotesChecked, through the variant
+    // with its own copy of the counting scan.
+    assertEquals("a\\\\\\\"", JIUtil.escapeQuotesRemoveNewLinesChecked("a\\\\\""));
+    final var oddRun = "a\\\\\\\"";
+    assertSame(oddRun, JIUtil.escapeQuotesRemoveNewLinesChecked(oddRun));
+    assertEquals("\\\\\\\"", JIUtil.escapeQuotesRemoveNewLinesChecked("\\\\\""));
+    final var oddRunAtStart = "\\\\\\\"";
+    assertSame(oddRunAtStart, JIUtil.escapeQuotesRemoveNewLinesChecked(oddRunAtStart));
+    // A single escaped quote scans past; a later newline still routes to the
+    // strip with everything before it preserved verbatim.
+    final var escapedOnly = "a\\\"";
+    assertSame(escapedOnly, JIUtil.escapeQuotesRemoveNewLinesChecked(escapedOnly));
+    assertEquals("a\\\"b", JIUtil.escapeQuotesRemoveNewLinesChecked("a\\\"b\n"));
+  }
+
+  @Test
+  void testEscapeQuotesRemoveNewLinesLeadingNewlineOnly() {
+    // A leading newline stripped with nothing escaped is the one shape where
+    // the scan ends having emitted nothing yet must NOT return the input
+    // unchanged.
+    assertEquals("abc", JIUtil.escapeQuotesRemoveNewLines("\nabc"));
+    assertEquals("abc", JIUtil.escapeQuotesRemoveNewLines("\rabc"));
+    assertEquals("abc", JIUtil.escapeQuotesRemoveNewLinesChecked("\nabc"));
+    assertEquals("", JIUtil.escapeQuotesRemoveNewLines("\n\r"));
+  }
+
+  @Test
   void testEscapeQuotesRemoveNewLinesCheckedQuoteBeforeBackslash() {
     // First special char is an unescaped quote whose *following* char is a
     // backslash: the escape check must look backwards, not forwards.

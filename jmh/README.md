@@ -16,7 +16,9 @@ cd jmh
 ```
 
 Configuration comes from the shared `software.sava.build.feature.jmh`
-convention plugin (resolved from the sibling `../sava-build` checkout). Every
+convention plugin (pinned to the published sava-build in `settings.gradle.kts`;
+`-PsavaBuildLocalRepo` overrides it with a local test-repo publish — see the
+root `AGENTS.md`). Every
 default it sets is overridable per invocation: `-PjmhFork`, `-PjmhIncludes`,
 `-PjmhWarmupIterations`, `-PjmhWarmup`, `-PjmhIterations`,
 `-PjmhTimeOnIteration`, `-PjmhFailOnError`, and
