@@ -193,6 +193,50 @@ timeout). The accepted remainder is equivalent by construction:
   it (invalid input throws first), so the copy is defensive; forcing it is
   allocation-only.
 
+## Timed-out mutants (audited set)
+
+`TIMED_OUT` is detected — these mutants never enter a baseline — but the
+watchdog observed slowness, not wrongness: for exactly these mutants the
+ratchet cannot see a weakened covering assertion, because a timeout keeps
+"detecting" no matter what the test asserts. Per HARDENING.md, the summary's
+`N timed out (load-dependent)` is therefore an audited set, not a count: every
+member is listed here with the structural cause that makes it spin, and a
+mutant timing out that is *not* on this list is something a reviewer stops on.
+Members flip `KILLED`↔`TIMED_OUT` run to run — the covering test reaching a
+failure races the watchdog over a dead mutant, benign in both directions — so
+per-run counts sit at or below the set size. (The 2026-07-21 convergence check
+recorded 7 iterator members; one has since settled to `KILLED`.)
+
+As of 2026-07-26 — 8 members, 6 iterator + 2 util, numbers none:
+
+**iterator**
+- `BaseJsonIterator.reduceScale:1021`, two mutants (`scale--` → `scale++`;
+  loop condition → `true`): the counter crossing the negative `scaleLimit` is
+  the loop's only exit; both remove it and the divide loop spins on a settled
+  quotient of 0.
+- `BaseJsonIterator.skipObject:1122` (scan cursor `i++` → `i--`): the
+  `i == tail` bound is an equality a backward walk never meets, and the
+  string-skip re-entry (`i = head - 1` after `skipPastEndQuote()`) can pull
+  the cursor back into the same cycle indefinitely.
+- `BytesJsonIterator.parseMultiByteString:575` (escape-decode `buf[head++]` →
+  `buf[head--]`): the cursor backs away from the `head == tail` guard and
+  re-decodes earlier bytes; the spin races the eventual bounds fault, which is
+  why this member often lands `KILLED` instead.
+- `CharsJsonIterator.parse:136` (escape skip `++i` → `--i`): cancels the for
+  loop's own `++i`, pinning the cursor on the same backslash — a pure
+  oscillation with no exit and no fault.
+- `CharsJsonIterator.skipPastEndQuote:156` (`buf[head++]` → `buf[head--]`):
+  same reversed-cursor family as `parseMultiByteString:575`.
+
+**util**
+- `JIUtil.escapeQuotesChecked:170` (do-while `++from` → `--from`): after an
+  odd, already-escaped quote the backward `from` makes `indexOf('"', from)`
+  re-find the same quote every pass (a negative fromIndex clamps to 0), so
+  the loop never reaches `len`.
+- `FieldMatcher.of:51` (`names.length << 2` → `>> 2`): collapses the table
+  capacity below the entry count, and the linear-probe insert loop exits only
+  on an empty slot or a duplicate name — a full table offers neither.
+
 ## Mutator-set trial (2026-07-21)
 
 Per HARDENING.md ("the mutator set bounds what the ratchet can see"),
