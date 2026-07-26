@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 final class TestJIUtil {
 
@@ -13,6 +14,8 @@ final class TestJIUtil {
     final var clean = "hello world";
     assertSame(clean, JIUtil.escapeJson(clean));
     assertSame("", JIUtil.escapeJson(""));
+    // documented contract: null is the caller's problem, not silently defaulted
+    assertThrows(NullPointerException.class, () -> JIUtil.escapeJson(null));
 
     assertEquals("say \\\"hi\\\"", JIUtil.escapeJson("say \"hi\""));
     assertEquals("a\\\\b", JIUtil.escapeJson("a\\b"));

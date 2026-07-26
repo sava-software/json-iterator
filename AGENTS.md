@@ -70,7 +70,8 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   argued and which are debt. The verify and `pitest<Suite>Debt` count rows per
   label and warn when a family label has no `# <label>` mention in
   `config/pitest/README.md` (`# untriaged` exempt). These baselines' rows predate
-  label seeding (21.5.10) and print as `unlabeled` — that is recorded state, not
+  label support (notes 21.5.10, refresh seeding 21.5.12) and print as
+  `unlabeled` — that is recorded state, not
   new debt; label a row with its README family when you touch it, never by bulk
   inference (a misassigned label reads as finished triage). Never run
   `-PupdateMutationBaseline` just to make the build pass. When a claimed
@@ -113,7 +114,13 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   line shift, annotated `(carried across NO_COVERAGE -> SURVIVED)` on a
   status flip — re-read those, an argument for an unreached mutant isn't
   automatically one for an observable mutant — and the dropped-rows listing
-  names each note's fate. A third, always-safe refresh exists:
+  names each note's fate. Unlabeled rows are likewise kept unlabeled across a
+  pure line shift, never reseeded `# untriaged` (a status flip still seeds
+  debt — it changes what the mutant proves). The pairing keys on
+  class/method/mutator/status, so a killed unlabeled row plus genuinely new
+  debt in the same method can mispair silently; the dropped listing names the
+  line each bare row was paired onto — read those after a refresh. A third,
+  always-safe refresh exists:
   `-PpruneMutationBaseline` only drops rows matching nothing this run (keeps
   `TIMED_OUT` coordinates and cross-status unkilled ones, naming them) —
   prefer it after a killing pass over hand-rolled cleanup scripts, and note

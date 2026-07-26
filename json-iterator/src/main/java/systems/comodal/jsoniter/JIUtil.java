@@ -59,6 +59,11 @@ public final class JIUtil {
   /// Callers that can receive unpaired surrogates should reject or replace
   /// them upstream. Note this differs from a well-formed `JSON.stringify`,
   /// which escapes lone surrogates instead.
+  ///
+  /// The input must be non-null: `null` throws a `NullPointerException`.
+  /// Callers with nullable inputs choose their own null representation
+  /// upstream (omit the field, emit a JSON `null`, or default to `""`) —
+  /// this method does not pick one for them.
   public static String escapeJson(final String str) {
     final int len = str.length();
     int from = 0;
