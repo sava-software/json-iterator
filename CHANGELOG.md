@@ -1,5 +1,19 @@
 # Changelog
 
+## [25.3.1](https://github.com/sava-software/json-iterator/compare/25.3.0...25.3.1) (2026-07-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **jsoniter:** `JsonIterParser.parse(InputStream, int bufSize)` removed; call `parse(InputStream)` instead.
+
+### Features
+
+* **build:** support local test-repo for sava-build plugin changes ([a8eb7c1](https://github.com/sava-software/json-iterator/commit/a8eb7c1643b22509607acf618721dcd1cc72c9d7))
+* **jmh:** add EscapeBench for JSON escape method benchmarking ([cb5f968](https://github.com/sava-software/json-iterator/commit/cb5f96832dd6a19268f4f4b63721f19fe75976a2))
+* **jsoniter:** enforce null handling contract in escapeJson ([0283f4b](https://github.com/sava-software/json-iterator/commit/0283f4b1b819b105baeb69302fa1fed05cf9600d))
+* **jsoniter:** remove deprecated JsonIterParser bufSize parse overload ([1ffe455](https://github.com/sava-software/json-iterator/commit/1ffe4557975aef701786eb2fee345fc8071a4741))
+
 ## [25.3.0](https://github.com/sava-software/json-iterator/compare/25.2.0...25.3.0) (2026-07-19)
 
 
