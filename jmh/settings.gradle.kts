@@ -17,17 +17,13 @@ pluginManagement {
     logger.warn(
       "sava-build: resolving 'software.sava.build*' plugins from LOCAL repo $savaBuildLocalRepo ($age)"
     )
-  }
-  // 'software.sava.build.feature.jmh' has no published plugin marker (sava-build only
-  // publishes markers for ids consumed from a settings 'plugins {}' block), so the
-  // published path also resolves by module. Keep the version in sync with the root
-  // build's plugins block.
-  resolutionStrategy.eachPlugin {
-    if (requested.id.id.startsWith("software.sava.build")) {
-      if (savaBuildLocalRepo != null) {
+    // Only the local path needs this: the test repo carries no plugin markers, so the
+    // id has to be rewritten to the module. The published path resolves through the
+    // marker sava-build publishes for every id (21.5.17+), from the version in
+    // build.gradle.kts's plugins block.
+    resolutionStrategy.eachPlugin {
+      if (requested.id.id.startsWith("software.sava.build")) {
         useModule("software.sava:sava-build:0.0.0-test")
-      } else {
-        useModule("software.sava:sava-build:21.5.16")
       }
     }
   }
@@ -37,9 +33,9 @@ pluginManagement {
     }
     gradlePluginPortal()
     mavenCentral()
-    // The published path resolves the 'software.sava:sava-build' module from GitHub
-    // Packages (it is not on the Plugin Portal or Maven Central), so the same
-    // credentials the root build needs are required here.
+    // sava-build publishes its markers and module to GitHub Packages only (neither is
+    // on the Plugin Portal or Maven Central), so the same credentials the root build
+    // needs are required here.
     val gprUser = providers.gradleProperty("savaGithubPackagesUsername")
       .orNull?.takeIf { it.isNotBlank() }
     val gprToken = providers.gradleProperty("savaGithubPackagesPassword")

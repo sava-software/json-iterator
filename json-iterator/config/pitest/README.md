@@ -207,7 +207,15 @@ failure races the watchdog over a dead mutant, benign in both directions — so
 per-run counts sit at or below the set size. (The 2026-07-21 convergence check
 recorded 7 iterator members; one has since settled to `KILLED`.) Membership is
 machine-checked: `iterator-timeouts.csv` / `util-timeouts.csv` hold the
-`class,method,mutator` keys, and the verify warns on any timeout outside them.
+`class,method,mutator` keys, and the verify warns on any timeout outside them
+(as well as on a member no mutant matches, and on one whose method is named
+nowhere below). `numbers` has never timed out, so it has no file and the check
+is inert for that suite. The keys are deliberately line-less — drift cannot
+churn membership — which is also the check's resolution: a *new* timed-out
+mutant inside an already-audited method+mutator matches the existing member
+silently. That is why each cause below names the line it argues about; re-read
+those lines whenever the code at them changes, because a clean run certifies
+"no new method+mutator", not "no new mutant".
 
 As of 2026-07-26 — 8 members, 6 iterator + 2 util, numbers none:
 

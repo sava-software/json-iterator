@@ -47,8 +47,8 @@ While set, every `software.sava.build*` plugin id resolves to the `0.0.0-test` m
 from that repo and the pinned versions are ignored (a warning is logged). **The publish
 is not automatic** — re-run it after every sava-build edit, or the build silently keeps
 the previously published jar. When done, drop the property and bump the pinned versions
-(the `plugins {}` block in `settings.gradle.kts` *and* the `useModule` version in
-`jmh/settings.gradle.kts`) to the released sava-build.
+(the `plugins {}` block in `settings.gradle.kts` *and* the `feature.jmh` version in
+`jmh/build.gradle.kts`) to the released sava-build.
 
 ## Verification & the mutation ratchet
 
@@ -58,7 +58,7 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
      HARDENING.md; `agentsTemplateInSync` (wired into `check`) fails when the
      template changes until the block is re-diffed — sync or ACT on each changed
      bullet (a new bullet may need code, not prose) — and the digest updated. -->
-<!-- hardening-template sha256:7f9eb869ee7e -->
+<!-- hardening-template sha256:f6dea3f41ab7 -->
 
 - **Scale verification to the change; suite choice is reachability, not habit.**
   Iterate with `test` (or `--tests` for the touched classes). Before handing off,
@@ -135,8 +135,14 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   debt — it changes what the mutant proves). The pairing keys on
   class/method/mutator/status, so a killed unlabeled row plus genuinely new
   debt in the same method can mispair silently; the dropped listing names the
-  line each bare row was paired onto — read those after a refresh. A third,
-  always-safe refresh exists:
+  line each bare row was paired onto, and a refresh prints
+  `PAIRING OUTLIER` for any pair whose line delta disagrees with its class's
+  dominant one (strict majority only, so it stays quiet on tied splits) —
+  read both after a refresh. The verify's churn classifier tests line-less
+  multiset equality *first*, so the 2026-07-26 incident (a pure `+5` shift
+  landing old rows on the literal lines of baseline rows with the same
+  mutators, misread as "newly covered" + "unexplained") now classifies as the
+  drift it is. A third, always-safe refresh exists:
   `-PpruneMutationBaseline` only drops rows matching nothing this run (keeps
   `TIMED_OUT` coordinates and cross-status unkilled ones, naming them) —
   prefer it after a killing pass over hand-rolled cleanup scripts, and note
@@ -173,6 +179,23 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   drift from a machine-local stash (`.pitest-history/<suite>.statuses`):
   `KILLED -> TIMED_OUT` is a benign count, `SURVIVED -> TIMED_OUT` a warning
   — never let a refresh drop such a row on the strength of a loaded run.
+  (The verify's stale-entry hint knows this too: a baseline row whose coordinate
+  read `TIMED_OUT` this run is reported as the load flip it is, not as a row to
+  prune.)
+- **A new timed-out mutant is a reviewer-stop, not detection noise** — for
+  exactly these the ratchet cannot see a weakened covering assertion, since the
+  timeout keeps "detecting" whatever the test asserts. Each suite's timeouts are
+  an audited set: `config/pitest/<suite>-timeouts.csv` holds line-less
+  `class,method,mutator` keys (`iterator-timeouts.csv` 6 rows,
+  `util-timeouts.csv` 2; `numbers` has never timed out, so it has no file and
+  the check is inert there), and `config/pitest/README.md` §"Timed-out mutants
+  (audited set)" carries the structural cause per member, each naming the line
+  it argues about. The verify warns on any timeout outside the set (paste the
+  printed row, then write the cause), on members matching no mutant, and on
+  members whose method is unmentioned in the README. Admit a newcomer only with
+  its cause written. Mind the resolution: line-less keys mean a *new* timed-out
+  mutant inside an already-audited method+mutator draws no warning, so re-read
+  the README's cited lines whenever that code changes.
 - **Randomized tests use fixed seeds, and never sleep** (`TestDouble`,
   `TestString`): the ratchet needs deterministic kills, and PIT re-runs the
   covering tests once per mutant, so a single real wait costs minutes across a
