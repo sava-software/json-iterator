@@ -208,9 +208,15 @@ per-run counts sit at or below the set size. (The 2026-07-21 convergence check
 recorded 7 iterator members; one has since settled to `KILLED`.) Membership is
 machine-checked: `iterator-timeouts.csv` / `util-timeouts.csv` hold the
 `class,method,mutator` keys, and the verify warns on any timeout outside them
-(as well as on a member no mutant matches, and on one whose method is named
-nowhere below). `numbers` has never timed out, so it has no file and the check
-is inert for that suite. The keys are deliberately line-less — drift cannot
+(as well as on malformed rows, on a member no mutant matches, on one whose
+class and method appear nowhere together below, and — via a machine-local
+quiet counter in `.pitest-history/` — on a member with no timeout in 3+
+consecutive mutation runs). All of it is advisory by default, re-printed in
+the end-of-build summary; `-PstrictTimeoutAudit` escalates the
+unaudited-newcomer/malformed/no-set findings to failures on certifying runs,
+and the static checks (row shape, cause presence) also run in
+`pitest<Suite>Debt`. `numbers` has never timed out, so it has no file and the
+check is inert for that suite. The keys are deliberately line-less — drift cannot
 churn membership — which is also the check's resolution: a *new* timed-out
 mutant inside an already-audited method+mutator matches the existing member
 silently. That is why each cause below names the line it argues about; re-read

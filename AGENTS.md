@@ -191,11 +191,25 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   the check is inert there), and `config/pitest/README.md` §"Timed-out mutants
   (audited set)" carries the structural cause per member, each naming the line
   it argues about. The verify warns on any timeout outside the set (paste the
-  printed row, then write the cause), on members matching no mutant, and on
-  members whose method is unmentioned in the README. Admit a newcomer only with
-  its cause written. Mind the resolution: line-less keys mean a *new* timed-out
-  mutant inside an already-audited method+mutator draws no warning, so re-read
-  the README's cited lines whenever that code changes.
+  printed row, then write the cause), on rows that do not parse as three
+  fields (named malformed, matched against nothing), on members matching no
+  mutant, on members whose class and method appear nowhere together in the
+  README, and — from a machine-local counter
+  (`.pitest-history/<suite>.timeout-quiet`) — on members with no timeout in
+  3+ consecutive mutation runs (membership must keep earning itself; a stale
+  interlude resets the counter). Admit a newcomer only with its cause
+  written. Every audit finding is advisory by default and re-printed in a
+  one-line-per-suite end-of-build summary; for certifying runs,
+  `-PstrictTimeoutAudit` escalates exactly the keep-the-audit findings
+  (unaudited newcomer, malformed row, timeouts with no set) to failures —
+  hygiene findings stay advisory even there — and both certifying flags
+  (`-PstrictTimeoutAudit`, `-PnoDriftTolerance`) refuse a `-PmutateOnly`
+  report outright, like the refresh flavours. The audit's static half (row
+  shape, cause presence) also runs in `pitest<Suite>Debt`, so a pasted row
+  or written cause is confirmed in seconds without a mutation run. Mind the
+  resolution: line-less keys mean a *new* timed-out mutant inside an
+  already-audited method+mutator draws no warning, so re-read the README's
+  cited lines whenever that code changes.
 - **Randomized tests use fixed seeds, and never sleep** (`TestDouble`,
   `TestString`): the ratchet needs deterministic kills, and PIT re-runs the
   covering tests once per mutant, so a single real wait costs minutes across a

@@ -2,21 +2,15 @@ pluginManagement {
   // Same local-dev toggle as the root build (see ../settings.gradle.kts): point
   // '-PsavaBuildLocalRepo=<path to sava-build>/build/sava-test-repo' at a published
   // local test repo to bench against an unpublished sava-build change. The publish is
-  // NOT automatic — re-run sava-build's publish task after every edit there.
+  // NOT automatic — re-run sava-build's publish task after every edit there. This
+  // block stays silent about it: this build applies no sava-build settings plugin,
+  // but 'includeBuild("..")' configures the root's, whose end-of-build notice covers
+  // the whole composite. Prefer an absolute property value — a relative one is
+  // resolved against each build's own settings dir, so this build and the root would
+  // read two different repos.
   val savaBuildLocalRepo = providers.gradleProperty("savaBuildLocalRepo")
     .orNull?.takeIf { it.isNotBlank() }
   if (savaBuildLocalRepo != null) {
-    val metadata = settingsDir.resolve(savaBuildLocalRepo)
-      .resolve("software/sava/sava-build/maven-metadata.xml")
-    val age = if (metadata.isFile) {
-      val minutes = (System.currentTimeMillis() - metadata.lastModified()) / 60_000
-      "0.0.0-test published ${if (minutes < 60) "$minutes min" else "${minutes / 60} h ${minutes % 60} min"} ago"
-    } else {
-      "NO 0.0.0-test PUBLISH FOUND — run sava-build's publish task"
-    }
-    logger.warn(
-      "sava-build: resolving 'software.sava.build*' plugins from LOCAL repo $savaBuildLocalRepo ($age)"
-    )
     // Only the local path needs this: the test repo carries no plugin markers, so the
     // id has to be rewritten to the module. The published path resolves through the
     // marker sava-build publishes for every id (21.5.17+), from the version in
