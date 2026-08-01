@@ -3,8 +3,9 @@
 Each `pitest<Suite>` run is finalized by `pitest<Suite>Verify`, which diffs the
 run's unkilled mutants (`SURVIVED` and `NO_COVERAGE`) against the accepted
 baseline in `<suite>-accepted.csv` and **fails on anything new**. Baseline row
-format: `class,method,line,mutator,status`, optionally followed by a
-`# <label>` note naming the row's acceptance family.
+format: `class,method,mutator,status`, optionally followed by a `# line N`
+tag recording where the mutant was last observed and/or a `# <label>` note
+naming the row's acceptance family.
 
 A new unkilled mutant has exactly three legal outcomes:
 
@@ -24,10 +25,16 @@ A new unkilled mutant has exactly three legal outcomes:
    below; label a row with its family when touching it rather than by bulk
    inference.
 
-Line numbers are part of the baseline key, so unrelated edits to a mutated
-file can shift entries: the verify classifies each pairing (`shifted` /
-`newly covered` / unexplained) and pure line drift passes on its own with a
-notice — see sava-build's `HARDENING.md`. The baseline is a **multiset**:
+Line numbers left the baseline key in sava-build 21.5.20 (these files were
+migrated with `migrateMutationBaselines` on 2026-08-01, row identities
+unchanged), so an unrelated edit to a mutated file churns nothing. What is
+left is a `# line N` tag every refresh rewrites, plus a **line-drift
+advisory** when a key is unkilled only at lines no tag names — the code an
+acceptance argues about moved, or a new mutant landed under an old
+acceptance. Re-read the argument below when that fires; the price of the
+line-less key is that a same-key swap (one mutant killed, another born at the
+same `class,method,mutator,status`) is otherwise invisible. See sava-build's
+`HARDENING.md`. The baseline is a **multiset**:
 identical rows are sibling mutants of one compound condition (one per
 operand or branch direction), so duplicate lines are legal and must never be
 hand-deduped.

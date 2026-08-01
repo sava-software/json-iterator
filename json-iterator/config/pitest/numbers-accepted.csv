@@ -1,76 +1,76 @@
-systems.comodal.jsoniter.DoubleParser,computeDouble,181,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeDouble,181,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeDouble,181,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeDouble,184,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeDouble,207,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeDouble,224,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeDouble,239,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeDouble,239,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeDouble,240,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,273,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,273,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,273,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,275,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,283,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,295,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,308,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,319,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,319,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,319,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,319,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,computeFloat,320,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,100,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,101,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,104,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,104,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,104,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,105,PrimitiveReturnsMutator,NO_COVERAGE
-systems.comodal.jsoniter.DoubleParser,parse,108,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,108,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,108,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,108,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,116,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,120,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,120,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,120,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,120,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,121,MathMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,123,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,123,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,124,IncrementsMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,126,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,126,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,126,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,126,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,126,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,134,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,134,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,134,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,135,IncrementsMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,135,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,135,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,136,PrimitiveReturnsMutator,NO_COVERAGE
-systems.comodal.jsoniter.DoubleParser,parse,139,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,140,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,140,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,141,IncrementsMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,141,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,141,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,142,PrimitiveReturnsMutator,NO_COVERAGE
-systems.comodal.jsoniter.DoubleParser,parse,146,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,146,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,146,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,146,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,146,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,146,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,147,PrimitiveReturnsMutator,NO_COVERAGE
-systems.comodal.jsoniter.DoubleParser,parse,151,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,154,IncrementsMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,154,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,158,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,158,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,158,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,158,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,161,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,165,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.DoubleParser,parse,165,RemoveConditionalMutator_ORDER_IF,SURVIVED
+systems.comodal.jsoniter.DoubleParser,computeDouble,ConditionalsBoundaryMutator,SURVIVED # line 181
+systems.comodal.jsoniter.DoubleParser,computeDouble,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 181
+systems.comodal.jsoniter.DoubleParser,computeDouble,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 181
+systems.comodal.jsoniter.DoubleParser,computeDouble,ConditionalsBoundaryMutator,SURVIVED # line 184
+systems.comodal.jsoniter.DoubleParser,computeDouble,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 207
+systems.comodal.jsoniter.DoubleParser,computeDouble,ConditionalsBoundaryMutator,SURVIVED # line 224
+systems.comodal.jsoniter.DoubleParser,computeDouble,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 239
+systems.comodal.jsoniter.DoubleParser,computeDouble,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 239
+systems.comodal.jsoniter.DoubleParser,computeDouble,ConditionalsBoundaryMutator,SURVIVED # line 240
+systems.comodal.jsoniter.DoubleParser,computeFloat,ConditionalsBoundaryMutator,SURVIVED # line 273
+systems.comodal.jsoniter.DoubleParser,computeFloat,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 273
+systems.comodal.jsoniter.DoubleParser,computeFloat,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 273
+systems.comodal.jsoniter.DoubleParser,computeFloat,ConditionalsBoundaryMutator,SURVIVED # line 275
+systems.comodal.jsoniter.DoubleParser,computeFloat,ConditionalsBoundaryMutator,SURVIVED # line 283
+systems.comodal.jsoniter.DoubleParser,computeFloat,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 295
+systems.comodal.jsoniter.DoubleParser,computeFloat,ConditionalsBoundaryMutator,SURVIVED # line 308
+systems.comodal.jsoniter.DoubleParser,computeFloat,ConditionalsBoundaryMutator,SURVIVED # line 319
+systems.comodal.jsoniter.DoubleParser,computeFloat,ConditionalsBoundaryMutator,SURVIVED # line 319
+systems.comodal.jsoniter.DoubleParser,computeFloat,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 319
+systems.comodal.jsoniter.DoubleParser,computeFloat,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 319
+systems.comodal.jsoniter.DoubleParser,computeFloat,ConditionalsBoundaryMutator,SURVIVED # line 320
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 100
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 101
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 104
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 104
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 104
+systems.comodal.jsoniter.DoubleParser,parse,PrimitiveReturnsMutator,NO_COVERAGE # line 105
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 108
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 108
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 108
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 108
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 116
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 120
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 120
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 120
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 120
+systems.comodal.jsoniter.DoubleParser,parse,MathMutator,SURVIVED # line 121
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 123
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 123
+systems.comodal.jsoniter.DoubleParser,parse,IncrementsMutator,SURVIVED # line 124
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 126
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 126
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 126
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 126
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 126
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 134
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 134
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 134
+systems.comodal.jsoniter.DoubleParser,parse,IncrementsMutator,SURVIVED # line 135
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 135
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 135
+systems.comodal.jsoniter.DoubleParser,parse,PrimitiveReturnsMutator,NO_COVERAGE # line 136
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 139
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 140
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 140
+systems.comodal.jsoniter.DoubleParser,parse,IncrementsMutator,SURVIVED # line 141
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 141
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 141
+systems.comodal.jsoniter.DoubleParser,parse,PrimitiveReturnsMutator,NO_COVERAGE # line 142
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 146
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 146
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 146
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 146
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 146
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 146
+systems.comodal.jsoniter.DoubleParser,parse,PrimitiveReturnsMutator,NO_COVERAGE # line 147
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 151
+systems.comodal.jsoniter.DoubleParser,parse,IncrementsMutator,SURVIVED # line 154
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 154
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 158
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 158
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 158
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 158
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 161
+systems.comodal.jsoniter.DoubleParser,parse,ConditionalsBoundaryMutator,SURVIVED # line 165
+systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 165

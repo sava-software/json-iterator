@@ -52,13 +52,16 @@ the previously published jar. When done, drop the property and bump the pinned v
 
 ## Verification & the mutation ratchet
 
-The process contract for changes here (full policy: sava-build's `HARDENING.md`):
+The process contract for changes here (full policy: sava-build's `HARDENING.md`).
+What a clean gate does *not* prove — the mutator set, the class path, the
+`targetTests` boundary, the excluded classes — is inventoried in
+`HARDENING_NOTES.md`; read it before reporting a green run as coverage.
 
 <!-- This section adapts the agent-instructions template in sava-build's
      HARDENING.md; `agentsTemplateInSync` (wired into `check`) fails when the
      template changes until the block is re-diffed — sync or ACT on each changed
      bullet (a new bullet may need code, not prose) — and the digest updated. -->
-<!-- hardening-template sha256:f6dea3f41ab7 -->
+<!-- hardening-template sha256:e035f8cc1fec -->
 
 - **Scale verification to the change; suite choice is reachability, not habit.**
   Iterate with `test` (or `--tests` for the touched classes). Before handing off,
@@ -113,41 +116,60 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   "no test can observe this" is the same sentence either way. Nothing here
   memoizes today — `JHex$INIT_DIGITS` is a static table with its own family
   argument, not a cache — so this binds any future one.
-- **Pure line drift passes on its own.** The verify classifies every paired
-  stale + "new" row: `(shifted from line N)` is a mutant that moved with an
-  edit, and when the whole run is shifts with per-population counts unchanged
-  it passes with a notice — refresh at a convenient moment. A
-  `newly covered` pairing (was `NO_COVERAGE`, now reached) is triage, not a
-  refresh: refreshing there launders a fresh survivor into the baseline.
-  Non-zero *unexplained* rows are the real signal — but pairing is greedy and
-  keys on the method, so a small residue against a heavily edited file (or an
-  extract-method refactor, which needs re-triage at the mutant's new home)
-  reads as "check these", not proof of a regression. `-PlistUnkilled` prints
-  unkilled rows with PIT's mutation descriptions (which sub-condition, which
-  branch direction — the CSV omits them); `-PnoDriftTolerance` restores
-  strict behaviour and belongs in certifying runs alongside
-  `-PnoMutationHistory`. Refreshes carry row notes: verbatim across a pure
-  line shift, annotated `(carried across NO_COVERAGE -> SURVIVED)` on a
-  status flip — re-read those, an argument for an unreached mutant isn't
-  automatically one for an observable mutant — and the dropped-rows listing
-  names each note's fate. Unlabeled rows are likewise kept unlabeled across a
-  pure line shift, never reseeded `# untriaged` (a status flip still seeds
-  debt — it changes what the mutant proves). The pairing keys on
-  class/method/mutator/status, so a killed unlabeled row plus genuinely new
-  debt in the same method can mispair silently; the dropped listing names the
-  line each bare row was paired onto, and a refresh prints
-  `PAIRING OUTLIER` for any pair whose line delta disagrees with its class's
-  dominant one (strict majority only, so it stays quiet on tied splits) —
-  read both after a refresh. The verify's churn classifier tests line-less
-  multiset equality *first*, so the 2026-07-26 incident (a pure `+5` shift
-  landing old rows on the literal lines of baseline rows with the same
-  mutators, misread as "newly covered" + "unexplained") now classifies as the
-  drift it is. A third, always-safe refresh exists:
-  `-PpruneMutationBaseline` only drops rows matching nothing this run (keeps
-  `TIMED_OUT` coordinates and cross-status unkilled ones, naming them) —
-  prefer it after a killing pass over hand-rolled cleanup scripts, and note
-  the three refresh flags are mutually exclusive. All baseline rewrites are
-  atomic, so an interrupted refresh cannot truncate the file.
+- **Baseline keys are line-less** — `class,method,mutator,STATUS`, with each
+  row's observed line demoted to a trailing `# line N` tag that every refresh
+  rewrites. Editing above a mutated method churns nothing the ratchet sees,
+  so the whole drift apparatus is retired: no shift classifier, no tolerated
+  pure-drift pass, no `PAIRING OUTLIER` scan, no `-PnoDriftTolerance` (the
+  2026-07-26 mispaired-shift incident is dead by construction, not by
+  classifier). These baselines were migrated 2026-08-01 with
+  `migrateMutationBaselines` (parse/re-render, no mutation run, identities
+  unchanged: 143/76/43). Migration is **one-way** — a pre-21.5.20 plugin
+  reads a migrated file as every row stale plus every mutant new — so both
+  pins (`settings.gradle.kts`, `jmh/build.gradle.kts`) move together.
+  Two paired stale + "new" classifications remain and want opposite
+  responses: `(newly covered — was NO_COVERAGE)` is triage, since refreshing
+  there launders a fresh survivor into the baseline, and `(shares an accepted
+  key — sibling debt surfaced, or a NEW mutant at that key; check the line)`
+  needs the report's lines read before anything is accepted. An *unexplained*
+  row is a genuinely new key; an extract-method refactor lands there
+  deliberately, the key naming the method and the covering tests at the
+  mutant's new home differing.
+- **The line-less trade is one documented hole: a same-key swap is invisible.**
+  Kill a mutant and introduce another at the same
+  `class,method,mutator,STATUS` in one change and the multiset is unchanged —
+  the new mutant silently inherits the old row's acceptance. The only trace is
+  the **line-drift advisory** (a key unkilled at lines no `# line` tag names),
+  so when it names a key whose `config/pitest/README.md` argument no longer
+  reads against the code, treat it as that swap until shown otherwise. Expect
+  a wave of these on the first runs after the migration: legacy line fields
+  were allowed to lag (pure drift used to pass with a notice), and promoting
+  them to tags surfaces the lag as re-read prompts, not regressions.
+  `-PlistUnkilled` prints unkilled rows with PIT's mutation description
+  prefixed by its line (`line 41: removed conditional…` — the key no longer
+  carries one). Refreshes carry row notes within a key by **line affinity**
+  first, then file order, annotating a status flip
+  `(carried across NO_COVERAGE -> SURVIVED)` — re-read those, an argument for
+  an unreached mutant isn't automatically one for an observable mutant — and
+  the dropped-rows listing names each note's fate and counts the losses. Rows
+  parse as an ordered list, so duplicate sibling rows each keep their **own**
+  note. A third, always-safe refresh exists: `-PpruneMutationBaseline` only
+  drops rows matching nothing this run (keeps `TIMED_OUT` coordinates and
+  cross-status unkilled ones, naming them) — prefer it after a killing pass
+  over hand-rolled cleanup scripts, and note the three refresh flags are
+  mutually exclusive. All baseline rewrites are atomic, so an interrupted
+  refresh cannot truncate the file.
+- **The PIT version is part of the record.** The mutant population is a
+  function of PIT itself, which rides sava-build bumps, so
+  `config/pitest/<suite>-pitest-version` records which version wrote each
+  suite's baseline — per suite, because one shared file would lift every
+  suite's refusal at the first refresh after a bump. It is stamped at the
+  *successful end* of a baseline-writing run. A mismatch warns on a checking
+  run and **refuses** every record-writing flag, `-PinitTimeoutAudit`
+  included (the timeout population is just as version-dependent, but it never
+  stamps). Bumping deliberately means setting the suite's file to the new
+  version and refreshing that suite, reading the churn as a real population
+  diff rather than noise.
 - **Iterate with `-PmutateOnly=<class-glob>`** while killing a cluster —
   seconds instead of a full suite — then re-run unscoped before any refresh;
   scoped reports are stamped `.scoped` and every baseline-touching consumer
@@ -172,10 +194,15 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   `qualityGate`, so the build flips on how it was invoked. Verify a changed
   baseline in both modes; union in only rows observed to flip, never every
   `TIMED_OUT` row; prefer removing the cause (a call budget or bound in the
-  harness) over leaning on the timeout. Unions are written with
-  `-PunionMutationBaseline` (append-only, each row annotated
-  `# flip insurance (<per-mode statuses>)`; a full `-PupdateMutationBaseline`
-  names every row it drops), and the verify announces run-to-run status
+  harness) over leaning on the timeout. Prefer writing unions through
+  `pitestModeCompare -PunionModeFlips`, which annotates each row
+  `# flip insurance (<per-mode statuses>)` and tags the observed `# line`, so
+  the note carries its own re-measurable evidence and the row-level drift
+  advisory covers it. `-PunionMutationBaseline` remains the escape hatch for a
+  directly witnessed flip (append-only; a full `-PupdateMutationBaseline`
+  names every row it drops) — but it lands **bare** rows, so a hand union owes
+  the evidence note by hand or the insurance is an unargued acceptance. The
+  verify announces run-to-run status
   drift from a machine-local stash (`.pitest-history/<suite>.statuses`):
   `KILLED -> TIMED_OUT` is a benign count, `SURVIVED -> TIMED_OUT` a warning
   — never let a refresh drop such a row on the strength of a loaded run.
@@ -193,23 +220,32 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   it argues about. The verify warns on any timeout outside the set (paste the
   printed row, then write the cause), on rows that do not parse as three
   fields (named malformed, matched against nothing), on members matching no
-  mutant, on members whose class and method appear nowhere together in the
-  README, and — from a machine-local counter
+  mutant, on members whose class and method appear together in no single
+  README **section** (a markdown-heading block, each name matched as a whole
+  word — paragraph granularity false-flagged causes written in the house
+  style that names the class in a section intro and argues each method
+  below), and — from a machine-local counter
   (`.pitest-history/<suite>.timeout-quiet`) — on members with no timeout in
   3+ consecutive mutation runs (membership must keep earning itself; a stale
-  interlude resets the counter). Admit a newcomer only with its cause
+  interlude resets the counter). It also parses the `# line` comment back and
+  warns as **line drift** when a member's observed timeout lines are all
+  absent from it (the anchor its cause argues about moved entirely; a new
+  sibling line next to a recorded one stays quiet, that being the line-less
+  key's stated resolution). Admit a newcomer only with its cause
   written. Every audit finding is advisory by default and re-printed in a
   one-line-per-suite end-of-build summary; for certifying runs,
   `-PstrictTimeoutAudit` escalates exactly the keep-the-audit findings
-  (unaudited newcomer, malformed row, timeouts with no set) to failures —
-  hygiene findings stay advisory even there — and both certifying flags
-  (`-PstrictTimeoutAudit`, `-PnoDriftTolerance`) refuse a `-PmutateOnly`
+  (unaudited newcomer, malformed row, a member whose cause was never written
+  — the doctrine admits a newcomer only with its cause, so a cause-less
+  member is an unfinished admission, not hygiene — and timeouts with no set)
+  to failures; hygiene findings (stale members, quiet streaks, drifted lines)
+  stay advisory even there. `-PstrictTimeoutAudit` refuses a `-PmutateOnly`
   report outright, like the refresh flavours. The audit's static half (row
   shape, cause presence) also runs in `pitest<Suite>Debt`, so a pasted row
   or written cause is confirmed in seconds without a mutation run. Mind the
   resolution: line-less keys mean a *new* timed-out mutant inside an
-  already-audited method+mutator draws no warning, so re-read the README's
-  cited lines whenever that code changes.
+  already-audited method+mutator draws no warning beyond the line advisory,
+  so re-read the README's cited lines whenever that code changes.
 - **Randomized tests use fixed seeds, and never sleep** (`TestDouble`,
   `TestString`): the ratchet needs deterministic kills, and PIT re-runs the
   covering tests once per mutant, so a single real wait costs minutes across a
@@ -250,7 +286,11 @@ The process contract for changes here (full policy: sava-build's `HARDENING.md`)
   total while disagreeing about which mutants died — the headline number is
   not the check), and `pitestModeSnapshot -PpitestMode=<label>` /
   `pitestModeCompare` diff solo-vs-`qualityGate` modes, writing observed flips
-  to the baseline with `-PunionModeFlips`.
+  to the baseline with `-PunionModeFlips`. The compare keys line-lessly on
+  `(class, method, mutator)` with statuses compared as sorted multisets per
+  key — the baseline's own key shape, so a row it writes is one the verify
+  recognizes, and per gated status a key needs as many rows as the widest
+  mode observed (one row cannot insure two flipped siblings).
 - **Kill rates are bounded by the mutator set.** `BigInteger`/`BigDecimal`
   arithmetic is method calls, invisible to `STRONGER`'s arithmetic mutators.
   Trialed `EXPERIMENTAL_BIG_INTEGER` on 2026-07-21 across all three suites:
@@ -385,6 +425,21 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   stops cold. And a killed campaign dumps each in-flight input as a
   `crash-<hash>` artifact stamped the kill moment — dump-on-death, not findings.
   Replay them against the harness before treating any as a crash.
+- **A finding that can't be fixed yet still gets its regression test — a failing
+  one, committed `@Disabled`** with the finding's identifier as the reason,
+  asserting the *correct* behavior so it fails while the bug lives. Never assert
+  the buggy value to keep the suite green: that makes the bug look intended, and
+  is exactly how findings rot. Un-ignore when the fix lands. No open findings
+  today — the seven 2026-07-17 crashes are all fixed and seed-pinned.
+- **`.github/workflows/fuzz.yml` exists but is `workflow_dispatch`-only** — the
+  canonical weekly soak with its `schedule` block commented out, pending a
+  hand-dispatched run to see what it costs. Local campaigns stay the pre-release
+  ritual regardless. `fuzzWorkflowInSync` (in `check`) is now live and fails when
+  a registered target is named nowhere in that file — verified empirically by
+  dropping `fuzzInstant` and watching it fire. Registering a fifth target means
+  adding it to the soak's task list, or naming it in a yaml comment with the
+  reason it is deliberately left out; the budget step's target count (`4 *
+  MAX_FUZZ_TIME`) needs the same edit.
 - **Three of the four targets are saturated; don't budget hours of wall clock.**
   Measured 2026-07-24 at 600s per target: `fuzzDouble`, `fuzzNumber`, and
   `fuzzInstant` each ended with edge *and* feature counts identical to their seeded

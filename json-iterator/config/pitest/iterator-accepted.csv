@@ -1,143 +1,143 @@
-systems.comodal.jsoniter.BaseJsonIterator,closeArray,197,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,closeObj,478,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,closeObj,479,NullReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.BaseJsonIterator,contextWindow,88,MathMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,continueArray,187,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,mark,68,PrimitiveReturnsMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readArray,1412,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readArray,1414,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readArray,1415,VoidMethodCallMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readAsDouble,866,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readBigDecimal,892,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readBigDecimal,894,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readBigInteger,1047,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readInt,1224,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readInt,1224,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readInt,1263,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readInt,1285,InvertNegsMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readIntSlowPath,1210,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readLong,1332,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readLong,1332,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readLong,1371,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readLong,1393,InvertNegsMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readLongSlowPath,1318,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readLongSlowPath,920,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readLongSlowPath,928,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,1065,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,1066,EmptyObjectReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,1067,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,1069,RemoveConditionalMutator_EQUAL_ELSE,NO_COVERAGE
-systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,1069,RemoveConditionalMutator_EQUAL_IF,NO_COVERAGE
-systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,1071,EmptyObjectReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.BaseJsonIterator,readUnscaledAsLong,979,InvertNegsMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readUnscaledAsLong,996,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,readUnscaledDigits,946,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,reset,74,NullReturnValsMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,scaleLong,1033,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,scaleLong,1033,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skip,1156,NullReturnValsMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skipLiteral,166,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skipLiteral,166,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skipObject,1126,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skipObject,1127,MathMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skipObject,1128,VoidMethodCallMutator,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skipUntil,397,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skipUntil,401,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skipUntil,411,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BaseJsonIterator,skipUntil,420,RemoveConditionalMutator_EQUAL_ELSE,NO_COVERAGE
-systems.comodal.jsoniter.BaseJsonIterator,skipUntil,420,RemoveConditionalMutator_EQUAL_IF,NO_COVERAGE
-systems.comodal.jsoniter.BaseJsonIterator,skipUntil,425,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,containsMultiByteOrEscapePattern,58,BooleanTrueReturnValsMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,containsMultiByteOrEscapePattern,58,MathMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,containsMultiByteOrEscapePattern,58,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,containsMultiByteOrEscapePattern,58,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,containsPattern,46,BooleanTrueReturnValsMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,containsPattern,46,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,decodeBase64,283,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,decodeBase64,283,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,matchPattern,42,MathMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,matchPattern,42,MathMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,matchPattern,42,MathMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,nextToken,110,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parse,175,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parse,175,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parse,177,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,313,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,313,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,319,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,332,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,333,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,451,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,452,BooleanFalseReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,452,BooleanTrueReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,455,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,455,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,455,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,463,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,463,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,466,BooleanFalseReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,466,BooleanTrueReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,488,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,488,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,490,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,505,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,505,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,513,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,513,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,659,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,663,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseString,347,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseString,347,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseString,354,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseString,367,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseString,368,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseTail,215,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,parseTail,215,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,peekChar,146,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,249,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,249,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,254,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,265,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,266,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,713,MathMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,717,MathMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,749,MathMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,753,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,753,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastSingleByteEndQuote,238,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,skipPastSingleByteEndQuote,238,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,widenToCharBuf,199,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,widenToCharBuf,199,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.BytesJsonIterator,widenToCharBuf,200,MathMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,handleEscapes,228,MathMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,handleEscapes,266,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parse,309,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parse,309,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,406,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,406,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,406,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,407,BooleanFalseReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,407,BooleanTrueReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,410,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,412,BooleanTrueReturnValsMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,418,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,418,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,430,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,430,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,432,BooleanTrueReturnValsMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,434,BooleanFalseReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,434,BooleanTrueReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldName,446,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldName,446,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,peekChar,100,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,172,MathMutator,SURVIVED
-systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,176,MathMutator,SURVIVED
-systems.comodal.jsoniter.ValueType$INIT_TYPES,initValueTypes,30,VoidMethodCallMutator,SURVIVED
-systems.comodal.jsoniter.ValueType$INIT_TYPES,initValueTypes,48,NullReturnValsMutator,SURVIVED
-systems.comodal.jsoniter.ValueType,of,20,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$0,14,BooleanFalseReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$0,14,BooleanTrueReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$1,16,NullReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.factory.JsonIterParserFactory,loadParser,13,NullReturnValsMutator,NO_COVERAGE
-systems.comodal.jsoniter.factory.JsonIterParserFactory,loadParser,14,NakedReceiverMutator,NO_COVERAGE
-systems.comodal.jsoniter.factory.JsonIterParserFactory,loadParser,8,NullReturnValsMutator,NO_COVERAGE
+systems.comodal.jsoniter.BaseJsonIterator,closeArray,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 197
+systems.comodal.jsoniter.BaseJsonIterator,closeObj,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 478
+systems.comodal.jsoniter.BaseJsonIterator,closeObj,NullReturnValsMutator,NO_COVERAGE # line 479
+systems.comodal.jsoniter.BaseJsonIterator,contextWindow,MathMutator,SURVIVED # line 88
+systems.comodal.jsoniter.BaseJsonIterator,continueArray,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 187
+systems.comodal.jsoniter.BaseJsonIterator,mark,PrimitiveReturnsMutator,SURVIVED # line 68
+systems.comodal.jsoniter.BaseJsonIterator,readArray,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 1412
+systems.comodal.jsoniter.BaseJsonIterator,readArray,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 1414
+systems.comodal.jsoniter.BaseJsonIterator,readArray,VoidMethodCallMutator,SURVIVED # line 1415
+systems.comodal.jsoniter.BaseJsonIterator,readAsDouble,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 866
+systems.comodal.jsoniter.BaseJsonIterator,readBigDecimal,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 892
+systems.comodal.jsoniter.BaseJsonIterator,readBigDecimal,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 894
+systems.comodal.jsoniter.BaseJsonIterator,readBigInteger,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 1047
+systems.comodal.jsoniter.BaseJsonIterator,readInt,ConditionalsBoundaryMutator,SURVIVED # line 1224
+systems.comodal.jsoniter.BaseJsonIterator,readInt,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 1224
+systems.comodal.jsoniter.BaseJsonIterator,readInt,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 1263
+systems.comodal.jsoniter.BaseJsonIterator,readInt,InvertNegsMutator,SURVIVED # line 1285
+systems.comodal.jsoniter.BaseJsonIterator,readIntSlowPath,ConditionalsBoundaryMutator,SURVIVED # line 1210
+systems.comodal.jsoniter.BaseJsonIterator,readLong,ConditionalsBoundaryMutator,SURVIVED # line 1332
+systems.comodal.jsoniter.BaseJsonIterator,readLong,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 1332
+systems.comodal.jsoniter.BaseJsonIterator,readLong,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 1371
+systems.comodal.jsoniter.BaseJsonIterator,readLong,InvertNegsMutator,SURVIVED # line 1393
+systems.comodal.jsoniter.BaseJsonIterator,readLongSlowPath,ConditionalsBoundaryMutator,SURVIVED # line 1318
+systems.comodal.jsoniter.BaseJsonIterator,readLongSlowPath,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 920
+systems.comodal.jsoniter.BaseJsonIterator,readLongSlowPath,ConditionalsBoundaryMutator,SURVIVED # line 928
+systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 1065
+systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,EmptyObjectReturnValsMutator,NO_COVERAGE # line 1066
+systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 1067
+systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,RemoveConditionalMutator_EQUAL_ELSE,NO_COVERAGE # line 1069
+systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,RemoveConditionalMutator_EQUAL_IF,NO_COVERAGE # line 1069
+systems.comodal.jsoniter.BaseJsonIterator,readNumberOrNumberString,EmptyObjectReturnValsMutator,NO_COVERAGE # line 1071
+systems.comodal.jsoniter.BaseJsonIterator,readUnscaledAsLong,InvertNegsMutator,SURVIVED # line 979
+systems.comodal.jsoniter.BaseJsonIterator,readUnscaledAsLong,ConditionalsBoundaryMutator,SURVIVED # line 996
+systems.comodal.jsoniter.BaseJsonIterator,readUnscaledDigits,ConditionalsBoundaryMutator,SURVIVED # line 946
+systems.comodal.jsoniter.BaseJsonIterator,reset,NullReturnValsMutator,SURVIVED # line 74
+systems.comodal.jsoniter.BaseJsonIterator,scaleLong,ConditionalsBoundaryMutator,SURVIVED # line 1033
+systems.comodal.jsoniter.BaseJsonIterator,scaleLong,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 1033
+systems.comodal.jsoniter.BaseJsonIterator,skip,NullReturnValsMutator,SURVIVED # line 1156
+systems.comodal.jsoniter.BaseJsonIterator,skipLiteral,ConditionalsBoundaryMutator,SURVIVED # line 166
+systems.comodal.jsoniter.BaseJsonIterator,skipLiteral,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 166
+systems.comodal.jsoniter.BaseJsonIterator,skipObject,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 1126
+systems.comodal.jsoniter.BaseJsonIterator,skipObject,MathMutator,SURVIVED # line 1127
+systems.comodal.jsoniter.BaseJsonIterator,skipObject,VoidMethodCallMutator,SURVIVED # line 1128
+systems.comodal.jsoniter.BaseJsonIterator,skipUntil,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 397
+systems.comodal.jsoniter.BaseJsonIterator,skipUntil,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 401
+systems.comodal.jsoniter.BaseJsonIterator,skipUntil,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 411
+systems.comodal.jsoniter.BaseJsonIterator,skipUntil,RemoveConditionalMutator_EQUAL_ELSE,NO_COVERAGE # line 420
+systems.comodal.jsoniter.BaseJsonIterator,skipUntil,RemoveConditionalMutator_EQUAL_IF,NO_COVERAGE # line 420
+systems.comodal.jsoniter.BaseJsonIterator,skipUntil,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 425
+systems.comodal.jsoniter.BytesJsonIterator,containsMultiByteOrEscapePattern,BooleanTrueReturnValsMutator,SURVIVED # line 58
+systems.comodal.jsoniter.BytesJsonIterator,containsMultiByteOrEscapePattern,MathMutator,SURVIVED # line 58
+systems.comodal.jsoniter.BytesJsonIterator,containsMultiByteOrEscapePattern,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 58
+systems.comodal.jsoniter.BytesJsonIterator,containsMultiByteOrEscapePattern,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 58
+systems.comodal.jsoniter.BytesJsonIterator,containsPattern,BooleanTrueReturnValsMutator,SURVIVED # line 46
+systems.comodal.jsoniter.BytesJsonIterator,containsPattern,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 46
+systems.comodal.jsoniter.BytesJsonIterator,decodeBase64,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 283
+systems.comodal.jsoniter.BytesJsonIterator,decodeBase64,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 283
+systems.comodal.jsoniter.BytesJsonIterator,matchPattern,MathMutator,SURVIVED # line 42
+systems.comodal.jsoniter.BytesJsonIterator,matchPattern,MathMutator,SURVIVED # line 42
+systems.comodal.jsoniter.BytesJsonIterator,matchPattern,MathMutator,SURVIVED # line 42
+systems.comodal.jsoniter.BytesJsonIterator,nextToken,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 110
+systems.comodal.jsoniter.BytesJsonIterator,parse,ConditionalsBoundaryMutator,SURVIVED # line 175
+systems.comodal.jsoniter.BytesJsonIterator,parse,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 175
+systems.comodal.jsoniter.BytesJsonIterator,parse,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 177
+systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,ConditionalsBoundaryMutator,SURVIVED # line 313
+systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 313
+systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 319
+systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,ConditionalsBoundaryMutator,SURVIVED # line 332
+systems.comodal.jsoniter.BytesJsonIterator,parseBase64String,ConditionalsBoundaryMutator,SURVIVED # line 333
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 451
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,BooleanFalseReturnValsMutator,NO_COVERAGE # line 452
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,BooleanTrueReturnValsMutator,NO_COVERAGE # line 452
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,ConditionalsBoundaryMutator,SURVIVED # line 455
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 455
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 455
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 463
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 463
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,BooleanFalseReturnValsMutator,NO_COVERAGE # line 466
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,BooleanTrueReturnValsMutator,NO_COVERAGE # line 466
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,ConditionalsBoundaryMutator,SURVIVED # line 488
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 488
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 490
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,ConditionalsBoundaryMutator,SURVIVED # line 505
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 505
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,ConditionalsBoundaryMutator,SURVIVED # line 513
+systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 513
+systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 659
+systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 663
+systems.comodal.jsoniter.BytesJsonIterator,parseString,ConditionalsBoundaryMutator,SURVIVED # line 347
+systems.comodal.jsoniter.BytesJsonIterator,parseString,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 347
+systems.comodal.jsoniter.BytesJsonIterator,parseString,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 354
+systems.comodal.jsoniter.BytesJsonIterator,parseString,ConditionalsBoundaryMutator,SURVIVED # line 367
+systems.comodal.jsoniter.BytesJsonIterator,parseString,ConditionalsBoundaryMutator,SURVIVED # line 368
+systems.comodal.jsoniter.BytesJsonIterator,parseTail,ConditionalsBoundaryMutator,SURVIVED # line 215
+systems.comodal.jsoniter.BytesJsonIterator,parseTail,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 215
+systems.comodal.jsoniter.BytesJsonIterator,peekChar,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 146
+systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,ConditionalsBoundaryMutator,SURVIVED # line 249
+systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 249
+systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 254
+systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,ConditionalsBoundaryMutator,SURVIVED # line 265
+systems.comodal.jsoniter.BytesJsonIterator,skipPastEndQuote,ConditionalsBoundaryMutator,SURVIVED # line 266
+systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,MathMutator,SURVIVED # line 713
+systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,MathMutator,SURVIVED # line 717
+systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,MathMutator,SURVIVED # line 749
+systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,ConditionalsBoundaryMutator,SURVIVED # line 753
+systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 753
+systems.comodal.jsoniter.BytesJsonIterator,skipPastSingleByteEndQuote,ConditionalsBoundaryMutator,SURVIVED # line 238
+systems.comodal.jsoniter.BytesJsonIterator,skipPastSingleByteEndQuote,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 238
+systems.comodal.jsoniter.BytesJsonIterator,widenToCharBuf,ConditionalsBoundaryMutator,SURVIVED # line 199
+systems.comodal.jsoniter.BytesJsonIterator,widenToCharBuf,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 199
+systems.comodal.jsoniter.BytesJsonIterator,widenToCharBuf,MathMutator,SURVIVED # line 200
+systems.comodal.jsoniter.CharsJsonIterator,handleEscapes,MathMutator,SURVIVED # line 228
+systems.comodal.jsoniter.CharsJsonIterator,handleEscapes,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 266
+systems.comodal.jsoniter.CharsJsonIterator,parse,ConditionalsBoundaryMutator,SURVIVED # line 309
+systems.comodal.jsoniter.CharsJsonIterator,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 309
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,ConditionalsBoundaryMutator,SURVIVED # line 406
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 406
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 406
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,BooleanFalseReturnValsMutator,NO_COVERAGE # line 407
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,BooleanTrueReturnValsMutator,NO_COVERAGE # line 407
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 410
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,BooleanTrueReturnValsMutator,SURVIVED # line 412
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,ConditionalsBoundaryMutator,SURVIVED # line 418
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 418
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,ConditionalsBoundaryMutator,SURVIVED # line 430
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 430
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,BooleanTrueReturnValsMutator,SURVIVED # line 432
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,BooleanFalseReturnValsMutator,NO_COVERAGE # line 434
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,BooleanTrueReturnValsMutator,NO_COVERAGE # line 434
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldName,ConditionalsBoundaryMutator,SURVIVED # line 446
+systems.comodal.jsoniter.CharsJsonIterator,parseFieldName,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 446
+systems.comodal.jsoniter.CharsJsonIterator,peekChar,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 100
+systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,MathMutator,SURVIVED # line 172
+systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,MathMutator,SURVIVED # line 176
+systems.comodal.jsoniter.ValueType$INIT_TYPES,initValueTypes,VoidMethodCallMutator,SURVIVED # line 30
+systems.comodal.jsoniter.ValueType$INIT_TYPES,initValueTypes,NullReturnValsMutator,SURVIVED # line 48
+systems.comodal.jsoniter.ValueType,of,ConditionalsBoundaryMutator,SURVIVED # line 20
+systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$0,BooleanFalseReturnValsMutator,NO_COVERAGE # line 14
+systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$0,BooleanTrueReturnValsMutator,NO_COVERAGE # line 14
+systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$1,NullReturnValsMutator,NO_COVERAGE # line 16
+systems.comodal.jsoniter.factory.JsonIterParserFactory,loadParser,NullReturnValsMutator,NO_COVERAGE # line 13
+systems.comodal.jsoniter.factory.JsonIterParserFactory,loadParser,NakedReceiverMutator,NO_COVERAGE # line 14
+systems.comodal.jsoniter.factory.JsonIterParserFactory,loadParser,NullReturnValsMutator,NO_COVERAGE # line 8

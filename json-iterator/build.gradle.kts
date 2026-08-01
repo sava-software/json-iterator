@@ -40,6 +40,13 @@ hardening {
       "systems.comodal.jsoniter.FieldMatcher\$*"
     )
     targetTests = "systems.comodal.jsoniter.Test*,systems.comodal.jsoniter.*SeedReplayTest"
+    // no suite targets PowersOfFive, so the exclusion audit rightly calls it an
+    // unowned hole rather than a partition handoff — argued, not forgotten
+    declineExclusionAudit(
+      "systems.comodal.jsoniter.PowersOfFive",
+      "constant power-of-five tables: mutants are slow and low-value, and a wrong "
+          + "table entry surfaces as a killed DoubleParser mutant in the 'numbers' suite",
+    )
     // STRONGER misses dropped fluent calls (receiver-returning expressions);
     // NAKED_RECEIVER fired 16 mutants here in trial — numbers in config/pitest/README.md
     mutators = "STRONGER,EXPERIMENTAL_NAKED_RECEIVER"

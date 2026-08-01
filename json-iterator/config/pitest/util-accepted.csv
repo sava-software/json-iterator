@@ -1,43 +1,43 @@
-systems.comodal.jsoniter.FieldMatcher,hash,220,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.FieldMatcher,match,175,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.FieldMatcher,match,175,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.FieldMatcher,of,52,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.FieldMatcher,of,52,MathMutator,SURVIVED
-systems.comodal.jsoniter.FieldMatcher,of,52,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.FieldMatcher,of,52,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.FieldMatcher,of,53,MathMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,17,VoidMethodCallMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,18,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,18,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,18,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,19,MathMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,21,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,21,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,21,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,22,MathMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,22,MathMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,24,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,24,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,24,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,25,MathMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,25,MathMutator,SURVIVED
-systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,27,NullReturnValsMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,ensureCapacity,135,ConditionalsBoundaryMutator,SURVIVED # allocation routing
-systems.comodal.jsoniter.JIUtil,ensureCapacity,138,MathMutator,SURVIVED # allocation routing
-systems.comodal.jsoniter.JIUtil,escapeJson,83,MathMutator,SURVIVED # allocation routing
-systems.comodal.jsoniter.JIUtil,escapeJson,83,MathMutator,SURVIVED # allocation routing
-systems.comodal.jsoniter.JIUtil,escapeQuotes,183,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,183,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,186,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,186,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,202,RemoveConditionalMutator_EQUAL_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotes,213,IncrementsMutator,SURVIVED # escape parity
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,148,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,159,IncrementsMutator,SURVIVED # escape parity
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,170,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,170,RemoveConditionalMutator_ORDER_ELSE,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,269,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,269,RemoveConditionalMutator_ORDER_IF,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,302,IncrementsMutator,SURVIVED # escape parity
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,235,ConditionalsBoundaryMutator,SURVIVED
-systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,242,IncrementsMutator,SURVIVED # escape parity
+systems.comodal.jsoniter.FieldMatcher,hash,ConditionalsBoundaryMutator,SURVIVED # line 220
+systems.comodal.jsoniter.FieldMatcher,match,ConditionalsBoundaryMutator,SURVIVED # line 175
+systems.comodal.jsoniter.FieldMatcher,match,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 175
+systems.comodal.jsoniter.FieldMatcher,of,ConditionalsBoundaryMutator,SURVIVED # line 52
+systems.comodal.jsoniter.FieldMatcher,of,MathMutator,SURVIVED # line 52
+systems.comodal.jsoniter.FieldMatcher,of,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 52
+systems.comodal.jsoniter.FieldMatcher,of,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 52
+systems.comodal.jsoniter.FieldMatcher,of,MathMutator,SURVIVED # line 53
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,VoidMethodCallMutator,SURVIVED # line 17
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,ConditionalsBoundaryMutator,SURVIVED # line 18
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 18
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 18
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,MathMutator,SURVIVED # line 19
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,ConditionalsBoundaryMutator,SURVIVED # line 21
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 21
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 21
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,MathMutator,SURVIVED # line 22
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,MathMutator,SURVIVED # line 22
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,ConditionalsBoundaryMutator,SURVIVED # line 24
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 24
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 24
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,MathMutator,SURVIVED # line 25
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,MathMutator,SURVIVED # line 25
+systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,NullReturnValsMutator,SURVIVED # line 27
+systems.comodal.jsoniter.JIUtil,ensureCapacity,ConditionalsBoundaryMutator,SURVIVED # allocation routing # line 135
+systems.comodal.jsoniter.JIUtil,ensureCapacity,MathMutator,SURVIVED # allocation routing # line 138
+systems.comodal.jsoniter.JIUtil,escapeJson,MathMutator,SURVIVED # allocation routing # line 83
+systems.comodal.jsoniter.JIUtil,escapeJson,MathMutator,SURVIVED # allocation routing # line 83
+systems.comodal.jsoniter.JIUtil,escapeQuotes,ConditionalsBoundaryMutator,SURVIVED # line 183
+systems.comodal.jsoniter.JIUtil,escapeQuotes,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 183
+systems.comodal.jsoniter.JIUtil,escapeQuotes,ConditionalsBoundaryMutator,SURVIVED # line 186
+systems.comodal.jsoniter.JIUtil,escapeQuotes,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 186
+systems.comodal.jsoniter.JIUtil,escapeQuotes,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 202
+systems.comodal.jsoniter.JIUtil,escapeQuotes,IncrementsMutator,SURVIVED # escape parity # line 213
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 148
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,IncrementsMutator,SURVIVED # escape parity # line 159
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,ConditionalsBoundaryMutator,SURVIVED # line 170
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 170
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,ConditionalsBoundaryMutator,SURVIVED # line 269
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 269
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLines,IncrementsMutator,SURVIVED # escape parity # line 302
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,ConditionalsBoundaryMutator,SURVIVED # line 235
+systems.comodal.jsoniter.JIUtil,escapeQuotesRemoveNewLinesChecked,IncrementsMutator,SURVIVED # escape parity # line 242
