@@ -235,4 +235,18 @@ final class TestSkip {
       assertTrue(ex.getMessage().contains(c.expect), "'" + c.json + "' -> " + ex.getMessage());
     }
   }
+
+  @Test
+  void test_skip_until_opening_brace_arms() {
+    // every skipUntil test entered through '{' followed by a field, so the two
+    // other arms behind that brace were never executed
+    // an object that ends before any field is "not found", not an error
+    assertNull(factory.create("{}").skipUntil("z"));
+    // ...and a brace followed by neither a field nor '}' is an error, not a
+    // quiet "not found" — the two must not collapse into one answer
+    final var ji = factory.create("{5}");
+    final var ex = assertThrows(JsonException.class, () -> ji.skipUntil("z"));
+    assertEquals("skipUntil", ex.op());
+    assertTrue(ex.getMessage().contains("expected \" after {"), ex.getMessage());
+  }
 }

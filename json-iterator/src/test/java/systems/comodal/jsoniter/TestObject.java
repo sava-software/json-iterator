@@ -32,6 +32,17 @@ final class TestObject {
   }
 
   @Test
+  void test_close_obj_returns_the_iterator() {
+    // TestErrorReporting covers the failure path; the success arm — matching '}'
+    // and handing the iterator back for chaining — had no test, so returning
+    // null instead was indistinguishable
+    final var ji = factory.create("{\"a\":1}");
+    assertSame(ji, ji.skipObjField());
+    assertEquals(1, ji.readInt());
+    assertSame(ji, ji.closeObj());
+  }
+
+  @Test
   void test_one_field() {
     final var json = """
         { "field1"

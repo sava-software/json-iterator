@@ -123,8 +123,9 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   pure-drift pass, no `PAIRING OUTLIER` scan, no `-PnoDriftTolerance` (the
   2026-07-26 mispaired-shift incident is dead by construction, not by
   classifier). These baselines were migrated 2026-08-01 with
-  `migrateMutationBaselines` (parse/re-render, no mutation run, identities
-  unchanged: 143/76/43). Migration is **one-way** — a pre-21.5.20 plugin
+  `migrateMutationBaselines` (parse/re-render, no mutation run, every row
+  identity preserved — the counts have moved since, so read them from the
+  CSVs). Migration is **one-way** — a pre-21.5.20 plugin
   reads a migrated file as every row stale plus every mutant new — so both
   pins (`settings.gradle.kts`, `jmh/build.gradle.kts`) move together.
   Two paired stale + "new" classifications remain and want opposite
@@ -209,6 +210,28 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   (The verify's stale-entry hint knows this too: a baseline row whose coordinate
   read `TIMED_OUT` this run is reported as the load flip it is, not as a row to
   prune.)
+  **Known false positive under sava-build 21.5.20 — three permanent
+  `SURVIVED -> TIMED_OUT` advisories here (1 iterator, 2 util), and they are
+  not flips.** 21.5.20 made the stash coordinate line-less
+  (`class,method,mutator`) but left the detector a set intersection
+  `nowTimedOut ∩ prevSurvived` without subtracting `prevTimedOut`. Three keys —
+  `CharsJsonIterator.skipPastEndQuote/MathMutator`,
+  `JIUtil.escapeQuotesChecked/IncrementsMutator`, `FieldMatcher.of/MathMutator` —
+  hold an accepted survivor sibling *and* an audited-timeout sibling at
+  different lines within the same run, so once the line number stopped
+  separating them the intersection is non-empty on every run, forever. Verified:
+  two consecutive gates produce byte-identical statuses at those keys, and each
+  key appears in the stash under both statuses at once. Nothing flipped, nothing
+  is load-dependent, nothing is masked — the baselines match this run exactly and
+  all 8 timeouts are audited members whose causes are structural (non-terminating
+  loops, which time out deterministically). Treat these three as noise **only
+  while they are exactly these three**: a fourth key, or one of these losing its
+  survivor, is a real signal. The upstream fix is written and verified against
+  this repo through the local test repo — sava-build now compares per-key
+  *counts*, so a flip is a key whose timeout count rose **and** whose survivor
+  count fell (casebook: "The flip that fired forever") — but it is **not
+  released**. Delete this paragraph, don't annotate it, once the pin moves past
+  21.5.20.
 - **A new timed-out mutant is a reviewer-stop, not detection noise** — for
   exactly these the ratchet cannot see a weakened covering assertion, since the
   timeout keeps "detecting" whatever the test asserts. Each suite's timeouts are
@@ -324,9 +347,16 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   provider would need the dual declaration — `module-info` *and*
   `META-INF/services`.
 - **A suite's percentage is not a target.** An accepted mutant with a written
-  reason is finished work, not debt. Here every baseline entry is triaged in
-  `config/pitest/README.md` with no untriaged debt. Attention belongs to a
-  growing baseline, not a number below 100%.
+  reason is finished work, not debt. Attention belongs to a growing baseline,
+  not a number below 100%. But "no untriaged debt" is a claim about labels,
+  not about arguments: on 2026-08-01 seven `NO_COVERAGE` rows in
+  `readNumberOrNumberString`, `skipUntil` and `closeObj` turned out to have no
+  argument anywhere in `config/pitest/README.md` — they were `unlabeled`, which
+  the label-mention warning exempts, so nothing had ever flagged them. They
+  were untested branches on covered public API, not equivalents, and were
+  killed rather than argued. **Audit an unlabeled row by looking for its
+  argument, not by trusting its label state**: grep the README for the
+  class-and-method before believing a row is settled.
 - **Allocation bounds are asserted where allocation is the contract — and only
   there.** `TestAllocation` pins the zero/exact-allocation contracts via
   `ThreadMXBean` allocation counters; new API whose *stated design goal* is

@@ -12,6 +12,8 @@ import static java.math.BigDecimal.ZERO;
 import static java.time.Instant.ofEpochSecond;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ParameterizedClass
 @FieldSource("systems.comodal.jsoniter.TestFactories#FACTORIES")
@@ -219,5 +221,22 @@ final class TestFloat {
     assertEquals(Float.POSITIVE_INFINITY, factory.create("\"Infinity\"").readFloat());
     assertEquals(Double.NaN, factory.create("\"NaN\"").readDouble());
     assertEquals(Float.NaN, factory.create("\"NaN\"").readFloat());
+  }
+
+  @Test
+  void test_read_number_or_number_string_across_value_types() {
+    // every caller in this suite passed a quoted number, so only the STRING arm
+    // ever ran: the bare-number, null and wrong-type arms had no coverage at all
+    assertEquals("123.456", factory.create("123.456").readNumberOrNumberString());
+    assertEquals("123.456", factory.create("\"123.456\"").readNumberOrNumberString());
+    // null is the value, not the absence of one — "" would read as an empty number
+    assertNull(factory.create("null").readNumberOrNumberString());
+
+    // anything else names the op and the type it actually found, rather than
+    // silently skipping it and answering null
+    final var ji = factory.create("true");
+    final var ex = assertThrows(JsonException.class, ji::readNumberOrNumberString);
+    assertEquals("readNumberOrNumberString", ex.op());
+    assertTrue(ex.getMessage().contains("BOOLEAN"), ex.getMessage());
   }
 }

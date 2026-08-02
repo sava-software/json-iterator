@@ -312,6 +312,55 @@ Re-triaged individually:
   mutants activate) are line-level and cover every operand direction at
   their coordinates. The baselines now carry one row per sibling mutant.
 
+## Unargued NO_COVERAGE pass (2026-08-01)
+
+Seven `iterator` `NO_COVERAGE` rows carried no argument anywhere in this file:
+`readNumberOrNumberString` (4), `skipUntil` (2), `closeObj` (1). They were
+`unlabeled`, and an unlabeled row is exempt from the family-label mention
+warning, so nothing had ever surfaced them — the label state read as "settled
+before labels existed" while the argument it pointed at did not exist.
+
+None of them was an equivalence candidate. All three methods are covered
+public API whose *branches* were unreached, which is the case the doctrine
+calls mechanical work rather than acceptance:
+
+- `readNumberOrNumberString` — every existing caller passed a **quoted**
+  number, so only the `STRING` arm ever ran. The bare-number, `null`, and
+  wrong-type arms had no coverage at all, which is why `return ""` for
+  `readNumberAsString()` and `return ""` in place of `null` were both
+  invisible. Killed by
+  `TestFloat.test_read_number_or_number_string_across_value_types`, which
+  pins all four arms including the error's op and the type it names.
+- `skipUntil` — every existing test entered through `{` followed by a field,
+  so the two other arms behind that brace never executed: an object that ends
+  before any field (`{}` → "not found", not an error) and a brace followed by
+  neither a field nor `}` (`{5}` → error, not a quiet "not found"). The two
+  answers must not collapse into one. Killed by
+  `TestSkip.test_skip_until_opening_brace_arms`, which also swept up the
+  line-411 `EQUAL_IF` survivor.
+- `closeObj` — the failure path was covered in `TestErrorReporting`; the
+  success arm that matches `}` and hands the iterator back for chaining had
+  no test, so returning `null` instead was indistinguishable. Killed by
+  `TestObject.test_close_obj_returns_the_iterator`.
+
+Result: `iterator` 1776→1787 of 1919 detected, baseline 143→132 rows,
+`NO_COVERAGE` rows 21→14. `numbers` and `util` were unaffected (the new tests
+are in `Test*` classes all three suites match, but they exercise no code those
+suites mutate). Refresh took two passes for a line-less-key reason worth
+remembering: `-PpruneMutationBaseline` dropped only 8 of the 11, because the
+two dead `skipUntil` line-420 rows share `class,method,mutator` with live
+survivors at 397/401 and prune keeps any coordinate still unkilled at another
+status. `-PupdateMutationBaseline` on a solo run finished the job after a
+per-key diff of report against baseline confirmed the only mismatches were
+those 3 rows — no accepted row was missing a counterpart to a timeout, so
+there was no flip insurance to lose.
+
+Remaining `NO_COVERAGE` debt, deliberately left for a separate pass: the six
+`JsonIterParserFactory` ServiceLoader rows (an *unreachable in-harness* claim,
+which sava-build 21.5.20 put an explicit expiry date on) and the twelve
+`parseFieldEquals` / `DoubleParser.parse` NC→SURVIVED-trap rows — the same
+trap reasoning that was overturned on 2026-07-26 in `util`.
+
 ## Convergence check (2026-07-21)
 
 Per HARDENING.md's convergence method: two solo passes per suite and two
