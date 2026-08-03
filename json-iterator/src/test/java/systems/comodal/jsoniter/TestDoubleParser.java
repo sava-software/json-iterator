@@ -15,9 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /// bit-exact against the JDK reference parsers.
 ///
 /// Inputs that end immediately after a sign or exponent marker ("-", "1e",
-/// "1e+", "1e+x") are deliberately absent: they terminate in a slow-path
-/// return whose only reachable behavior is the reference parser's throw, so
-/// covering them would only surface unkillable return-value mutants.
+/// "1e+", "1e+x") terminate in a slow-path return whose only reachable
+/// behavior is the reference parser's throw. They were once left untested on
+/// the theory that covering them would surface unkillable return-value
+/// mutants; that theory was wrong — PIT's block coverage probes a block at
+/// its end, so a `return slow(...)` block whose call always throws reads
+/// NO_COVERAGE no matter what executes it, and its mutants can never change
+/// status. What those inputs *do* owe is the exception contract, asserted
+/// below against the reference parsers' own messages.
 final class TestDoubleParser {
 
   private static void assertParses(final String str) {
@@ -40,6 +45,31 @@ final class TestDoubleParser {
     final char[] buf = str.toCharArray();
     assertThrows(NumberFormatException.class, () -> DoubleParser.parse(buf, 0, buf.length), str);
     assertThrows(NumberFormatException.class, () -> DoubleParser.parseFloat(buf, 0, buf.length), str);
+  }
+
+  private static void assertRejectsWithReferenceMessage(final String str) {
+    final char[] buf = str.toCharArray();
+    final var expected = assertThrows(NumberFormatException.class, () -> Double.parseDouble(str), str);
+    final var actual = assertThrows(NumberFormatException.class, () -> DoubleParser.parse(buf, 0, buf.length), str);
+    assertEquals(expected.getMessage(), actual.getMessage(), str);
+    final var expectedFloat = assertThrows(NumberFormatException.class, () -> Float.parseFloat(str), str);
+    final var actualFloat = assertThrows(NumberFormatException.class, () -> DoubleParser.parseFloat(buf, 0, buf.length), str);
+    assertEquals(expectedFloat.getMessage(), actualFloat.getMessage(), str);
+  }
+
+  @Test
+  void test_sign_and_exponent_marker_at_end_of_input() {
+    // Each of these ends inside the grammar — after a sign, an exponent
+    // marker, or an exponent sign — and must reproduce the reference
+    // parser's exception, message included, not a fast-path misparse or an
+    // out-of-bounds read.
+    assertRejectsWithReferenceMessage("-");
+    assertRejectsWithReferenceMessage("1e");
+    assertRejectsWithReferenceMessage("1E");
+    assertRejectsWithReferenceMessage("1e+");
+    assertRejectsWithReferenceMessage("1e-");
+    assertRejectsWithReferenceMessage("1e+x");
+    assertRejectsWithReferenceMessage("1e-x");
   }
 
   @Test

@@ -62,7 +62,6 @@ systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,BooleanTrueReturnVal
 systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,BooleanTrueReturnValsMutator,NO_COVERAGE # line 466
 systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,ConditionalsBoundaryMutator,SURVIVED # line 455
 systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 455
-systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 463
 systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 463
 systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 451
 systems.comodal.jsoniter.BytesJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 455
@@ -105,12 +104,8 @@ systems.comodal.jsoniter.CharsJsonIterator,parse,RemoveConditionalMutator_ORDER_
 systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,BooleanFalseReturnValsMutator,NO_COVERAGE # line 407
 systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,BooleanTrueReturnValsMutator,NO_COVERAGE # line 407
 systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,BooleanTrueReturnValsMutator,SURVIVED # line 412
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,ConditionalsBoundaryMutator,SURVIVED # line 406
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,ConditionalsBoundaryMutator,SURVIVED # line 418
 systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 410
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 406
 systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 406
-systems.comodal.jsoniter.CharsJsonIterator,parseFieldEquals,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 418
 systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,BooleanFalseReturnValsMutator,NO_COVERAGE # line 434
 systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,BooleanTrueReturnValsMutator,NO_COVERAGE # line 434
 systems.comodal.jsoniter.CharsJsonIterator,parseFieldEqualsSlow,BooleanTrueReturnValsMutator,SURVIVED # line 432
@@ -124,9 +119,3 @@ systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,MathMutator,SURVIVED
 systems.comodal.jsoniter.ValueType$INIT_TYPES,initValueTypes,NullReturnValsMutator,SURVIVED # line 48
 systems.comodal.jsoniter.ValueType$INIT_TYPES,initValueTypes,VoidMethodCallMutator,SURVIVED # line 30
 systems.comodal.jsoniter.ValueType,of,ConditionalsBoundaryMutator,SURVIVED # line 20
-systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$0,BooleanFalseReturnValsMutator,NO_COVERAGE # line 14
-systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$0,BooleanTrueReturnValsMutator,NO_COVERAGE # line 14
-systems.comodal.jsoniter.factory.JsonIterParserFactory,lambda$loadParser$1,NullReturnValsMutator,NO_COVERAGE # line 16
-systems.comodal.jsoniter.factory.JsonIterParserFactory,loadParser,NakedReceiverMutator,NO_COVERAGE # line 14
-systems.comodal.jsoniter.factory.JsonIterParserFactory,loadParser,NullReturnValsMutator,NO_COVERAGE # line 8
-systems.comodal.jsoniter.factory.JsonIterParserFactory,loadParser,NullReturnValsMutator,NO_COVERAGE # line 13

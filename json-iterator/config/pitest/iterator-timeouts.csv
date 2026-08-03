@@ -5,5 +5,6 @@ systems.comodal.jsoniter.BaseJsonIterator,reduceScale,IncrementsMutator
 systems.comodal.jsoniter.BaseJsonIterator,reduceScale,RemoveConditionalMutator_ORDER_IF
 systems.comodal.jsoniter.BaseJsonIterator,skipObject,IncrementsMutator
 systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,MathMutator
+systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,MathMutator
 systems.comodal.jsoniter.CharsJsonIterator,parse,IncrementsMutator
 systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,MathMutator

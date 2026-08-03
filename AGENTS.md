@@ -58,9 +58,17 @@ What a clean gate does *not* prove — the mutator set, the class path, the
 `HARDENING_NOTES.md`; read it before reporting a green run as coverage.
 
 <!-- This section adapts the agent-instructions template in sava-build's
-     HARDENING.md; `agentsTemplateInSync` (wired into `check`) fails when the
-     template changes until the block is re-diffed — sync or ACT on each changed
-     bullet (a new bullet may need code, not prose) — and the digest updated. -->
+     HARDENING.md. Read it from the Git TAG matching the pinned plugin version,
+     never moving `main` — the digest is baked into a release, while `main` may
+     already describe the next one — or print the exact text the resolved plugin
+     carries with `./gradlew :json-iterator:hardeningAgentTemplate`.
+     `agentsTemplateInSync` (wired into `check`, and so into `qualityGate` and
+     `hardeningCertify`) fails when the template changes until the block is
+     re-diffed — sync or ACT on each changed bullet (a new bullet may need code,
+     not prose) — and the digest updated. Under `-PsavaBuildLocalRepo` a stale
+     marker only warns: the marker acknowledges a *released* digest, so the
+     marker dance lands with the release, never before it. A marker-less
+     AGENTS.md still fails even in that mode. -->
 <!-- hardening-template sha256:e035f8cc1fec -->
 
 - **Scale verification to the change; suite choice is reachability, not habit.**
@@ -71,14 +79,26 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   Test-only edits still owe the suite those tests kill mutants in — a weakened or
   deleted test is exactly what the ratchet catches; doc, build-script, and comment
   changes owe no suite at all.
-- **`qualityGate` — every suite, serialized, each diffed against its baseline in
-  `config/pitest/` — is the pre-release check, not the inner loop or the per-commit
-  gate.** The pre-release ritual is `qualityGate` plus long fuzz runs
-  (`-PmaxFuzzTime=600`+) plus a change-scoped jmh A/B per benchmark discipline
-  below. CI deliberately runs only `check` (sava-build's shared workflow): the
-  serialized PIT suites are too slow for hosted runners, so the full gate is
-  **owned by the local release checklist** — run before deciding to release, not
-  by CI. Don't wire `qualityGate` into CI to "fix" this; it's a decision.
+- **`hardeningCertify` — every suite freshly observed, provenance-bound, and
+  diffed against `config/pitest/` with strict timeout and whole-population
+  ownership audits — is the pre-release check, not the inner loop or the
+  per-commit gate.** It is `qualityGate` plus the parts a release needs and a
+  working day does not: mutation history off, scoped and record-writing flags
+  refused before PIT starts, `-PstrictTimeoutAudit` forced on,
+  `mutationOwnershipAudit` mandatory, and a per-suite evidence manifest bound
+  to the report it certifies, receipted in
+  `json-iterator/build/hardening/pitest-certification.tsv`. Run it **bare** —
+  the preflight refuses `-PmutateOnly`, every refresh flag, `-PinitTimeoutAudit`,
+  `-PunionModeFlips`, `-PtrialMutators`, `-PpitestMode`, and any `-x`; the
+  habitual `-PnoMutationHistory` and `-PstrictTimeoutAudit` are redundant, not
+  helpful. The rest of the pre-release ritual is an explicit local
+  `fuzzAll -PmaxFuzzTime=600` campaign (§ fuzzing below) plus a change-scoped
+  jmh A/B per benchmark discipline. CI deliberately runs only `check`
+  (sava-build's shared workflow): the serialized PIT suites are too slow for
+  hosted runners, so certification is **owned by the local release checklist** —
+  run before deciding to release, not by CI. Don't wire it into CI to "fix"
+  that; it's a decision. `qualityGate` remains the plain aggregate for a
+  no-stakes sweep of every suite.
 - A new unkilled mutant has exactly three legal outcomes: **kill it** with a test
   (prefer asserting the property it breaks — position after a skip, exact error
   context, allocation bounds — over restating the implementation), **refactor** it
@@ -117,8 +137,14 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   memoizes today — `JHex$INIT_DIGITS` is a static table with its own family
   argument, not a cache — so this binds any future one.
 - **Baseline keys are line-less** — `class,method,mutator,STATUS`, with each
-  row's observed line demoted to a trailing `# line N` tag that every refresh
-  rewrites. Editing above a mutated method churns nothing the ratchet sees,
+  row's observed line demoted to a trailing `# line N` tag. Not every refresh
+  rewrites those tags, and the difference decides which flag clears a line-drift
+  advisory: a full `-PupdateMutationBaseline` refreshes every tag, a **green**
+  `-PpruneMutationBaseline` refreshes the tags of matched retained rows even
+  when it drops nothing, and unions and `migrateMutationBaselines` preserve
+  existing tags. So a pure code move is cleared by prune — the always-safe
+  flag — not by reaching for update.
+  Editing above a mutated method churns nothing the ratchet sees,
   so the whole drift apparatus is retired: no shift classifier, no tolerated
   pure-drift pass, no `PAIRING OUTLIER` scan, no `-PnoDriftTolerance` (the
   2026-07-26 mispaired-shift incident is dead by construction, not by
@@ -155,11 +181,27 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   the dropped-rows listing names each note's fate and counts the losses. Rows
   parse as an ordered list, so duplicate sibling rows each keep their **own**
   note. A third, always-safe refresh exists: `-PpruneMutationBaseline` only
-  drops rows matching nothing this run (keeps `TIMED_OUT` coordinates and
-  cross-status unkilled ones, naming them) — prefer it after a killing pass
-  over hand-rolled cleanup scripts, and note the three refresh flags are
-  mutually exclusive. All baseline rewrites are atomic, so an interrupted
-  refresh cannot truncate the file.
+  drops rows matching nothing this run — prefer it after a killing pass over
+  hand-rolled cleanup scripts, and note the three refresh flags are mutually
+  exclusive. "Matching" is the verify's own **multiset** comparison, which
+  matters at every line-less key holding siblings: a key with thirteen rows
+  against twelve unkilled mutants has one row to drop, and which sibling goes
+  is decided by **line affinity** first (the row whose `# line` tag names no
+  live line is the killed mutant's row), file order after — so a noted row is
+  not dropped for its bare sibling's kill and no kept tag is left pointing at
+  a killed line. Two keeps survive that, and both are **budgets, not
+  statuses**: rows whose coordinate `TIMED_OUT` this run, capped at the number
+  that actually timed out there, and rows with an *unmatched* different-status
+  counterpart (a coverage flip to triage first) — a same-status sibling is
+  never that, and neither is a mutant already matched by a row of its own key.
+  Flip-insured rows are kept unconditionally and decided *before* the timeout
+  budget, so an insured row never spends the budget its uninsured sibling
+  needs. Prune and the stale hint read one keep plan, so the hint's "refresh
+  with prune" is a promise prune keeps (casebook: "The stale hint that named
+  the wrong flag") — if prune reports dropping nothing against a hint that
+  named it, that is a bug upstream, not a reason to reach for
+  `-PupdateMutationBaseline`. All baseline rewrites are atomic, so an
+  interrupted refresh cannot truncate the file.
 - **The PIT version is part of the record.** The mutant population is a
   function of PIT itself, which rides sava-build bumps, so
   `config/pitest/<suite>-pitest-version` records which version wrote each
@@ -170,7 +212,14 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   included (the timeout population is just as version-dependent, but it never
   stamps). Bumping deliberately means setting the suite's file to the new
   version and refreshing that suite, reading the churn as a real population
-  diff rather than noise.
+  diff rather than noise. One migration exception: a committed record with
+  **no** version file is legacy-unversioned, not a claimed match to some other
+  version, and `hardeningCertify` accepts it after freshly running the current
+  PIT and verifying the record — naming it `legacy-unversioned` in the receipt
+  rather than pretending the stamp exists. `util` is the local instance
+  (`iterator` and `numbers` are stamped 1.25.8); the next deliberate
+  record-writing run on it creates the file. An existing stamp for a
+  *different* version still fails certification.
 - **Iterate with `-PmutateOnly=<class-glob>`** while killing a cluster —
   seconds instead of a full suite — then re-run unscoped before any refresh;
   scoped reports are stamped `.scoped` and every baseline-touching consumer
@@ -204,39 +253,35 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   names every row it drops) — but it lands **bare** rows, so a hand union owes
   the evidence note by hand or the insurance is an unargued acceptance. The
   verify announces run-to-run status
-  drift from a machine-local stash (`.pitest-history/<suite>.statuses`):
-  `KILLED -> TIMED_OUT` is a benign count, `SURVIVED -> TIMED_OUT` a warning
-  — never let a refresh drop such a row on the strength of a loaded run.
+  drift from a machine-local stash (`.pitest-history/<suite>.statuses`, every
+  status now, `KILLED` included, behind a `# stash format` header — an origin
+  the stash omits is one the comparison misreads, and a stash in an older
+  format resets the comparison for one announced run rather than comparing
+  blind). `KILLED -> TIMED_OUT` is a benign count; `SURVIVED -> TIMED_OUT` and
+  `NO_COVERAGE -> TIMED_OUT` are warnings — never let a refresh drop such a row
+  on the strength of a loaded run. The comparison is per-key **counts**, not
+  sets, which is what makes it usable here: these keys are line-less, so one
+  routinely holds an accepted survivor *and* an audited timeout in the same
+  run, and a set intersection answers "flip" on every run forever. Three keys
+  here are exactly that shape — `CharsJsonIterator.skipPastEndQuote/
+  MathMutator`, `JIUtil.escapeQuotesChecked/IncrementsMutator`,
+  `FieldMatcher.of/MathMutator` — and they went on reporting a flip in
+  byte-identical populations under 21.5.20 (casebook: "The flip that fired
+  forever"; fixed in 21.5.21, which is the pin). A flip is now a key whose
+  timeout count rose **and** whose unkilled count fell, so those three are
+  silent and a warning at any of them is real again.
   (The verify's stale-entry hint knows this too: a baseline row whose coordinate
   read `TIMED_OUT` this run is reported as the load flip it is, not as a row to
-  prune.)
-  **Known false positive under sava-build 21.5.20 — three permanent
-  `SURVIVED -> TIMED_OUT` advisories here (1 iterator, 2 util), and they are
-  not flips.** 21.5.20 made the stash coordinate line-less
-  (`class,method,mutator`) but left the detector a set intersection
-  `nowTimedOut ∩ prevSurvived` without subtracting `prevTimedOut`. Three keys —
-  `CharsJsonIterator.skipPastEndQuote/MathMutator`,
-  `JIUtil.escapeQuotesChecked/IncrementsMutator`, `FieldMatcher.of/MathMutator` —
-  hold an accepted survivor sibling *and* an audited-timeout sibling at
-  different lines within the same run, so once the line number stopped
-  separating them the intersection is non-empty on every run, forever. Verified:
-  two consecutive gates produce byte-identical statuses at those keys, and each
-  key appears in the stash under both statuses at once. Nothing flipped, nothing
-  is load-dependent, nothing is masked — the baselines match this run exactly and
-  all 8 timeouts are audited members whose causes are structural (non-terminating
-  loops, which time out deterministically). Treat these three as noise **only
-  while they are exactly these three**: a fourth key, or one of these losing its
-  survivor, is a real signal. The upstream fix is written and verified against
-  this repo through the local test repo — sava-build now compares per-key
-  *counts*, so a flip is a key whose timeout count rose **and** whose survivor
-  count fell (casebook: "The flip that fired forever") — but it is **not
-  released**. Delete this paragraph, don't annotate it, once the pin moves past
-  21.5.20.
+  prune — and so is a row at a **flip-insured** key, which prune keeps and the
+  hint excludes, so following the hint can never drop a row whose absence would
+  fail the next solo run. Both are key-level, because which member of a flappy
+  family reads killed on a given run is itself load-dependent; such a row leaves
+  by the union's written removal criterion, never by refresh.)
 - **A new timed-out mutant is a reviewer-stop, not detection noise** — for
   exactly these the ratchet cannot see a weakened covering assertion, since the
   timeout keeps "detecting" whatever the test asserts. Each suite's timeouts are
   an audited set: `config/pitest/<suite>-timeouts.csv` holds line-less
-  `class,method,mutator` keys (`iterator-timeouts.csv` 6 rows,
+  `class,method,mutator` keys (`iterator-timeouts.csv` 7 rows,
   `util-timeouts.csv` 2; `numbers` has never timed out, so it has no file and
   the check is inert there), and `config/pitest/README.md` §"Timed-out mutants
   (audited set)" carries the structural cause per member, each naming the line
@@ -340,12 +385,27 @@ What a clean gate does *not* prove — the mutator set, the class path, the
 - **PIT minions run on the class path**, even though this repo's tasks run on
   the module path: `module-info` services are invisible to minions, and a
   test-resources `META-INF/services` is invisible to the module-path `test`
-  task — a harness whose result depends on which task ran it is never
-  committed. The local instance is `JsonIterParserFactory`'s `ServiceLoader`
-  path, accepted as unreachable in-harness (the whitebox test setup cannot
-  provide a service; see `config/pitest/README.md`). A real (main-source)
-  provider would need the dual declaration — `module-info` *and*
+  task — a harness whose *pass/fail* depends on which task ran it is never
+  committed, but a harness may branch its assertions on a `ServiceLoader`
+  probe and assert the correct behavior for whichever world it woke up in.
+  `TestParserFactoryLoading` does exactly that: its test-resources
+  `META-INF/services` registers fixture factories the class-path minions see
+  (killing the whole `loadParser` pipeline) while the module-path `test` task
+  asserts the no-provider error — which is how the former
+  "unreachable in-harness" acceptance for that family was disproven on
+  2026-08-02. Its fixtures are nested inside the `Test*` class deliberately;
+  top-level fixtures would join the mutated population. A real (main-source)
+  provider would still need the dual declaration — `module-info` *and*
   `META-INF/services`.
+- **PIT cannot see a block that always exits by throw** — block coverage
+  probes a block at its end, so `return f(...)` where `f` throws for every
+  input reaching it reads `NO_COVERAGE` forever, executed or not, and its
+  return-value mutants can never change status. Ten baseline rows are this
+  shape (the Throw-terminated blocks family in `config/pitest/README.md`);
+  before writing a test purely to flip a `NO_COVERAGE` row, check whether its
+  block can complete — and before accepting one as a "trap", remember the
+  trap mechanism requires the block to complete. What such a row is owed is a
+  test asserting the throw's contract, not coverage.
 - **A suite's percentage is not a target.** An accepted mutant with a written
   reason is finished work, not debt. Attention belongs to a growing baseline,
   not a number below 100%. But "no untriaged debt" is a claim about labels,
@@ -378,6 +438,18 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   population. `pitest<Suite>Verify` cross-references mutated classes against the
   test source set and warns by name; heed that warning, and after registering or
   widening a suite confirm no mutated class lives under `src/test`.
+- **Every production class is owned by a suite or argued out of one.**
+  `mutationOwnershipAudit` enumerates the compiled production classes and
+  **fails** on a class no suite mutates, a `declineExclusionAudit` with no
+  reason, and a decline that no longer waives anything. It is mandatory under
+  `hardeningCertify` and reachable from neither `check` nor `qualityGate`, so
+  run it directly after touching a glob — it is seconds, and today reads
+  `35 production class(es) owned, 1 explicitly declined`. A deliberate opt-out
+  is not a comment: it must sit inside a suite's target universe, be excluded
+  *there*, and carry `declineExclusionAudit(glob, reason)` naming what owns
+  correctness instead (`PowersOfFive` is the only one — see
+  `HARDENING_NOTES.md`). `HARDENING_NOTES.md` is supplemental context and
+  waives nothing.
 - **Verify by the absence of failures, not the presence of passes.** Counting
   `PASSED` lines hides a failure sitting next to them, and a green `clean build`
   can mean the build cache short-circuited rather than that tests ran. Check the
@@ -387,16 +459,39 @@ What a clean gate does *not* prove — the mutator set, the class path, the
   the exit code, and delete report directories when comparing runs.
 - **A suite that got faster without getting narrower is a bug report.** Real
   speedups come from fewer mutants or faster covering tests; an unexplained one
-  usually means the run did less than you think. (Exception if arcmutate history
-  is ever activated here — `arcmutate-licence.txt` at the repo root, free for
-  OSS: a `[history]` marker on the summary makes fast the expected state, and
-  the pre-release gate then runs `-PnoMutationHistory` to re-earn every status
-  from scratch.)
+  usually means the run did less than you think. No `[history]` exception
+  applies here: the Sava OSS ArcMutate certificate is scoped to
+  `software.sava.*` packages and this library's are `systems.comodal.jsoniter.*`,
+  so every run is open-source PIT from scratch — see `HARDENING_NOTES.md`
+  §"No ArcMutate acceleration here" before copying a certificate in. Even where
+  history is available, `hardeningCertify` disables it and re-earns every
+  status.
 - **Transient infra failures are not results.** PIT `MINION_DIED` fails before
   writing a report, so it cannot corrupt one — re-run the suite; a Gradle-worker
-  `EOFException` death is the same shape, and a per-mutant `RUN_ERROR` under
-  load is the same shape smaller (the summary names it, not counted as
-  detected). The daemon log
+  `EOFException` death is the same shape. A per-mutant `RUN_ERROR` under load is
+  no longer a quiet under-count: the report is **refused** rather than certified
+  at PIT's detected score, and the same refusal covers `MEMORY_ERROR`,
+  `STARTED`, `NOT_STARTED`, a status a PIT upgrade introduced, and any malformed
+  CSV row (each named by line). `NON_VIABLE` and `EQUIVALENT` still parse — they
+  are shown, not counted as detected. So a loaded run now fails loudly instead
+  of shrinking the population, and the answer is a quiet re-run, never a refresh
+  flag. **Copy the offending coordinate out before you re-run** — the refusal
+  and `pitest<Suite>Debt` both name every offending row, and the quiet re-run
+  overwrites the only report that held it, so without the coordinate the
+  same-mutant-twice test below cannot be applied to the next occurrence. Debt
+  stays usable after such a failure: it names the rows and tallies from the
+  committed baseline instead of refusing. A `RUN_ERROR` that persists on one
+  mutant across quiet re-runs is not
+  load and deserves a look at the mutated bytecode. Witnessed here 2026-08-03:
+  a cold `clean hardeningCertify` died in `pitestIteratorVerify` on
+  `RUN_ERROR x1`, and the identical re-run certified all three suites — one
+  occurrence in three certification runs, so load. Budget for that: a release
+  certification can lose two minutes to a single flaky minion, and the correct
+  response is to run it again, not to reach for a flag. A crashed or interrupted run
+  is caught from the other side: PIT writes its CSV incrementally, so a partial
+  report looks complete, and a `.running` sentinel written before PIT starts and
+  cleared only on a clean exit is what makes the verify refuse it as evidence.
+  The daemon log
   (`~/.gradle/daemon/<version>/daemon-<pid>.out.log`) keeps a failed build's
   full output even when the shell discarded it — read it before calling a
   failure unexplained.
@@ -461,15 +556,36 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   the buggy value to keep the suite green: that makes the bug look intended, and
   is exactly how findings rot. Un-ignore when the fix lands. No open findings
   today — the seven 2026-07-17 crashes are all fixed and seed-pinned.
-- **`.github/workflows/fuzz.yml` exists but is `workflow_dispatch`-only** — the
-  canonical weekly soak with its `schedule` block commented out, pending a
-  hand-dispatched run to see what it costs. Local campaigns stay the pre-release
-  ritual regardless. `fuzzWorkflowInSync` (in `check`) is now live and fails when
-  a registered target is named nowhere in that file — verified empirically by
-  dropping `fuzzInstant` and watching it fire. Registering a fifth target means
-  adding it to the soak's task list, or naming it in a yaml comment with the
-  reason it is deliberately left out; the budget step's target count (`4 *
-  MAX_FUZZ_TIME`) needs the same edit.
+- **The pre-release campaign is local and explicit, not scheduled.** Run
+  `./gradlew --continue :json-iterator:fuzzAll -PmaxFuzzTime=600`; `fuzzAll`
+  derives its dependencies from the four registrations, so it cannot drift from
+  a hand-written task list the way a workflow can, and it writes
+  `build/hardening/local-fuzz.tsv` after every selected target succeeds.
+  **That file is not the durable record** — like the certification receipt it
+  sits under git-ignored `build/`, and the next `clean` deletes it. It becomes
+  evidence one of two ways, and a campaign whose seconds and outcome nobody
+  retained is a recollection, not a record:
+  - **Driven by sava-build's `tools/local-fuzz.sh --release --seconds <N>`**
+    (the fleet path): the runner finds this repo's `local-fuzz.tsv`, hashes it,
+    and copies it into an immutable SHA-bound run bundle under *sava-build's*
+    `build/hardening/local-fuzz-runs/run.*/aggregates/`, with the canonical
+    receipt an atomic pointer at that bundle. The **sava-build release owner**
+    retains that run directory with the release record — outside the Git tree
+    it certifies — and `--verify-receipt` rehashes it without rerunning Gradle.
+    Nothing here is retained, and nothing needs to be.
+  - **Run standalone from this repo**: nothing copies it anywhere. Whoever ran
+    it copies `build/hardening/local-fuzz.tsv` (and
+    `build/hardening/pitest-certification.tsv`) out of `build/` into the
+    release record before the next `clean`, or the evidence is gone.
+
+  `--continue` lets independent
+  targets finish after one finds a crash; Gradle still exits non-zero.
+  `.github/workflows/fuzz.yml` is now only an optional manual campaign with no
+  cron contract and no bearing on certification: `fuzzWorkflowInSync` is a
+  deprecated no-op and is no longer in `check`, so that file's task list and its
+  `4 * MAX_FUZZ_TIME` budget arithmetic are hand-maintained and machine-checked
+  by nothing. Registering a fifth target means editing both if the workflow is
+  still wanted — or deleting it, since `fuzzAll` is what the release relies on.
 - **Three of the four targets are saturated; don't budget hours of wall clock.**
   Measured 2026-07-24 at 600s per target: `fuzzDouble`, `fuzzNumber`, and
   `fuzzInstant` each ended with edge *and* feature counts identical to their seeded

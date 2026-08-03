@@ -86,23 +86,48 @@ earlier limit check already rejected it: slow-path wrapped-accumulator
 `== 0` cases in `readIntSlowPath`/`readLongSlowPath`, the `scaleLong`
 single-step wrap check, `FieldMatcher.hash` len == 8 word agreement,
 capacity-sizing mutants in `FieldMatcher.of` (any power-of-two capacity ≥
-field count matches identically).
+field count matches identically), and the `numEscapes == 0` fallback return
+in `CharsJsonIterator.parseFieldEqualsSlow` (line 434, 2 NO_COVERAGE): both
+entries into that method preclude it — the truncation entry throws inside
+`parse(from)` before any return, and the backslash entry guarantees
+`numEscapes >= 1`. Kept as defense against a future `parse` change; a
+refactor that removes the branch retires the rows with it.
 
 **Static-initializer table** (`JHex$INIT_DIGITS`): built once per PIT minion
 JVM before mutants activate, so table-construction mutants are unkillable by
 construction. The per-call `decode` mutants all die.
 
-**NC→SURVIVED traps** — covering the line would convert provably-equivalent
-mutants on it into new SURVIVED entries: `DoubleParser` `return slow(...)`
-sites whose inputs always throw inside `slow`; `parseFieldEquals` truncation
-bail-outs whose slow-path true-return is structurally unreachable. The
-`JIUtil.escapeQuotes*` deep-escape branches were deliberately taken out of
-this set on 2026-07-26: the backslash-run tests
-(`testEscapeQuotes*BackslashRunBeforeQuote`, `...LeadingNewlineOnly`) killed
-20 accepted mutants — 11 of the 13 NO_COVERAGE entries plus 9 SURVIVED rows
-(util 331→351 of 394 detected) — at the cost of the two remaining
-NO_COVERAGE mutants surfacing as stranded `# escape parity` increments.
-Public-API branches with no test were worth more than the trap avoided.
+**Throw-terminated blocks** — `NO_COVERAGE` that no test can ever clear,
+because PIT's block coverage probes a block at its *end*: a `return f(...)`
+whose call throws for every input reaching it never completes its block, so
+the line reads unreached no matter what executes it, and its return-value
+mutants can never change status (the throw happens before the mutated return).
+Established empirically on 2026-08-02: `TestDouble` had fed quoted `"1e"`
+through `readDouble()` since the parser landed, and `DoubleParser.parse:136`
+read `NO_COVERAGE` in every report regardless. The rows, all
+executed by tests that assert the throw:
+- `DoubleParser.parse` 105/136/142/147 — `return slow(...)` for inputs ending
+  after a sign or exponent marker (`-`, `1e`, `1e±`, `1e±x`); the reference
+  parser throws for every such input, with message parity pinned by
+  `TestDoubleParser.test_sign_and_exponent_marker_at_end_of_input` and the
+  wrapped-message loop in `TestDouble.test_specials`.
+- `BytesJsonIterator.parseFieldEquals` 452/466 and
+  `CharsJsonIterator.parseFieldEquals` 407 — truncation bail-outs into
+  `parseFieldEqualsSlow`, whose `parse` reports the incomplete document (no
+  source refills: streams are read fully upfront, so `tail` is always the
+  document end). Executed by `TestSkip.test_skip_until_truncated_field_name`.
+
+The retired name of this family was **NC→SURVIVED traps** — the fear that
+covering these lines would surface the return-value mutants as new SURVIVED
+entries. That mechanism was wrong: the mutants stay `NO_COVERAGE` under any
+test, so the deliberate test absence bought nothing and cost real contract
+coverage — closing it killed 10 accepted SURVIVED siblings whose routing
+arguments only held while malformed and truncated inputs went unasserted
+(see the 2026-08-02 section). The one honest trap instance remains history:
+the `JIUtil.escapeQuotes*` branches, taken knowingly on 2026-07-26 — the
+backslash-run tests killed 20 accepted mutants at the cost of two stranded
+`# escape parity` increments. Public-API branches with no test were worth
+more than the trap avoided, both times.
 
 **Multibyte scan paths**:
 - `containsMultiByteOrEscapePattern`: over-detection mutants only route the
@@ -230,7 +255,7 @@ silently. That is why each cause below names the line it argues about; re-read
 those lines whenever the code at them changes, because a clean run certifies
 "no new method+mutator", not "no new mutant".
 
-As of 2026-07-26 — 8 members, 6 iterator + 2 util, numbers none:
+As of 2026-08-03 — 9 members, 7 iterator + 2 util, numbers none:
 
 **iterator**
 - `BaseJsonIterator.reduceScale:1021`, two mutants (`scale--` → `scale++`;
@@ -250,6 +275,25 @@ As of 2026-07-26 — 8 members, 6 iterator + 2 util, numbers none:
   oscillation with no exit and no fault.
 - `CharsJsonIterator.skipPastEndQuote:156` (`buf[head++]` → `buf[head--]`):
   same reversed-cursor family as `parseMultiByteString:575`.
+- `BytesJsonIterator.skipPastMultiByteEndQuote:690` (escape-dispatch
+  `buf[head++]` → `buf[head--]`, admitted 2026-08-03): the reversed cursor
+  lands back on the backslash's *own* index, so the next pass reads the same
+  `\` at line 683, re-enters the same branch and restores the same state — a
+  fixed point with no exit and no fault, unlike the bounds-race spin of its two
+  `buf[head--]` siblings. What makes the *member* flap is the input, not the
+  loop: only the eight simple escapes (`b t n f r " / \`) spin, because the `u`
+  arm's four `head++` hex reads step past the backslash and leave the mutant
+  merely wrong. So a covering test carrying `\uXXXX` kills it while one
+  carrying `\n` hangs it, and the member reads `TIMED_OUT` or `KILLED`
+  according to which the minion reaches first — observed both ways within an
+  hour on 2026-08-03 (`TIMED_OUT` on the cold certify that surfaced it,
+  `KILLED` on the next run). Removing the timeout would therefore mean removing
+  a legitimate covering input, not fixing a harness bound. The sibling
+  reversal at line 683 is reliably `KILLED`, which is the contrast worth
+  keeping: at the loop head a backward cursor immediately misreads and the scan
+  diverges observably, while at 690 it is invisible because the loop never
+  advances at all. Non-termination confirmed by transcribing the loop and
+  running both variants over `\\`, `\n`, `\"` and `A`.
 
 **util**
 - `JIUtil.escapeQuotesChecked:170` (do-while `++from` → `--from`): after an
@@ -282,9 +326,9 @@ Of the 5 unkilled: 4 were dropped `skip()` calls on the default branches of
 untested cursor positions, killed by extending
 `TestNull.test_read_primitive_or_default_skips_and_positions` with
 position-after reads across all widths (the long/int variants already had
-them, which is what killed their mutants in trial); 1 is a `NO_COVERAGE` row
-on `JsonIterParserFactory.loadParser`, joining the unreachable-in-harness
-ServiceLoader family below.
+them, which is what killed their mutants in trial); 1 was a `NO_COVERAGE` row
+on `JsonIterParserFactory.loadParser`, killed with the rest of the
+ServiceLoader family on 2026-08-02.
 
 ## Multiset re-triage (2026-07-23)
 
@@ -355,11 +399,47 @@ per-key diff of report against baseline confirmed the only mismatches were
 those 3 rows — no accepted row was missing a counterpart to a timeout, so
 there was no flip insurance to lose.
 
-Remaining `NO_COVERAGE` debt, deliberately left for a separate pass: the six
-`JsonIterParserFactory` ServiceLoader rows (an *unreachable in-harness* claim,
-which sava-build 21.5.20 put an explicit expiry date on) and the twelve
-`parseFieldEquals` / `DoubleParser.parse` NC→SURVIVED-trap rows — the same
-trap reasoning that was overturned on 2026-07-26 in `util`.
+The remaining `NO_COVERAGE` debt was re-triaged the next day, below.
+
+## NO_COVERAGE re-triage (2026-08-02)
+
+The 18 rows deferred above, resolved in three different directions —
+notably, *none* of them was what its recorded argument said it was:
+
+- **The ServiceLoader family (6 rows) was killed, disproving the
+  unreachable-in-harness acceptance.** The claim held for the module path but
+  ignored that PIT minions always run on the class path, where a
+  `META-INF/services` file in test resources *is* scanned.
+  `TestParserFactoryLoading` registers two fixture factories (nested inside
+  the `Test*` class so they stay out of the mutated population) and branches
+  on a `ServiceLoader` probe: on the module path it asserts the no-factory
+  error, on the class path it asserts prefix resolution, wrong-factory
+  rejection, and the error message — killing all six mutants, the
+  `NakedReceiverMutator` included. Deterministic in both environments, so it
+  satisfies the never-commit-environment-dependent-results rule. This is the
+  fleet's second disproven "the harness cannot reach this" (sava-build
+  HARDENING.md dates the first 2026-07-26); the acceptance had named the
+  missing capability as "a blackbox suite with its own module descriptor",
+  which was one capability more than the kill actually needed.
+- **The 12 trap rows were never traps** — see the Throw-terminated blocks
+  family above for the mechanism (PIT block coverage cannot observe a block
+  that always exits by throw). 10 rows stay `NO_COVERAGE` permanently with
+  their contracts now asserted; 2 (`parseFieldEqualsSlow` 434) moved to the
+  unreachable defense-in-depth family as dead defensive code.
+- **The new contract tests killed 10 accepted SURVIVED siblings as a
+  side-effect** — 5 `DoubleParser.parse` boundary/conditional mutants whose
+  slow-path-routing arguments only held while no test asserted the
+  reference-parser throw for `-`/`1e`/`1e±`/`1e±x` (a mutant routing those
+  *away* from `slow` returned numbers where the contract demands the legacy
+  exception), and 5 `parseFieldEquals` prefix-compare mutants with no
+  truncation-shaped witness. Routing arguments are direction-specific: "more
+  inputs to the oracle" is equivalent, "fewer" never was, and only the
+  malformed inputs could tell the two apart.
+
+Result: `iterator` 1787→1798 of 1919 (baseline 127→121 after the interleaved
+prunes/updates; net 132→121 across the pass), `numbers` 250→255 of 326
+(baseline 76→71), `NO_COVERAGE` rows 25→12, every remaining one argued under
+a mechanism verified this pass. `qualityGate` green.
 
 ## Convergence check (2026-07-21)
 
@@ -374,20 +454,6 @@ were stable in both modes, so the baselines carry no flip-insurance rows to
 revisit. The abstract-base `@Execution`/`@TestInstance` instability cannot
 apply here: the test suite has no abstract test classes and uses neither
 annotation.
-
-**ServiceLoader factory path — unreachable in-harness**
-(`JsonIterParserFactory`, 6 NO_COVERAGE — 5 original plus the 2026-07-22
-`NakedReceiverMutator` on the `ServiceLoader.load(...).stream()` chain): the
-load-success path needs a
-registered provider, and the whitebox test setup patches tests *into* the
-main module — a provider would need a `provides` directive, which cannot come
-from patched-in test sources (the JVM has no `--add-provides`) and does not
-belong in the production `module-info`. What would reach it: a blackbox test
-suite with its own module descriptor providing a test factory. Covering only
-the failure path was considered and rejected — it converts the `loadParser`
-return-value mutants into NC→SURVIVED traps (the call throws before either
-`return` completes) without observing the load behavior. Accepted as
-unreachable in-harness, not as equivalent.
 
 The baseline is otherwise fully triaged; no untriaged debt remains
 (the `JsonIterParser` bufSize-shim family closed 2026-07-21 with the shim's

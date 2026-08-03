@@ -237,6 +237,19 @@ final class TestSkip {
   }
 
   @Test
+  void test_skip_until_truncated_field_name() {
+    // documents cut inside a field name, at every prefix relationship to the
+    // sought field: mid-comparison, exactly after the compared prefix, and
+    // past a mismatch. All must report the incomplete document, never answer
+    // "not found" — a truncated document has no answer.
+    for (final var json : new String[]{"{\"ab", "{\"abc", "{\"abcd", "{\"x"}) {
+      final var ji = factory.create(json);
+      final var ex = assertThrows(JsonException.class, () -> ji.skipUntil("abc"), json);
+      assertTrue(ex.getMessage().contains("incomplete"), json + " -> " + ex.getMessage());
+    }
+  }
+
+  @Test
   void test_skip_until_opening_brace_arms() {
     // every skipUntil test entered through '{' followed by a field, so the two
     // other arms behind that brace were never executed

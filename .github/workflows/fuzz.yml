@@ -1,15 +1,8 @@
 name: Fuzz
 
-# Adapted from the canonical soak in sava-build's HARDENING.md ("The weekly soak").
-# Deliberately manual-only for now: the schedule below is commented out until a
-# hand-dispatched run has shown what a full soak costs on hosted runners. Local
-# 600s x 4 campaigns remain the pre-release ritual either way (AGENTS.md).
-# To enable the weekly soak, uncomment the `schedule` block.
+# Optional manual GitHub campaign. Release evidence is produced by the explicit
+# local fuzzAll campaign and retained receipt; this workflow has no cron contract.
 on:
-  # schedule:
-  #   # weekly soak; findings surface as workflow failures with the crash input
-  #   # attached — commit each one as a named seed + regression test
-  #   - cron: "17 5 * * 1"
   workflow_dispatch:
     inputs:
       max-fuzz-time:
@@ -47,7 +40,7 @@ jobs:
           echo "timeout-minutes=$(( (4 * MAX_FUZZ_TIME + 59) / 60 + 30 ))" >> "$GITHUB_OUTPUT"
 
       # --continue, or the first crashing target skips every remaining one —
-      # inverting the soak's purpose on exactly the weeks it matters. The
+      # inverting the campaign's purpose on exactly the runs it matters. The
       # timeout lives on the step, not the job: a cancelled job never fires
       # `if: failure()` and the findings upload is silently lost.
       - name: Fuzz

@@ -101,6 +101,18 @@ final class TestDouble {
     assertThrows(JsonException.class, () -> factory.create("\"\"").readDouble());
     assertThrows(JsonException.class, () -> factory.create("\"12x\"").readDouble());
     assertThrows(JsonException.class, () -> factory.create("\"1e\"").readDouble());
+
+    // tokens ending inside the grammar — after a sign, an exponent marker, or
+    // an exponent sign — carry the reference parser's message through the
+    // JsonException wrapper; "-" scans as a bare number token, the rest ride
+    // in quoted strings
+    for (final var token : new String[]{"-", "1e", "1e+", "1e-", "1e+x"}) {
+      final var json = token.equals("-") ? token : '"' + token + '"';
+      final var ex = assertThrows(JsonException.class, () -> factory.create(json).readDouble(), token);
+      assertTrue(ex.getMessage().contains("For input string: \"" + token + '"'), token + " -> " + ex.getMessage());
+      final var exFloat = assertThrows(JsonException.class, () -> factory.create(json).readFloat(), token);
+      assertTrue(exFloat.getMessage().contains("For input string: \"" + token + '"'), token + " -> " + exFloat.getMessage());
+    }
   }
 
   @Test
