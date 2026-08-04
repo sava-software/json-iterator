@@ -1,10 +1,10 @@
 # Audited timed-out mutants (class,method,mutator — line-less; the verify warns on
 # timeouts missing from this set). Structural causes: README.md "Timed-out mutants
 # (audited set)".
-systems.comodal.jsoniter.BaseJsonIterator,reduceScale,IncrementsMutator
-systems.comodal.jsoniter.BaseJsonIterator,reduceScale,RemoveConditionalMutator_ORDER_IF
-systems.comodal.jsoniter.BaseJsonIterator,skipObject,IncrementsMutator
-systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,MathMutator
-systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,MathMutator
-systems.comodal.jsoniter.CharsJsonIterator,parse,IncrementsMutator
-systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,MathMutator
+systems.comodal.jsoniter.BaseJsonIterator,reduceScale,IncrementsMutator  # line 1021
+systems.comodal.jsoniter.BaseJsonIterator,reduceScale,RemoveConditionalMutator_ORDER_IF  # line 1021
+systems.comodal.jsoniter.BaseJsonIterator,skipObject,IncrementsMutator  # line 1122
+systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,MathMutator  # line 575
+systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,MathMutator  # line 690
+systems.comodal.jsoniter.CharsJsonIterator,parse,IncrementsMutator  # line 136
+systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,MathMutator  # line 156

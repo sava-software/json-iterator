@@ -170,13 +170,13 @@ more than the trap avoided, both times.
   Four rows, all
   producing byte-identical output because every shortfall is corrected by
   `ensureCapacity` before anything is written:
-  - `escapeJson:68` `new char[len + 8 + (len >> 3)]`, two MathMutator siblings.
+  - `escapeJson:83` `new char[len + 8 + (len >> 3)]`, two MathMutator siblings.
     Only the *initial* capacity moves; a smaller one just grows sooner and a
     larger one wastes a little. The third sibling (`len - 8`) is killed — it
     goes negative on short input and throws.
-  - `ensureCapacity:120` `needed <= out.length` → `<`: at exact equality the
+  - `ensureCapacity:135` `needed <= out.length` → `<`: at exact equality the
     mutant grows a buffer that already fits. Same array contents.
-  - `ensureCapacity:123` `out.length << 1` → `>> 1`: `Math.max(needed, half)`
+  - `ensureCapacity:138` `out.length << 1` → `>> 1`: `Math.max(needed, half)`
     is then always `needed`, so the buffer is sized exactly instead of doubled —
     correct output, just more frequent growth.
   Deliberately not chased with `TestAllocation`: per AGENTS.md the allocation
@@ -184,7 +184,7 @@ more than the trap avoided, both times.
   micro-optimization only an allocation bound could observe" case it names as
   accept-worthy. The *observable* directions here are killed —
   `TestJIUtil.testEscapeJsonGrowsPastInitialCapacity` kills both under-request
-  mutants on line 77 (`n + span - 6` runs off the end of a 64-control-character
+  mutants on line 92 (`n + span - 6` runs off the end of a 64-control-character
   buffer; `n - span + 6` off a 15-char one where a 13-char span meets the first
   growth point).
 - `matchPattern` (the Hacker's Delight zero-byte finder): the three surviving
@@ -255,6 +255,18 @@ silently. That is why each cause below names the line it argues about; re-read
 those lines whenever the code at them changes, because a clean run certifies
 "no new method+mutator", not "no new mutant".
 
+Every member carries a `# line` anchor in its CSV row as of 2026-08-03, which
+is what arms the line-drift advisory; before that the rows were bare and the
+check was silently inert. The anchors were verified against source and against
+a certification run in which the five members that did time out landed on
+exactly the recorded lines.
+
+Two members currently sit on the quiet counter — `parseMultiByteString`
+(3 runs) and `skipPastMultiByteEndQuote` (4). **Both are expected to, and
+neither should be retired on that advisory alone**: each one's cause below
+explains why it flaps rather than hangs every run. The counter is doing its
+job by asking; the answer is written down.
+
 As of 2026-08-03 — 9 members, 7 iterator + 2 util, numbers none:
 
 **iterator**
@@ -294,6 +306,16 @@ As of 2026-08-03 — 9 members, 7 iterator + 2 util, numbers none:
   diverges observably, while at 690 it is invisible because the loop never
   advances at all. Non-termination confirmed by transcribing the loop and
   running both variants over `\\`, `\n`, `\"` and `A`.
+  **Quiet-streak note, 2026-08-03:** it has read `KILLED` on every certification
+  since the one that admitted it, and the audit's quiet counter now reports it
+  at 3+ runs. Retirement is **refused**, and the counter is expected to keep
+  firing: the flap is a per-mutant test-order race, not a load effect, so the
+  next run that reaches the `\n` input before the `\uXXXX` one will time out
+  again — and with the member retired that would be an unaudited newcomer,
+  which `hardeningCertify`'s forced strict audit fails hard. A one-in-N member
+  is exactly what an audited set is for. Retire it only on evidence the race is
+  gone: the `\n`-carrying covering test removed, or the escape dispatch
+  restructured so the reversed cursor can no longer land on its own backslash.
 
 **util**
 - `JIUtil.escapeQuotesChecked:170` (do-while `++from` → `--from`): after an

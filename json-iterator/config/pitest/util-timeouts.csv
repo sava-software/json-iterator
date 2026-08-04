@@ -1,5 +1,5 @@
 # Audited timed-out mutants (class,method,mutator — line-less; the verify warns on
 # timeouts missing from this set). Structural causes: README.md "Timed-out mutants
 # (audited set)".
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,IncrementsMutator
-systems.comodal.jsoniter.FieldMatcher,of,MathMutator
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,IncrementsMutator  # line 170
+systems.comodal.jsoniter.FieldMatcher,of,MathMutator  # line 51

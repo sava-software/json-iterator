@@ -83,11 +83,10 @@ receipt out of `build/` first — the same caveat applies to
 `build/hardening/pitest-certification.tsv`. The recorded release budget is
 `-PmaxFuzzTime=600` per target; the saturation measurement behind that number
 is in `AGENTS.md`, and three of the four targets buy no new coverage past it.
-`.github/workflows/fuzz.yml` remains an optional manual campaign, not a
-schedule or a certification gate — `fuzzWorkflowInSync` is a deprecated no-op
-and no longer in `check`, so that file's task list and budget arithmetic are
-hand-maintained and check nothing. Between campaigns, `check`'s seed replay
-guards inputs already found — never the code that changed since.
+There is no GitHub fuzz workflow: `.github/workflows/fuzz.yml` was deleted on
+2026-08-03, so a campaign happens only when someone runs one. Between
+campaigns, `check`'s seed replay guards inputs already found — never the code
+that changed since.
 
 The fuzz targets contribute in one direction only: each registered target's
 class is auto-excluded from every suite's mutant population, while its
