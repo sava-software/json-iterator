@@ -1,3 +1,4 @@
+!sava-hardening-baseline-schema,1
 systems.comodal.jsoniter.BaseJsonIterator,closeArray,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 197
 systems.comodal.jsoniter.BaseJsonIterator,contextWindow,MathMutator,SURVIVED # line 88
 systems.comodal.jsoniter.BaseJsonIterator,continueArray,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 187

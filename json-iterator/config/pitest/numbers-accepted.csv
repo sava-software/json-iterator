@@ -1,3 +1,4 @@
+!sava-hardening-baseline-schema,1
 systems.comodal.jsoniter.DoubleParser,computeDouble,ConditionalsBoundaryMutator,SURVIVED # line 181
 systems.comodal.jsoniter.DoubleParser,computeDouble,ConditionalsBoundaryMutator,SURVIVED # line 184
 systems.comodal.jsoniter.DoubleParser,computeDouble,ConditionalsBoundaryMutator,SURVIVED # line 224

@@ -1,3 +1,4 @@
+!sava-hardening-baseline-schema,1
 systems.comodal.jsoniter.FieldMatcher,hash,ConditionalsBoundaryMutator,SURVIVED # line 220
 systems.comodal.jsoniter.FieldMatcher,match,ConditionalsBoundaryMutator,SURVIVED # line 175
 systems.comodal.jsoniter.FieldMatcher,match,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 175

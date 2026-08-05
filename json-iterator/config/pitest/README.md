@@ -9,11 +9,17 @@ naming the row's acceptance family.
 
 A new unkilled mutant has exactly three legal outcomes:
 
-1. **Kill it** — add or strengthen a test. Prefer asserting the property the
-   mutant breaks (position after a skip, exact error context, allocation
+1. **Kill it** — add or strengthen a test. Name the property the code is
+   externally meant to hold and an oracle independent of the implementation
+   before writing the assertion; if that oracle contradicts current behaviour,
+   the mutant found a production bug and is owed a failing regression test plus
+   a source fix, not a passing assertion that pins the bug. See AGENTS.md,
+   "A mutant is a question, not a specification". Prefer asserting the property
+   the mutant breaks (position after a skip, exact error context, allocation
    bounds) over restating the implementation.
 2. **Refactor** — restructure so the mutant cannot exist.
-3. **Accept it knowingly** — re-run with `-PupdateMutationBaseline` and record
+3. **Accept it knowingly** — re-run through the suite's named baseline writer
+   (`pitest<Suite>BaselineUpdate`; `hardeningHelp` lists them) and record
    the reason below. Acceptance is for mutants that are *equivalent with
    respect to observable behavior*, not for "hard to test". The refresh seeds
    each new row `# untriaged`; finishing triage means replacing that with a
@@ -413,10 +419,10 @@ Result: `iterator` 1776→1787 of 1919 detected, baseline 143→132 rows,
 `NO_COVERAGE` rows 21→14. `numbers` and `util` were unaffected (the new tests
 are in `Test*` classes all three suites match, but they exercise no code those
 suites mutate). Refresh took two passes for a line-less-key reason worth
-remembering: `-PpruneMutationBaseline` dropped only 8 of the 11, because the
+remembering: the shrink-only prune dropped only 8 of the 11, because the
 two dead `skipUntil` line-420 rows share `class,method,mutator` with live
 survivors at 397/401 and prune keeps any coordinate still unkilled at another
-status. `-PupdateMutationBaseline` on a solo run finished the job after a
+status. A full baseline rewrite on a solo run finished the job after a
 per-key diff of report against baseline confirmed the only mismatches were
 those 3 rows — no accepted row was missing a counterpart to a timeout, so
 there was no flip insurance to lose.

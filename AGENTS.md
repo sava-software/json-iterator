@@ -64,12 +64,11 @@ last of which is inventoried in `HARDENING_NOTES.md`.
 
 <!-- The block below is this repo's adaptation of the agent-instructions
      template in sava-build's HARDENING.md. `agentsTemplateInSync` (in `check`)
-     fails until the marker acknowledges the resolved plugin's digest. Under
-     `-PsavaBuildLocalRepo` a stale marker only warns: the marker acknowledges a
-     *released* digest, so the marker dance lands with the release, never before
-     it. Candidate aac11d3 carries digest 4e2be5e1a9dd; the marker below moves to
-     it together with both plugin pins. -->
-<!-- hardening-template sha256:e035f8cc1fec -->
+     fails until the marker acknowledges the resolved plugin's digest; re-diff
+     the block against `hardeningAgentTemplate` before moving it, because a
+     changed bullet can require code rather than prose. Acknowledged together
+     with both plugin pins for sava-build 21.5.22. -->
+<!-- hardening-template sha256:d128cb8208fa -->
 
 - **Suite choice is reachability, not habit.** `pitestNumbers` mutates
   `DoubleParser`; `pitestUtil` mutates `JHex`/`JIUtil`/`InstantParser`/
@@ -80,7 +79,8 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   deliberately runs only `check` (sava-build's shared workflow) — the serialized
   PIT suites are too slow for hosted runners. Don't wire the full gate into CI to
   "fix" that; it's a decision. The pre-release ritual is certification plus an
-  explicit local `fuzzAll -PmaxFuzzTime=600` campaign (§ fuzzing) plus a
+  explicit local `fuzzAll -PmaxFuzzTime=600 -PmaxParallelFuzzTargets=1`
+  campaign (§ fuzzing) plus a
   change-scoped jmh A/B per benchmark discipline.
 - **These baselines' rows predate label support** (notes 21.5.10, refresh seeding
   21.5.12) and print as `unlabeled` — recorded state, not new debt. Label a row
@@ -99,10 +99,17 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   dead by construction rather than by classifier. Expect line-drift advisories on
   runs after a record rewrite: legacy line fields were allowed to lag, and
   promoting them to tags surfaces the lag as re-read prompts, not regressions.
-- **PIT version stamps here:** `iterator` and `numbers` are stamped 1.25.8;
-  `util` has no file and is accepted as legacy-unversioned, which certification
-  names explicitly rather than pretending the stamp exists. The next deliberate
-  record-writing run on `util` creates it.
+- **Mutation provenance here is fully bound as of 2026-08-04.** All three
+  suites carry the paired record — `<suite>-pitest-version` at PIT 1.25.9 and
+  `<suite>-pitest-toolchain.tsv` — adopted through `pitest<Suite>BaselineRebase`,
+  which retained every accepted row and added none: 1.25.9 generates exactly the
+  populations 1.25.8 did (1919/326/394). That closed two older states: `util` was
+  legacy-unversioned, and `iterator`/`numbers` were *torn* (a version stamp with
+  no sidecar), which the plugin now fails closed on. The sidecars record ArcMutate
+  as `absent` on all three — the machine-checked form of the namespace decision in
+  `HARDENING_NOTES.md`, so a certificate appearing at this repo's root would now
+  be an announced toolchain transition rather than silent population churn. Never
+  hand-edit either file; the rebase task writes them.
 - **Identical rows are siblings, never hand-dedupe.** These baselines carry such
   rows at `matchPattern`, the `DoubleParser` scan guards, and `INIT_DIGITS`. The
   2026-07-23 multiset re-triage is the proof it pays: two "siblings of accepted
@@ -175,6 +182,23 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   equivalents, and were killed rather than argued. **Audit an unlabeled row by
   looking for its argument, not by trusting its label state**: grep the README
   for the class-and-method before believing a row is settled.
+- **A mutant is a question, not a specification** (shared rule, adopted with
+  sava-build 21.5.23; it governs triage from here on and demands no rewrite of
+  past work). Before writing a killing test, state the property the code is
+  *externally* meant to hold and an oracle independent of the current
+  implementation — the public contract, a reference implementation, a caller
+  invariant, a domain rule. If the oracle contradicts what the code does today,
+  that is a production bug: prove it with a regression test that fails against
+  the *unmutated* code, then fix the source. Never add a passing assertion that
+  merely pins current behaviour, which promotes a bug to a specification.
+  Report nontrivial behavioural clusters — not individual mutants — as
+  `Property: … | Oracle: … | Outcome: missing assertion / production bug /
+  accepted equivalent`. This repo has already paid for the rule twice, which is
+  why it is worth keeping rather than importing: the 2026-08-02 contract tests
+  killed 10 accepted `SURVIVED` siblings whose routing arguments had only ever
+  been checked in the equivalent direction, and the 2026-08-01 pass found seven
+  `NO_COVERAGE` rows that were untested public API rather than the equivalents
+  their label state implied. Both were oracle failures, not assertion failures.
 - **Allocation bounds are asserted where allocation is the contract — and only
   there.** `TestAllocation` pins the zero/exact-allocation contracts via
   `ThreadMXBean` counters; new API whose *stated design goal* is allocation
@@ -278,9 +302,10 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   is exactly how findings rot. Un-ignore when the fix lands. No open findings
   today — the seven 2026-07-17 crashes are all fixed and seed-pinned.
 - **The pre-release campaign is local and explicit, not scheduled.** Run
-  `./gradlew --continue :json-iterator:fuzzAll -PmaxFuzzTime=600`; `fuzzAll`
-  derives its dependencies from the four registrations, so it cannot drift from
-  a hand-written task list the way a workflow can, and it writes
+  `./gradlew --continue :json-iterator:fuzzAll -PmaxFuzzTime=600
+  -PmaxParallelFuzzTargets=1`; `fuzzAll` derives its dependencies from the four
+  registrations, so it cannot drift from a hand-written task list the way a
+  workflow can, and it writes
   `build/hardening/local-fuzz.tsv` after every selected target succeeds.
   **That file is not the durable record** — like the certification receipt it
   sits under git-ignored `build/`, and the next `clean` deletes it. It becomes
@@ -310,6 +335,11 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   start (401/962, 374/831, 326/832) across 38–130M executions — more time buys
   nothing there, and new coverage needs a harness or oracle change instead. Only
   `fuzzJson` still moves, and barely (two new feature buckets, flat edge coverage).
+  **Width is deliberately 1.** Those per-target figures were measured with one
+  target on the machine at a time, so a campaign that widens `fuzzAll` is not
+  comparable against them — libFuzzer's exec rate, and therefore its coverage
+  curve, is sensitive to contention. Widen only with a fresh baseline measured
+  at the same width.
   The 600s legs remain the pre-release ritual; treat a *longer* run as a decision
   needing a reason.
 - Multibyte lead bytes are **negative** as signed `byte`s, and `0x80` appears
