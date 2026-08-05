@@ -24,7 +24,6 @@ systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,MathMutator,SURVIVED # line
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,MathMutator,SURVIVED # line 25
 systems.comodal.jsoniter.JHex$INIT_DIGITS,initDigits,NullReturnValsMutator,SURVIVED # line 27
 systems.comodal.jsoniter.JIUtil,ensureCapacity,ConditionalsBoundaryMutator,SURVIVED # allocation routing # line 135
-systems.comodal.jsoniter.JIUtil,ensureCapacity,MathMutator,SURVIVED # allocation routing # line 138
 systems.comodal.jsoniter.JIUtil,escapeJson,MathMutator,SURVIVED # allocation routing # line 83
 systems.comodal.jsoniter.JIUtil,escapeJson,MathMutator,SURVIVED # allocation routing # line 83
 systems.comodal.jsoniter.JIUtil,escapeQuotes,ConditionalsBoundaryMutator,SURVIVED # line 183

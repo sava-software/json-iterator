@@ -94,7 +94,6 @@ systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,RemoveCondi
 systems.comodal.jsoniter.BytesJsonIterator,skipPastSingleByteEndQuote,ConditionalsBoundaryMutator,SURVIVED # line 238
 systems.comodal.jsoniter.BytesJsonIterator,skipPastSingleByteEndQuote,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 238
 systems.comodal.jsoniter.BytesJsonIterator,widenToCharBuf,ConditionalsBoundaryMutator,SURVIVED # line 199
-systems.comodal.jsoniter.BytesJsonIterator,widenToCharBuf,MathMutator,SURVIVED # line 200
 systems.comodal.jsoniter.BytesJsonIterator,widenToCharBuf,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 199
 systems.comodal.jsoniter.CharsJsonIterator,handleEscapes,MathMutator,SURVIVED # line 228
 systems.comodal.jsoniter.CharsJsonIterator,handleEscapes,RemoveConditionalMutator_EQUAL_ELSE,SURVIVED # line 266

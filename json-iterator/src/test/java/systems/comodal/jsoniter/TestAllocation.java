@@ -98,6 +98,72 @@ final class TestAllocation {
             + " bytes; amortised doubling costs a few hundred, per-character doubling megabytes");
   }
 
+  /// Field names decode through the ascii fast path's
+  /// `charBuf = new char[Math.max(len, charBuf.length << 1)]`. Halving that
+  /// shift is content-safe — `Math.max` still admits `len`, so every name still
+  /// decodes — but it drops the doubling headroom, so charBuf is resized to
+  /// exactly the length each time and a run of lengthening names reallocates on
+  /// every one. Invisible within a single read, which is why this walks one
+  /// object whose names grow 64..192: amortised growth reallocates three times,
+  /// exact sizing on all 129. testObject is the right vehicle because the
+  /// FieldBufferFunction contract allocates nothing per field, so the buffer
+  /// growth is the only thing the counter can see.
+  @Test
+  void test_field_name_widening_keeps_doubling_headroom() {
+    final var doc = new StringBuilder("{");
+    for (int i = 0; i < 129; ++i) {
+      doc.append(i == 0 ? "" : ",").append('"').append("a".repeat(64 + i)).append("\":0");
+    }
+    final byte[] json = doc.append('}').toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    // correctness first: the bound below only means something if the names decode
+    final int[] seen = {0};
+    JsonIterator.parse(json).testObject((buf, offset, len, ji) -> {
+      assertEquals(64 + seen[0]++, len);
+      ji.skip();
+      return true;
+    });
+    assertEquals(129, seen[0]);
+    final long allocated = minAllocated(() -> {
+      // fresh iterator per measurement, or charBuf is already at full size and
+      // neither the correct nor the mutated sizing reallocates at all
+      JsonIterator.parse(json, 8).testObject((buf, offset, len, ji) -> {
+        if (len == 0) {
+          throw new AssertionError("unreachable; keeps the decode observable");
+        }
+        ji.skip();
+        return true;
+      });
+    });
+    assertTrue(
+        allocated > 0 && allocated <= 8192,
+        "129 lengthening field names allocated " + allocated
+            + " bytes; doubling headroom costs about 900, exact sizing about 33000");
+  }
+
+  /// `JIUtil.escapeJson` grows its output through
+  /// `ensureCapacity`'s `new char[Math.max(needed, out.length << 1)]`, once per
+  /// escape. Halving that shift is content-safe — `Math.max` still admits
+  /// `needed`, so the escaped string is identical — but it sizes the buffer to
+  /// exactly what this escape needs, so a densely-escaped input reallocates per
+  /// escape instead of doubling. 512 control characters expand about six-fold:
+  /// doubling gets there in three grows, exact sizing in 512.
+  @Test
+  void test_escape_growth_doubles_rather_than_sizing_to_each_escape() {
+    final var dense = "\u0001".repeat(512);
+    final var escaped = JIUtil.escapeJson(dense);
+    // correctness first: the bound below only means something if the escape is right
+    assertEquals(512 * 6, escaped.length());
+    final long allocated = minAllocated(() -> {
+      if (JIUtil.escapeJson(dense).isEmpty()) {
+        throw new AssertionError("unreachable; keeps the escape observable");
+      }
+    });
+    assertTrue(
+        allocated > 0 && allocated <= 65_536,
+        "escaping 512 control characters allocated " + allocated
+            + " bytes; doubling costs tens of kilobytes, per-escape sizing megabytes");
+  }
+
   @Test
   void test_guarded_primitive_reads_allocate_nothing() {
     final byte[] number = "42".getBytes();

@@ -185,6 +185,19 @@ more than the trap avoided, both times.
   - `ensureCapacity:138` `out.length << 1` → `>> 1`: `Math.max(needed, half)`
     is then always `needed`, so the buffer is sized exactly instead of doubled —
     correct output, just more frequent growth.
+  **Narrowed 2026-08-05 to constant-factor sizing only.** The fourth row of this
+  family — `ensureCapacity:138` `Math.max(needed, out.length << 1)` -> `>> 1` —
+  was *not* allocation routing: it drops the doubling headroom, so a densely
+  escaped input reallocates once per escape instead of three times in total,
+  which is a complexity-class change wearing an identical output.
+  `TestAllocation.test_escape_growth_doubles_rather_than_sizing_to_each_escape`
+  kills it (512 control characters, 64 KiB bound against megabytes); util
+  43 -> 42 rows, 351 -> 352 of 394. The three rows that remain are genuine:
+  `ensureCapacity:135` grows once more than needed at exact equality, and the
+  two `escapeJson:83` initial-capacity mutants pick a different constant. Those
+  cost a bounded multiple, never a different growth curve, so no bound
+  separates them from correct behaviour without becoming the thin margin this
+  file warns about.
   Deliberately not chased with `TestAllocation`: per AGENTS.md the allocation
   harness is a last resort, and these are precisely the "incidental
   micro-optimization only an allocation bound could observe" case it names as
@@ -249,13 +262,19 @@ family by asserting the property directly — decoding 54 chars from a 2-char
 buffer allocates a few hundred bytes, where per-character doubling allocates
 about a megabyte. Baseline 121 -> 119; `iterator` 1798 -> 1800 of 1919.
 
-Still open in the same family: `widenToCharBuf:200` `MathMutator`
-(`Math.max(len, charBuf.length << 1)` -> `>> 1`) survives. It is content-safe
-because `Math.max` still admits `len`; what it removes is the doubling headroom,
-so the cost is repeated reallocation across a *sequence* of widening reads
-rather than within one. Killing it needs an allocation assertion over successive
-growing reads on one iterator, which is a different measurement from the one
-above.
+`widenToCharBuf:200` `MathMutator` (`Math.max(len, charBuf.length << 1)` ->
+`>> 1`) closed the family on the same day. It is content-safe because
+`Math.max` still admits `len`; what it removes is the doubling headroom, so the
+cost is repeated reallocation across a *sequence* of widening reads rather than
+within one — invisible to any single-read assertion.
+`TestAllocation.test_field_name_widening_keeps_doubling_headroom` walks one
+object whose field names grow 64..192: amortised growth reallocates three times,
+exact sizing on all 129. It uses `testObject` deliberately, because the
+`FieldBufferPredicate` contract allocates nothing per field, so buffer growth is
+the only thing the counter can see — the first attempt went through
+`applyCharsAsInt`, which reaches a different `parse` overload that never calls
+`widenToCharBuf`, and the mutant survived it. Baseline 119 -> 118;
+`iterator` 1800 -> 1802 of 1919.
 
 ## Timed-out mutants (audited set)
 
