@@ -306,11 +306,13 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   -PmaxParallelFuzzTargets=1`; `fuzzAll` derives its dependencies from the four
   registrations, so it cannot drift from a hand-written task list the way a
   workflow can, and it writes
-  `build/hardening/local-fuzz.tsv` after every selected target succeeds.
-  **That file is not the durable record** — like the certification receipt it
-  sits under git-ignored `build/`, and the next `clean` deletes it. It becomes
-  evidence one of two ways, and a campaign whose seconds and outcome nobody
-  retained is a recollection, not a record:
+  `.pitest-history/local-fuzz.tsv` after every selected target succeeds (schema
+  4 as of sava-build 21.5.23, carrying the plugin JAR hash, the budget, the
+  parallel width and per-target execution counts). That path is deliberately
+  outside `build/`, so unlike the certification receipt it survives `clean` — it
+  is still git-ignored machine-local state, so it is durable against the build,
+  not against the machine. A campaign whose seconds and outcome nobody retained
+  is a recollection, not a record, and it becomes evidence one of two ways:
   - **Driven by sava-build's `tools/local-fuzz.sh --release --seconds <N>`**
     (the fleet path): the runner finds this repo's `local-fuzz.tsv`, hashes it,
     and copies it into an immutable SHA-bound run bundle under *sava-build's*
@@ -319,22 +321,26 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
     retains that run directory with the release record — outside the Git tree
     it certifies — and `--verify-receipt` rehashes it without rerunning Gradle.
     Nothing here is retained, and nothing needs to be.
-  - **Run standalone from this repo**: nothing copies it anywhere. Whoever ran
-    it copies `build/hardening/local-fuzz.tsv` (and
-    `build/hardening/pitest-certification.tsv`) out of `build/` into the
-    release record before the next `clean`, or the evidence is gone.
+  - **Run standalone from this repo**: nothing copies it anywhere. The fuzz
+    receipt at least survives `clean`; `build/hardening/pitest-certification.tsv`
+    does not, so whoever certifies copies that one into the release record
+    before the next `clean` or the evidence is gone.
 
   `--continue` lets independent
   targets finish after one finds a crash; Gradle still exits non-zero.
   **There is no GitHub fuzz workflow** — `.github/workflows/fuzz.yml` was
   deleted on 2026-08-03. Campaigns are locally owned and run on purpose; no
   schedule, no dispatch, nothing to keep a task list in sync with.
-- **Three of the four targets are saturated; don't budget hours of wall clock.**
-  Measured 2026-07-24 at 600s per target: `fuzzDouble`, `fuzzNumber`, and
-  `fuzzInstant` each ended with edge *and* feature counts identical to their seeded
-  start (401/962, 374/831, 326/832) across 38–130M executions — more time buys
-  nothing there, and new coverage needs a harness or oracle change instead. Only
-  `fuzzJson` still moves, and barely (two new feature buckets, flat edge coverage).
+- **Three of the four targets are effectively saturated; don't budget hours of
+  wall clock.** Re-measured 2026-08-05 at 600s per target, width 1, 314M
+  executions total: `fuzzInstant` 326/832 and `fuzzNumber` 374/831 are
+  edge- and feature-identical to the 2026-07-24 figures, so those two are flat.
+  `fuzzDouble` moved from 401/962 to **403/963** across 104M executions — a
+  trickle, not a plateau, so "saturated" is an approximation there rather than a
+  fact. `fuzzJson` is the one that still explores and is also the slowest
+  (29.6k exec/s against 85k–234k; cov 472, ft 2864). Budget accordingly: more
+  time buys almost nothing on instant and number, and new coverage there needs a
+  harness or oracle change rather than a longer run.
   **Width is deliberately 1.** Those per-target figures were measured with one
   target on the machine at a time, so a campaign that widens `fuzzAll` is not
   comparable against them — libFuzzer's exec rate, and therefore its coverage
