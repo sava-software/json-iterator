@@ -73,8 +73,6 @@ systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,RemoveConditionalMutat
 systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,RemoveConditionalMutator_ORDER_ELSE,SURVIVED # line 488
 systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 505
 systems.comodal.jsoniter.BytesJsonIterator,parseFieldName,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 513
-systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 659
-systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,RemoveConditionalMutator_EQUAL_IF,SURVIVED # line 663
 systems.comodal.jsoniter.BytesJsonIterator,parseString,ConditionalsBoundaryMutator,SURVIVED # line 347
 systems.comodal.jsoniter.BytesJsonIterator,parseString,ConditionalsBoundaryMutator,SURVIVED # line 367
 systems.comodal.jsoniter.BytesJsonIterator,parseString,ConditionalsBoundaryMutator,SURVIVED # line 368

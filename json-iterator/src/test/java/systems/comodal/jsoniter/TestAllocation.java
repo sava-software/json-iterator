@@ -69,6 +69,35 @@ final class TestAllocation {
     assertTrue(bytes > 0 && bytes <= 32, "byte[3] read allocated " + bytes + " bytes");
   }
 
+  /// The reusable char buffer must grow *amortised* — double only when full —
+  /// so decoding N chars costs O(log N) grows. Every "grow always" mutant on
+  /// those guards is content-identical (the string still decodes correctly), so
+  /// no assertEquals can see it; the only thing that changes is how much was
+  /// allocated getting there. Starting from a 2-char buffer, correct decoding
+  /// allocates a few hundred bytes, while a per-character double allocates
+  /// 2^N — megabytes here. Without this bound those mutants either survive or,
+  /// worse, are "killed" only by exhausting the heap in a long-string test,
+  /// which races the PIT timeout and fails a loaded certification at random.
+  @Test
+  void test_char_buffer_grows_amortised_not_per_character() {
+    // supplementary chars exercise the surrogate-split grows, the ascii tail the
+    // general append grow; both live on the multi-byte decode path
+    final var text = "\uD83D\uDE00".repeat(18) + "a".repeat(18);
+    final byte[] doc = ('"' + text + '"').getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    // correctness first: the bound below is only meaningful if the read is right
+    assertEquals(text, JsonIterator.parse(doc, 2).readString());
+    final long allocated = minAllocated(() -> {
+      final var read = JsonIterator.parse(doc, 2).readString();
+      if (read.isEmpty()) {
+        throw new AssertionError("unreachable; keeps the decode observable");
+      }
+    });
+    assertTrue(
+        allocated > 0 && allocated <= 8192,
+        "decoding " + text.length() + " chars from a 2-char buffer allocated " + allocated
+            + " bytes; amortised doubling costs a few hundred, per-character doubling megabytes");
+  }
+
   @Test
   void test_guarded_primitive_reads_allocate_nothing() {
     final byte[] number = "42".getBytes();

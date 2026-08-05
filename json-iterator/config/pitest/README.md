@@ -231,6 +231,32 @@ timeout). The accepted remainder is equivalent by construction:
   it (invalid input throws first), so the copy is defensive; forcing it is
   allocation-only.
 
+## Amortised char-buffer growth (2026-08-05)
+
+`BytesJsonIterator` guards every `charBuf` append with
+`if (charBuf.length == j) doubleReusableCharBuffer();`. The *never-grow*
+direction of each guard corrupts output and dies to
+`TestMultiByteScanEdges.test_char_buffer_growth_through_surrogate_split`. The
+*always-grow* direction is content-identical — the string still decodes
+correctly, it just allocated 2^N getting there — so no `assertEquals` can see
+it. Lines 659 and 663 therefore sat in the accepted baseline as survivors, and
+line 672 was "killed" only by `TestString.test_long_string` exhausting the heap,
+which races PIT's watchdog: it timed out under a loaded certification on
+2026-08-05 and read `KILLED` on the same commit solo.
+
+`TestAllocation.test_char_buffer_grows_amortised_not_per_character` closes the
+family by asserting the property directly — decoding 54 chars from a 2-char
+buffer allocates a few hundred bytes, where per-character doubling allocates
+about a megabyte. Baseline 121 -> 119; `iterator` 1798 -> 1800 of 1919.
+
+Still open in the same family: `widenToCharBuf:200` `MathMutator`
+(`Math.max(len, charBuf.length << 1)` -> `>> 1`) survives. It is content-safe
+because `Math.max` still admits `len`; what it removes is the doubling headroom,
+so the cost is repeated reallocation across a *sequence* of widening reads
+rather than within one. Killing it needs an allocation assertion over successive
+growing reads on one iterator, which is a different measurement from the one
+above.
+
 ## Timed-out mutants (audited set)
 
 `TIMED_OUT` is detected — these mutants never enter a baseline — but the
