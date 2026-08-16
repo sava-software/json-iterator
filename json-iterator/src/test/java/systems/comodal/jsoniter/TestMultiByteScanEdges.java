@@ -88,4 +88,27 @@ final class TestMultiByteScanEdges {
     final byte[] padded = ("xx\"" + expected + "\"yy").getBytes();
     assertEquals(expected, JsonIterator.parse(padded, 2, padded.length - 2, 2).readString());
   }
+
+  /// The `char[]` a [FieldBufferPredicate] receives is the iterator's reusable
+  /// decode buffer, and widening replaces it only when a name outgrows it — so
+  /// two names that already fit must arrive in the *same* array. Forcing the
+  /// grow branch is content-identical (every name still decodes), so no
+  /// `assertEquals` can see it; buffer identity can. This is the capability-free
+  /// half of the widening contract: [TestAllocation] asserts the same property
+  /// with byte counts, but that whole class is skipped on a JVM without thread
+  /// allocation counters.
+  @Test
+  void test_field_buffer_is_reused_when_the_name_already_fits() {
+    final byte[] doc = "{\"alpha\":1,\"bravo\":2}".getBytes();
+    final char[][] seen = new char[2][];
+    final int[] n = {0};
+    JsonIterator.parse(doc, 32).testObject((buf, offset, len, ji) -> {
+      assertEquals(5, len);
+      seen[n[0]++] = buf;
+      ji.skip();
+      return true;
+    });
+    assertEquals(2, n[0]);
+    assertSame(seen[0], seen[1], "the reusable field buffer was reallocated for a name that already fit");
+  }
 }

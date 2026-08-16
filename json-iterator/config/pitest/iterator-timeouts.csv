@@ -1,10 +1,12 @@
-# Audited timed-out mutants (class,method,mutator — line-less; the verify warns on
-# timeouts missing from this set). Structural causes: README.md "Timed-out mutants
-# (audited set)".
-systems.comodal.jsoniter.BaseJsonIterator,reduceScale,IncrementsMutator  # line 1021
-systems.comodal.jsoniter.BaseJsonIterator,reduceScale,RemoveConditionalMutator_ORDER_IF  # line 1021
-systems.comodal.jsoniter.BaseJsonIterator,skipObject,IncrementsMutator  # line 1122
-systems.comodal.jsoniter.BytesJsonIterator,parseMultiByteString,MathMutator  # line 575
-systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,MathMutator  # line 690
-systems.comodal.jsoniter.CharsJsonIterator,parse,IncrementsMutator  # line 136
-systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,MathMutator  # line 156
+# Audited timed-out mutants: line-less 'class,method,mutator' keys, each carrying the
+# reviewed '# cause:<category>' comment. Only cause:liveness is admissible watchdog
+# detection; resource/harness/untriaged are findings and never certify. '# line' is
+# diagnostic metadata for review only — it neither authorizes nor identifies a mutant,
+# and source-line movement alone requires no re-anchoring. Structural causes:
+# README.md "Timed-out mutants (audited set)".
+systems.comodal.jsoniter.BaseJsonIterator,reduceScale,IncrementsMutator  # cause:liveness line 1021
+systems.comodal.jsoniter.BaseJsonIterator,reduceScale,RemoveConditionalMutator_ORDER_IF  # cause:liveness line 1021
+systems.comodal.jsoniter.BaseJsonIterator,skipObject,IncrementsMutator  # cause:liveness line 1122
+systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,MathMutator  # cause:liveness line 709
+systems.comodal.jsoniter.CharsJsonIterator,parse,IncrementsMutator  # cause:liveness line 136
+systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,MathMutator  # cause:liveness line 156

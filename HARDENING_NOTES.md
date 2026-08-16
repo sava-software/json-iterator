@@ -72,15 +72,17 @@ Every suite targets `systems.comodal.jsoniter.Test*` plus
 
 Fuzzing is deliberately explicit and local: `fuzzAll` derives all four
 registered targets from the registrations, so it cannot drift from a
-hand-written task list. Its receipt lands at `build/hardening/local-fuzz.tsv`,
-which is git-ignored and destroyed by `clean` — durability is somebody's job,
-not the file's. Under sava-build's `tools/local-fuzz.sh --release` that job is
-done for us: the runner hashes this repo's receipt into an immutable run bundle
-under sava-build's `build/hardening/local-fuzz-runs/`, retained by the
-sava-build release owner outside the tree it certifies. A campaign run
-standalone from here is retained by nobody unless whoever ran it copies the
-receipt out of `build/` first — the same caveat applies to
-`build/hardening/pitest-certification.tsv`. The recorded release budget is
+hand-written task list. Its receipt lands at `.pitest-history/local-fuzz.tsv`
+— deliberately outside `build/`, so unlike the certification receipt it
+survives `clean`. It is still git-ignored machine-local state, so it is durable
+against the build, not against the machine. Under sava-build's
+`tools/local-fuzz.sh --release` durability stops being anyone's problem here:
+the runner hashes this repo's receipt into an immutable run bundle under
+sava-build's `build/hardening/local-fuzz-runs/`, retained by the sava-build
+release owner outside the tree it certifies. A campaign run standalone from
+here is retained by nobody beyond this machine. That caveat is sharper for
+`build/hardening/pitest-certification.tsv`, which `clean` does destroy — copy
+it into the release record before the next one. The recorded release budget is
 `-PmaxFuzzTime=600` per target; the saturation measurement behind that number
 is in `AGENTS.md`, and three of the four targets buy no new coverage past it.
 There is no GitHub fuzz workflow: `.github/workflows/fuzz.yml` was deleted on

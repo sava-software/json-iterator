@@ -19,8 +19,17 @@ A new unkilled mutant has exactly three legal outcomes:
    bounds) over restating the implementation.
 2. **Refactor** — restructure so the mutant cannot exist.
 3. **Accept it knowingly** — re-run through the suite's named baseline writer
-   (`pitest<Suite>BaselineUpdate`; `hardeningHelp` lists them) and record
-   the reason below. Acceptance is for mutants that are *equivalent with
+   and record the reason below. `hardeningHelp` lists them, and which one is
+   not a detail: these baselines are already bound and fully triaged, so a
+   reviewed *additive* acceptance is `pitest<Suite>BaselineUnion`, which
+   appends the new rows and leaves every existing one alone.
+   `pitest<Suite>BaselineUpdate` rewrites the record from the report and drops
+   rows the run did not match, which on a baseline carrying flip insurance and
+   argued siblings loses evidence rather than adding it — reach for it only
+   when a whole-record rewrite is the intent (the 2026-08-01 pass is the one
+   time that was true here, and it took a per-key diff first).
+   `pitest<Suite>BaselineRebase` is for a reviewed PIT/toolchain transition
+   only. Acceptance is for mutants that are *equivalent with
    respect to observable behavior*, not for "hard to test". The refresh seeds
    each new row `# untriaged`; finishing triage means replacing that with a
    short family label whose argument lives in a section below (mentioned there
@@ -34,7 +43,9 @@ A new unkilled mutant has exactly three legal outcomes:
 Line numbers left the baseline key in sava-build 21.5.20 (these files were
 migrated with `migrateMutationBaselines` on 2026-08-01, row identities
 unchanged), so an unrelated edit to a mutated file churns nothing. What is
-left is a `# line N` tag every refresh rewrites, plus a **line-drift
+left is a `# line N` tag — review metadata, not identity, rewritten only by a
+full `BaselineUpdate` or by a `BaselinePrune` whose removal-candidate preview
+is empty, not by every writer — plus a **line-drift
 advisory** when a key is unkilled only at lines no tag names — the code an
 acceptance argues about moved, or a new mutant landed under an old
 acceptance. Re-read the argument below when that fires; the price of the
@@ -45,12 +56,17 @@ identical rows are sibling mutants of one compound condition (one per
 operand or branch direction), so duplicate lines are legal and must never be
 hand-deduped.
 
-Incremental analysis (PIT history) is available via arcmutate (free licences
-for open source; the build plugin activates it when `arcmutate-licence.txt`
-sits at the repo root — see sava-build's `HARDENING.md`). Not adopted here
-yet: suite scoping keeps full runs around a minute each. If adopted, the
-pre-release gate, baseline refreshes, and convergence runs all take
-`-PnoMutationHistory`.
+Incremental analysis (PIT history) needs arcmutate, which is **not eligible
+here** — the certificate is scoped to `software.sava.*` packages and this
+library's are `systems.comodal.jsoniter.*`, so no run of these suites can be
+`[history]`-backed (`HARDENING_NOTES.md` §"No ArcMutate acceleration here").
+The rule it would otherwise impose still binds every writer decision, because
+the other way to get a report that cannot support one is cheap and local: a
+`[history]` report may check the ratchet but can never add, remove or relabel
+an accepted or timeout row, and neither can a `-PmutateOnly` scoped report,
+which the plugin diverts to `build/reports/pitest-scoped/` and marks
+`ratchet skipped`. Iterate scoped, then re-run the suite unscoped with
+`-PnoMutationHistory` before touching any record here.
 
 The fuzz seed corpora replay deterministically in the unit suite via the
 plugin-generated `<Harness>SeedReplayTest` classes (one per fuzz target), so
@@ -276,106 +292,181 @@ the only thing the counter can see — the first attempt went through
 `widenToCharBuf`, and the mutant survived it. Baseline 119 -> 118;
 `iterator` 1800 -> 1802 of 1919.
 
+The "always-grow is content-identical" premise above held only while growth was
+unbounded; see the next section, which removed it. Both tests stay — they now
+guard *amortisation*, which is still invisible to any `assertEquals`, rather than
+being the only thing that could see the mutant at all.
+
+## Bounding the reusable char buffer (2026-08-15)
+
+`doubleReusableCharBuffer` doubled with no clamp, so past 2^30 chars
+`charBuf.length << 1` overflowed negative — a real `NegativeArraySizeException`
+independent of any mutant. It is now bounded by the document: every decode step
+consumes at least as many source bytes as it writes chars, `buf` is never
+refilled mid-parse (`reset(InputStream)` reads the stream whole), and every
+caller grows only when the buffer is exactly full — so a grow request at or past
+`tail` cannot happen for any input, valid or malformed, unless the cursor stopped
+advancing. `widenToCharBuf` takes the same clamp.
+
+That closed both non-certifying timeout findings, which is why they are no longer
+in the audited set:
+
+- `parseMultiByteString` `MathMutator`, every cursor reversal in the method —
+  previously `cause:harness`. The reversed cursor still spins, but the loop now
+  ends in a `JsonException` within milliseconds instead of racing PIT's watchdog
+  against the heap. All of them read `KILLED`.
+- `widenToCharBuf` `RemoveConditionalMutator_ORDER_IF` — previously
+  `cause:resource`, and simultaneously an accepted `SURVIVED` row. Forcing the
+  grow branch now allocates a bounded amount, so
+  `test_field_name_widening_keeps_doubling_headroom` reaches its assertion
+  instead of the heap ceiling. Killed, and the accepted row pruned.
+  Its `ConditionalsBoundaryMutator` sibling (`>` -> `>=`) is unaffected and
+  stays accepted: one extra grow at the exact-fit boundary is far inside the
+  8192-byte bound.
+
+`TestMultiByteScanEdges.test_field_buffer_is_reused_when_the_name_already_fits`
+was added alongside, asserting the same widening contract through buffer identity
+rather than byte counts — `TestAllocation` is skipped entirely on a JVM without
+thread allocation counters, and this kill should not depend on that capability.
+
+Two new accepted survivors, label `# bounded reusable buffer`: the guard's
+boundary direction (`>=` -> `>`) and its never-fire direction. Both are
+equivalent by construction — the guarded state is unreachable, so no test can
+distinguish them — which is the disclosed price of the bound. The other two
+directions are killed: forcing the guard throws on every grow, and negating it
+throws on the first.
+
+Baseline 118 -> 119; audited timeouts 10 -> 8; `iterator` 1802 -> 1803 of 1922,
+timed out 7 -> 5.
+
 ## Timed-out mutants (audited set)
 
 `TIMED_OUT` is detected — these mutants never enter a baseline — but the
 watchdog observed slowness, not wrongness: for exactly these mutants the
 ratchet cannot see a weakened covering assertion, because a timeout keeps
-"detecting" no matter what the test asserts. Per HARDENING.md, the summary's
+"detecting" no matter what the test asserts. The summary's
 `N timed out (load-dependent)` is therefore an audited set, not a count: every
 member is listed here with the structural cause that makes it spin, and a
 mutant timing out that is *not* on this list is something a reviewer stops on.
-Members flip `KILLED`↔`TIMED_OUT` run to run — the covering test reaching a
-failure races the watchdog over a dead mutant, benign in both directions — so
-per-run counts sit at or below the set size. (The 2026-07-21 convergence check
-recorded 7 iterator members; one has since settled to `KILLED`.) Membership is
-machine-checked: `iterator-timeouts.csv` / `util-timeouts.csv` hold the
-`class,method,mutator` keys, and the verify warns on any timeout outside them
-(as well as on malformed rows, on a member no mutant matches, on one whose
-class and method appear nowhere together below, and — via a machine-local
-quiet counter in `.pitest-history/` — on a member with no timeout in 3+
-consecutive mutation runs). All of it is advisory by default, re-printed in
-the end-of-build summary; `-PstrictTimeoutAudit` escalates the
-unaudited-newcomer/malformed/no-set findings to failures on certifying runs,
-and the static checks (row shape, cause presence) also run in
-`pitest<Suite>Debt`. `numbers` has never timed out, so it has no file and the
-check is inert for that suite. The keys are deliberately line-less — drift cannot
-churn membership — which is also the check's resolution: a *new* timed-out
-mutant inside an already-audited method+mutator matches the existing member
-silently. That is why each cause below names the line it argues about; re-read
-those lines whenever the code at them changes, because a clean run certifies
-"no new method+mutator", not "no new mutant".
+Membership is machine-checked — `iterator-timeouts.csv` / `util-timeouts.csv`
+hold the `class,method,mutator` keys — and `numbers` has never timed out, so it
+has no file and the check is inert for that suite.
 
-Every member carries a `# line` anchor in its CSV row as of 2026-08-03, which
-is what arms the line-drift advisory; before that the rows were bare and the
-check was silently inert. The anchors were verified against source and against
-a certification run in which the five members that did time out landed on
-exactly the recorded lines.
+Each row also carries a reviewed `# cause:` category, and only **one** of them
+certifies. `cause:liveness` means the mutated path has no finite completion
+guarantee of its own: it does not end, so the watchdog is the only thing that
+*can* report it, and the timeout is honest evidence. The other three are
+findings, not classifications to settle on — `cause:resource` for a path that
+does complete but at a cost the watchdog beats, `cause:harness` for a
+demonstrated finite covering-path/watchdog race being repaired, and
+`cause:untriaged` for a seeded row nobody has read yet. A run under
+`-PstrictTimeoutAudit` — which `hardeningCertify` forces — fails on all three.
 
-Two members currently sit on the quiet counter — `parseMultiByteString`
-(3 runs) and `skipPastMultiByteEndQuote` (4). **Both are expected to, and
-neither should be retired on that advisory alone**: each one's cause below
-explains why it flaps rather than hangs every run. The counter is doing its
-job by asking; the answer is written down.
+The distinction that matters here is **allocation**, and it splits this repo's
+otherwise identical reversed-cursor family in two. `buf[head++] -> buf[head--]`
+pins the cursor on the backslash it just read, so the loop never advances. In a
+*skip* path nothing is written and the loop simply never ends: liveness. In a
+*parse* path the same non-advancing loop appends one char to `charBuf` every
+pass and doubles the buffer, so it ends after all — by exhausting the heap.
+That is a finite fault racing the watchdog, and it is not liveness however much
+the loop looks like it. Measure before classifying: transcribe the loop, run
+it, and see whether it stops.
 
-As of 2026-08-03 — 9 members, 7 iterator + 2 util, numbers none:
+Keys are deliberately line-less, so drift cannot churn membership, and `# line`
+tags are diagnostic metadata for review only. Source-line movement never warns,
+never fails, and never requires re-anchoring — adding a method or reflowing an
+expression above a mutated line is not a hardening record change. What the
+line-less key *does* cost is resolution: a new timed-out mutant inside an
+already-audited method+mutator matches the existing member silently. That is why
+each cause below names the line it argues about and, where the key covers more
+than one mutant, says so — re-read those lines whenever the code at them
+changes, because a clean run certifies "no new method+mutator", not "no new
+mutant". Cause is key-level too: a liveness token claims every sibling under its
+key, so a key that mixes liveness with a finite cause cannot be recorded
+honestly at all until the site is split or removed.
 
-**iterator**
+Members flip `KILLED`↔`TIMED_OUT` run to run, so per-run counts sit at or below
+the set size — but a *finite* flip is a repair item, not a recorded cause. The
+2026-08-15 history-free observations had 5 of the 6 `iterator` members time out
+(`skipPastMultiByteEndQuote` did not) across three consecutive runs.
+
+As of 2026-08-15 — 8 members, 6 `iterator` + 2 `util`, `numbers` none, and all
+eight are honest liveness. Two `BytesJsonIterator` members were retired the same
+day by repair rather than by a quiet streak; the change that closed them is
+recorded under "Bounding the reusable char buffer (2026-08-15)".
+
+**iterator — cause:liveness**
+
 - `BaseJsonIterator.reduceScale:1021`, two mutants (`scale--` → `scale++`;
   loop condition → `true`): the counter crossing the negative `scaleLimit` is
   the loop's only exit; both remove it and the divide loop spins on a settled
-  quotient of 0.
+  quotient of 0. Long division allocates nothing, so nothing else can end it.
 - `BaseJsonIterator.skipObject:1122` (scan cursor `i++` → `i--`): the
   `i == tail` bound is an equality a backward walk never meets, and the
-  string-skip re-entry (`i = head - 1` after `skipPastEndQuote()`) can pull
-  the cursor back into the same cycle indefinitely.
-- `BytesJsonIterator.parseMultiByteString:575` (escape-decode `buf[head++]` →
-  `buf[head--]`): the cursor backs away from the `head == tail` guard and
-  re-decodes earlier bytes; the spin races the eventual bounds fault, which is
-  why this member often lands `KILLED` instead.
-- `CharsJsonIterator.parse:136` (escape skip `++i` → `--i`): cancels the for
-  loop's own `++i`, pinning the cursor on the same backslash — a pure
-  oscillation with no exit and no fault.
-- `CharsJsonIterator.skipPastEndQuote:156` (`buf[head++]` → `buf[head--]`):
-  same reversed-cursor family as `parseMultiByteString:575`.
-- `BytesJsonIterator.skipPastMultiByteEndQuote:690` (escape-dispatch
+  string-skip re-entry (`i = head - 1` after `skipPastEndQuote()`) pulls the
+  cursor forward again, so on any object carrying a field name the cursor
+  cycles over a fixed span instead of running off the front. Nothing is
+  allocated inside the cycle.
+- `BytesJsonIterator.skipPastMultiByteEndQuote:709` (escape-dispatch
   `buf[head++]` → `buf[head--]`, admitted 2026-08-03): the reversed cursor
   lands back on the backslash's *own* index, so the next pass reads the same
   `\` at line 683, re-enters the same branch and restores the same state — a
-  fixed point with no exit and no fault, unlike the bounds-race spin of its two
-  `buf[head--]` siblings. What makes the *member* flap is the input, not the
-  loop: only the eight simple escapes (`b t n f r " / \`) spin, because the `u`
-  arm's four `head++` hex reads step past the backslash and leave the mutant
-  merely wrong. So a covering test carrying `\uXXXX` kills it while one
-  carrying `\n` hangs it, and the member reads `TIMED_OUT` or `KILLED`
-  according to which the minion reaches first — observed both ways within an
-  hour on 2026-08-03 (`TIMED_OUT` on the cold certify that surfaced it,
-  `KILLED` on the next run). Removing the timeout would therefore mean removing
-  a legitimate covering input, not fixing a harness bound. The sibling
-  reversal at line 683 is reliably `KILLED`, which is the contrast worth
-  keeping: at the loop head a backward cursor immediately misreads and the scan
-  diverges observably, while at 690 it is invisible because the loop never
-  advances at all. Non-termination confirmed by transcribing the loop and
-  running both variants over `\\`, `\n`, `\"` and `A`.
-  **Quiet-streak note, 2026-08-03:** it has read `KILLED` on every certification
-  since the one that admitted it, and the audit's quiet counter now reports it
-  at 3+ runs. Retirement is **refused**, and the counter is expected to keep
-  firing: the flap is a per-mutant test-order race, not a load effect, so the
-  next run that reaches the `\n` input before the `\uXXXX` one will time out
-  again — and with the member retired that would be an unaudited newcomer,
-  which `hardeningCertify`'s forced strict audit fails hard. A one-in-N member
-  is exactly what an audited set is for. Retire it only on evidence the race is
-  gone: the `\n`-carrying covering test removed, or the escape dispatch
-  restructured so the reversed cursor can no longer land on its own backslash.
+  fixed point with no exit and no fault. It is a skip, so the loop body writes
+  nothing: transcribed and run outside the codebase on 2026-08-15 it completed
+  500,000,000 iterations with `head` pinned and zero allocation. What makes the
+  *member* flap is the input, not the loop: only the eight simple escapes
+  (`b t n f r " / \`) spin, because the `u` arm's four `head++` hex reads step
+  past the backslash and hand `JHex.decode` the `\` itself, which throws. So a
+  covering test carrying `\uXXXX` kills it while one carrying `\n` hangs it, and
+  the member reads `TIMED_OUT` or `KILLED` according to which the minion reaches
+  first — observed both ways within an hour on 2026-08-03. Removing the timeout
+  would therefore mean removing a legitimate covering input, not fixing a
+  harness bound. The sibling reversal at line 683 is reliably `KILLED`, which is
+  the contrast worth keeping: at the loop head a backward cursor immediately
+  misreads and the scan diverges observably, while at 690 it is invisible
+  because the loop never advances at all. The continuation-byte read at line 737
+  is the same fixed point under the same key and the same liveness token.
+- `CharsJsonIterator.parse:136` (escape skip `++i` → `--i`): cancels the for
+  loop's own `++i`, pinning the cursor on the same backslash — a pure
+  oscillation with no exit and no fault. `numEscapes` increments and wraps;
+  nothing is allocated.
+- `CharsJsonIterator.skipPastEndQuote:156` (`buf[head++]` → `buf[head--]`):
+  the same allocation-free fixed point as `skipPastMultiByteEndQuote:709`, and
+  for the same reason — this is the chars-source *skip* path, so the loop body
+  writes nothing. **Not** the same family as `parseMultiByteString:575`, which
+  an earlier revision of this file claimed; that one appends.
 
-**util**
+**util — cause:liveness**
+
 - `JIUtil.escapeQuotesChecked:170` (do-while `++from` → `--from`): after an
   odd, already-escaped quote the backward `from` makes `indexOf('"', from)`
   re-find the same quote every pass (a negative fromIndex clamps to 0), so
-  the loop never reaches `len`.
+  the loop never reaches `len`. `indexOf` and `charAt` allocate nothing.
 - `FieldMatcher.of:51` (`names.length << 2` → `>> 2`): collapses the table
   capacity below the entry count, and the linear-probe insert loop exits only
-  on an empty slot or a duplicate name — a full table offers neither.
+  on an empty slot or a duplicate name — a full table offers neither. The probe
+  walks a fixed `int[]`; nothing grows.
+
+**On retiring a member.** `skipPastMultiByteEndQuote` sits on the quiet counter
+and is not retired on that advisory alone. The flap is a per-mutant test-order
+race over a genuinely endless loop, so the next run that reaches the `\n` input
+before the `\uXXXX` one times out again, and with the member retired that would
+be an unaudited newcomer that `hardeningCertify`'s forced strict audit fails
+hard. A one-in-N member is exactly what an audited set is for. Retire it only on
+evidence the race is gone: the `\n`-carrying covering test removed, or the escape
+dispatch restructured so the reversed cursor can no longer land on its own
+backslash.
+
+The other route out is repair, and it is what closed the two `BytesJsonIterator`
+members on 2026-08-15. Note what licenses their removal: not an enumeration of
+the sites that used to spin. The key is line-less, so retiring it asserts that
+*no* mutant under that method and mutator can time out — and an enumeration would
+have missed `parseMultiByteString`'s 2-byte continuation read, a third spinning
+cursor nobody had listed. The licence is a loop bound instead: every pass of that
+loop returns, throws, breaks, or appends at least one char, and appends now stop
+at `tail`, so the loop terminates no matter which cursor a mutation reverses.
+Prefer a structural argument of that shape over a site list whenever a line-less
+key is retired.
 
 ## Mutator-set trial (2026-07-21)
 

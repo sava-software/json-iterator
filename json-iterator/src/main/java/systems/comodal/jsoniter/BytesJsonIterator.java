@@ -159,9 +159,31 @@ class BytesJsonIterator extends BaseJsonIterator {
     return intDigit(buf[offset]);
   }
 
+  /// The document bounds the reusable decode buffer. Every decode step
+  /// consumes at least as many source bytes as it writes chars — ascii one for
+  /// one, an escape two for one, a six-character hex escape six for one, a
+  /// four-byte sequence four for the two chars of a surrogate pair — and `buf`
+  /// is a fixed array
+  /// that is never refilled mid-parse (`reset(InputStream)` reads the stream
+  /// whole), so `head` only ever moves toward `tail`. Every caller grows only
+  /// when the buffer is exactly full, so a grow request at or past `tail` means
+  /// more chars were decoded than the document holds bytes: unreachable for
+  /// every input, valid or malformed, unless the cursor stopped advancing.
+  /// Report that against the read position instead of doubling on into the
+  /// heap. The clamp also keeps the shift from overflowing past 2^30 chars,
+  /// where `length << 1` turns negative.
+  ///
+  /// Two preconditions hold this up, and a change that breaks either one makes
+  /// this throw on valid input: `tail` is the end of the whole document, never
+  /// a refill boundary, and no growth policy pre-sizes beyond what the document
+  /// can fill.
   private void doubleReusableCharBuffer() {
-    final char[] newBuf = new char[charBuf.length << 1];
-    System.arraycopy(charBuf, 0, newBuf, 0, charBuf.length);
+    final int len = charBuf.length;
+    if (len >= tail) {
+      throw reportError("doubleReusableCharBuffer", "decoded chars cannot outgrow the document");
+    }
+    final char[] newBuf = new char[(int) Math.min((long) len << 1, tail)];
+    System.arraycopy(charBuf, 0, newBuf, 0, len);
     charBuf = newBuf;
   }
 
@@ -197,7 +219,11 @@ class BytesJsonIterator extends BaseJsonIterator {
     final int from = head;
     final int len = to - from;
     if (len > charBuf.length) {
-      charBuf = new char[Math.max(len, charBuf.length << 1)];
+      // Same bound as doubleReusableCharBuffer: `len <= tail` always, so
+      // `Math.max` still admits every legal length; the clamp only drops
+      // doubling headroom this document could never fill, and keeps the shift
+      // from overflowing negative past 2^30 chars.
+      charBuf = new char[Math.max(len, (int) Math.min((long) charBuf.length << 1, tail))];
     }
     for (int k = 0; k < len; ++k) {
       charBuf[k] = (char) (buf[from + k] & 0xff);

@@ -67,14 +67,19 @@ last of which is inventoried in `HARDENING_NOTES.md`.
      fails until the marker acknowledges the resolved plugin's digest; re-diff
      the block against `hardeningAgentTemplate` before moving it, because a
      changed bullet can require code rather than prose. Acknowledged together
-     with both plugin pins for sava-build 21.5.22. -->
-<!-- hardening-template sha256:d128cb8208fa -->
+     with both plugin pins for sava-build 21.5.25. -->
+<!-- hardening-template sha256:46f7174e51fb -->
 
 - **Suite choice is reachability, not habit.** `pitestNumbers` mutates
   `DoubleParser`; `pitestUtil` mutates `JHex`/`JIUtil`/`InstantParser`/
   `FieldMatcher`; `pitestIterator` mutates everything else. The first two finish
   in ~10s, `pitestIterator` costs ~90s. Test-only edits still owe the suite whose
   mutants those tests kill; doc, build-script and comment changes owe no suite.
+  Adding, removing, renaming or moving a production class — or editing the
+  `targetClasses`/`excludedClasses` globs in `json-iterator/build.gradle.kts` —
+  additionally owes the cheap whole-population `mutationOwnershipAudit` before
+  handoff, not just at certification time; it is the only leg that fails on an
+  unowned class, and it is reachable from neither `check` nor `qualityGate`.
 - **Certification is owned by the local release checklist, not CI.** CI
   deliberately runs only `check` (sava-build's shared workflow) — the serialized
   PIT suites are too slow for hosted runners. Don't wire the full gate into CI to
@@ -117,20 +122,45 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   with eight neighbouring rows the exact-offset assertions swept up.
 - **Three keys here hold an accepted survivor and an audited timeout at once** —
   `CharsJsonIterator.skipPastEndQuote/MathMutator`,
-  `JIUtil.escapeQuotesChecked/IncrementsMutator`, `FieldMatcher.of/MathMutator`.
-  Under sava-build 21.5.20 they reported a flip on every run in byte-identical
-  populations (casebook: "The flip that fired forever"); the per-key count
-  comparison that landed in 21.5.21 silenced them, so a warning at any of them
-  is real again.
-- **The audited timeout set here** is 7 `iterator` rows and 2 `util`; `numbers`
+  `JIUtil.escapeQuotesChecked/IncrementsMutator`, and
+  `FieldMatcher.of/MathMutator`.
+  Under sava-build 21.5.20 all three reported a flip on every run in
+  byte-identical populations (casebook: "The flip that fired forever"); the
+  per-key count comparison that landed in 21.5.21 silenced them, so a warning at
+  any of them is real again. A key whose survivor and timeout are the *same*
+  mutant seen at two speeds is not flip insurance at all but a repair item;
+  `widenToCharBuf/RemoveConditionalMutator_ORDER_IF` was one, and was repaired
+  on 2026-08-15 rather than insured.
+- **The audited timeout set here** is 6 `iterator` rows and 2 `util`; `numbers`
   has never timed out, so it has no file and the check is inert for that suite.
-  Every member carries a `# line` anchor as of 2026-08-03 — before that the rows
-  were bare and the line-drift check was silently inert. Causes live in
-  `config/pitest/README.md` §"Timed-out mutants (audited set)"; admit a newcomer
-  only with its cause written, and prefer removing the cause (a call budget or
-  bound in the harness) over leaning on the timeout. Two members currently sit on
-  the quiet counter and are deliberately not retired — the README records why and
-  what would justify retiring them.
+  Every row carries a reviewed `# cause:` category and only `cause:liveness`
+  certifies; causes live in `config/pitest/README.md` §"Timed-out mutants
+  (audited set)". Admit a newcomer only with its cause written, and prefer
+  removing the cause over leaning on the timeout. **The local test that decides
+  a cause here is allocation.** The reversed-cursor mutants
+  (`buf[head++]` → `buf[head--]`) all pin the cursor on the byte they just read,
+  but that only means *liveness* on the skip paths, where the loop body writes
+  nothing; on the parse path the same non-advancing loop appends to `charBuf`
+  and doubles it every pass, so it ends by exhausting the heap instead — a
+  finite fault racing the ~4 s watchdog (`duration × 1.25 + 4000 ms`), which is
+  not liveness however much the loop looks like it. Classify by transcribing the
+  loop and running it, never by family resemblance: that is how the 2026-08-15
+  pass found `BytesJsonIterator.parseMultiByteString` misfiled as liveness under
+  a cause ("the spin races the eventual bounds fault") that named a fault which
+  does not exist. `# line` tags are diagnostic metadata; source-line movement
+  never warns, fails, or needs re-anchoring, so the residual blind spot is a
+  *new* mutant sliding under an audited method+mutator — which is why each cause
+  names its line and the key's other mutants.
+- **Repair beats classification when the cause is finite.** Two rows were once
+  recorded here as non-certifying findings — `parseMultiByteString`
+  (`cause:harness`) and `widenToCharBuf` (`cause:resource`) — and both were
+  closed on 2026-08-15 by bounding `charBuf` to the document rather than by
+  relabelling them. A finite cause is a defect report: `cause:harness` and
+  `cause:resource` are holding states while you fix it, never a resting place.
+  Note what licensed retiring those line-less keys: a loop bound (every pass
+  returns, throws, breaks, or appends, and appends now stop at `tail`), not a
+  list of the sites that used to spin — an enumeration had already missed a
+  third spinning cursor in the same method.
 - **Randomized tests use fixed seeds, and never sleep** (`TestDouble`,
   `TestString`): PIT re-runs the covering tests once per mutant, so a single real
   wait costs minutes across a suite. Per-run exploration is the fuzz targets' job
@@ -208,7 +238,16 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   analysis can't delete the allocation under test, and a thin margin (observed:
   mutant at 88 bytes vs a 90-byte bound) is a flaky harness with extra steps. An
   incidental micro-optimization that only an allocation bound could observe is a
-  mutant to accept, with "allocation routing only" as the written reason.
+  mutant to accept, with "allocation routing only" as the written reason — but
+  that acceptance covers **constant-factor sizing only**. A mutant that removes a
+  growth, capacity or amortisation guard changes the allocation's *complexity
+  class* while leaving output byte-identical, and is a kill rather than an
+  equivalent: use a small input, an orders-of-magnitude margin, and the path
+  through the mutated code that actually reaches the guard. Both 2026-08-05 kills
+  are that shape — `ensureCapacity:138` reallocating once per escape instead of
+  by doubling, and `widenToCharBuf:200` dropping the doubling headroom across a
+  *sequence* of widening reads — and the second needed `testObject` rather than
+  `applyCharsAsInt`, because only that overload reaches `widenToCharBuf` at all.
 - **All test-source classes here are `Test*` or `*Fuzz*` today**, and the
   `iterator` suite excludes those patterns — but a shared fake extracted to a
   top-level `RecordingFoo`/`StubFoo` would match neither and silently join the
@@ -225,16 +264,39 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   `systems.comodal.jsoniter.*`, so every run is open-source PIT from scratch —
   see `HARDENING_NOTES.md` §"No ArcMutate acceleration here" before copying a
   certificate in. A suite that got faster without getting narrower is therefore
-  always a bug report here; there is no `[history]` exception to appeal to.
-- **Witnessed 2026-08-03: a transient `RUN_ERROR` fails a whole certification.**
+  always a bug report here; there is no `[history]` exception to appeal to, and
+  the rule that a `[history]` report may check the ratchet but can never support
+  adding, removing or relabelling an accepted or timeout record has no subject
+  here for the same reason.
+- **A scoped report is a preview, and the tooling enforces it.**
+  `-PmutateOnly=<class-glob>` writes to `build/reports/pitest-scoped/` instead of
+  the suite's report directory, prints `ratchet skipped`, and cannot advance a
+  baseline row, a timeout classification, or the quiet-run counter — so use it
+  freely to iterate on a cluster, then re-run the suite unscoped with
+  `-PnoMutationHistory` before any record decision. Reading a *timeout* out of a
+  scoped run is the specific trap: the scope changes what else is competing for
+  the machine, and timeouts are load-dependent.
+- **When a survivor contradicts an oracle you believe, suspect contaminated
+  evidence before rewriting the argument.** Compare the same scoped, history-free
+  population with and without `-PisolateMutants`; an isolation-only kill means
+  state leaked between mutants. This repo's one candidate for that is
+  `TestAllocation`'s `static volatile` sinks — required, because escape analysis
+  would otherwise delete the allocation under test — so if an allocation-bound
+  row ever reads `SURVIVED` against a bound you can reproduce by hand, isolate
+  before touching the baseline. Isolated execution is diagnosis, never a record.
+- **Witnessed 2026-08-03: a per-mutant `RUN_ERROR` fails a whole certification.**
   A cold certification died in `pitestIteratorVerify` on `RUN_ERROR x1`, and the
   identical re-run certified all three suites — one occurrence in three
-  certification runs, so load. Budget for it: a release certification can lose
-  two minutes to a single flaky minion, and the correct response is to run it
-  again, never to reach for a refresh flag. **Copy the offending coordinate out
-  before re-running** — the quiet re-run overwrites the only report that held it,
-  and without the coordinate the same-mutant-twice test cannot be applied to the
-  next occurrence.
+  certification runs. That is the observed rate and nothing more: a `RUN_ERROR`
+  diagnoses neither load nor memory, so it never justifies raising heap or
+  changing thread counts, and the machine's load average at the time is context
+  to record, not a cause to infer. Budget for it: a release certification can
+  lose two minutes to one invalid minion outcome, and the correct response is a
+  single quiet re-run, never a refresh flag. **Copy the offending coordinate out
+  before re-running** — the quiet re-run overwrites the only report that held it.
+  A repeat at the same coordinate is not a louder load signal; it is the cue to
+  read the mutated bytecode, its covering tests, and the tool failure itself
+  (the daemon log under `~/.gradle/daemon/<version>/` keeps the full output).
 - **Verify by the absence of failures, not the presence of passes.** A green
   `check` can mean the build cache short-circuited rather than that tests ran —
   on 2026-08-03 a post-`clean` `check` came back in 698ms with `:test`

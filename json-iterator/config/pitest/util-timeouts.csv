@@ -1,5 +1,8 @@
-# Audited timed-out mutants (class,method,mutator — line-less; the verify warns on
-# timeouts missing from this set). Structural causes: README.md "Timed-out mutants
-# (audited set)".
-systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,IncrementsMutator  # line 170
-systems.comodal.jsoniter.FieldMatcher,of,MathMutator  # line 51
+# Audited timed-out mutants: line-less 'class,method,mutator' keys, each carrying the
+# reviewed '# cause:<category>' comment. Only cause:liveness is admissible watchdog
+# detection; resource/harness/untriaged are findings and never certify. '# line' is
+# diagnostic metadata for review only — it neither authorizes nor identifies a mutant,
+# and source-line movement alone requires no re-anchoring. Structural causes:
+# README.md "Timed-out mutants (audited set)".
+systems.comodal.jsoniter.JIUtil,escapeQuotesChecked,IncrementsMutator  # cause:liveness line 170
+systems.comodal.jsoniter.FieldMatcher,of,MathMutator  # cause:liveness line 51
