@@ -66,9 +66,11 @@ last of which is inventoried in `HARDENING_NOTES.md`.
      template in sava-build's HARDENING.md. `agentsTemplateInSync` (in `check`)
      fails until the marker acknowledges the resolved plugin's digest; re-diff
      the block against `hardeningAgentTemplate` before moving it, because a
-     changed bullet can require code rather than prose. Acknowledged together
-     with both plugin pins for sava-build 21.5.25. -->
-<!-- hardening-template sha256:46f7174e51fb -->
+     changed bullet can require code rather than prose. `hardeningAgentTemplateDiff`
+     compares the bounded block below against the installed template. Acknowledged
+     together with both plugin pins for sava-build 21.5.26. -->
+<!-- hardening-template sha256:90537d1eb1dd -->
+<!-- hardening-template block:start -->
 
 - **Suite choice is reachability, not habit.** `pitestNumbers` mutates
   `DoubleParser`; `pitestUtil` mutates `JHex`/`JIUtil`/`InstantParser`/
@@ -294,14 +296,21 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   lose two minutes to one invalid minion outcome, and the correct response is a
   single quiet re-run, never a refresh flag. **Copy the offending coordinate out
   before re-running** — the quiet re-run overwrites the only report that held it.
-  A repeat at the same coordinate is not a louder load signal; it is the cue to
-  read the mutated bytecode, its covering tests, and the tool failure itself
-  (the daemon log under `~/.gradle/daemon/<version>/` keeps the full output).
+  A repeat at the same coordinate is not a louder load signal, and it is not
+  proof of a defect there either: a stable mutation-unit partition can report an
+  aggregate failure at the same coordinate every time. Recurrence localizes the
+  observation, not its cause. Compare shapes before blaming the mutant — a
+  history-free full run against `-PmutateOnly=<class> -PnoMutationHistory`, and
+  where they disagree, `-PisolateMutants`. Since 21.5.26 the unfiltered
+  `pitest.stdout.log` / `pitest.stderr.log` sit beside the report, so the daemon
+  log under `~/.gradle/daemon/<version>/` is the fallback rather than the
+  first stop.
 - **Verify by the absence of failures, not the presence of passes.** A green
   `check` can mean the build cache short-circuited rather than that tests ran —
   on 2026-08-03 a post-`clean` `check` came back in 698ms with `:test`
   `FROM-CACHE` and zero `PASSED` lines. Confirm the task actually executed before
   reporting a run as evidence.
+<!-- hardening-template block:end -->
 
 ## Correctness landmines
 
