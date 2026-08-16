@@ -419,6 +419,33 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   at the same width.
   The 600s legs remain the pre-release ritual; treat a *longer* run as a decision
   needing a reason.
+- **The only *external* oracle is `TestJsonTestSuite`** — nst/JSONTestSuite's 318
+  parsing cases, vendored at a fixed commit under `src/test/resources/jsontestsuite/`.
+  Everything else that checks parsing here is self-differential (byte source vs char
+  source), which by construction cannot see a bug both sources share; this is the one
+  thing that holds an outside opinion about what JSON is. Provenance and the argument
+  behind every divergence live in the README beside the corpus — **don't restate them
+  here, and don't flip a row without writing one**: two tests exist specifically to stop
+  that (`test_every_divergence_carries_its_argument` requires a named family on any row
+  contradicting the suite, and `test_leniency_is_confined_to_the_argued_families` pins
+  the counts so a new leniency cannot arrive by joining an old family). The result to
+  know: no RFC-valid document is rejected, and the accepted-but-invalid set is 13 cases
+  in exactly two families. It is deliberately a *document*-level driver — this library
+  has no whole-document entry point, so the harness supplies the "and then EOF" layer
+  and records which of the two rejected. **Read values, don't scan them**: the first
+  driver used `readNumberAsString` and credited the library with 26 lenient number
+  cases instead of 10, because a token scan hands back `"1+2"` and `"-"` whole and
+  only a parse rejects them. A conformance driver that skips or scans measures itself.
+  Adding a case here is not free the way a unit
+  test is: the class matches `targetTests`, so every case re-runs once per mutant.
+  It paid for that on the first run — `y_object_empty_key.json` (`{"":0}`) is the
+  only input in the repo that makes `skipObject` **non-terminating** under
+  `MathMutator` at the `head = i + 1` string re-entry: two adjacent quotes put
+  `skipPastEndQuote` on the *first* one, it returns having consumed only that,
+  and `i = head - 1; i++` restores the position (transcribed and run outside the
+  codebase: 500,000,000 iterations, `i` and `head` pinned at 2, zero allocation —
+  `cause:liveness`). Nothing here had ever run `skip()` across an empty-string
+  key, so 1922-mutant PIT runs and a saturated fuzz campaign both missed it.
 - Multibyte lead bytes are **negative** as signed `byte`s, and `0x80` appears
   mid-character in ordinary text — neither is a safe sentinel.
 - **Never index a lookup table with a raw source value.** A signed byte is negative on
