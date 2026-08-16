@@ -82,6 +82,29 @@ final class TestSkip {
   }
 
   @Test
+  void test_skip_object_with_empty_strings() {
+    // Adjacent quotes are the one shape where the object scan's string re-entry
+    // can fail to advance: skipPastEndQuote starts one past the opening quote,
+    // so an empty string is the case where it returns having consumed nothing
+    // but the closing quote. A trailing field pins the exact landing position.
+    for (final var body : new String[]{"{\"\":0}", "{\"\":\"\"}", "{\"a\":\"\"}", "{\"\":{\"\":[\"\"]}}"}) {
+      var ji = factory.create("[" + body + ",7]");
+      assertTrue(ji.readArray(), body);
+      ji.skip();
+      assertTrue(ji.readArray(), body);
+      assertEquals(7, ji.readInt(), body);
+      assertFalse(ji.readArray(), body);
+    }
+
+    // the same shapes unterminated must throw rather than spin on the object
+    // scan's only exit
+    for (final var body : new String[]{"{\"\":", "{\"\"", "{\"\":\"\"", "{\"\":{\"\":"}) {
+      final var truncated = factory.create(body);
+      assertThrows(JsonException.class, truncated::skip, body);
+    }
+  }
+
+  @Test
   void test_skip_surrogate_escapes() {
     // a valid escaped pair skips cleanly and lands exactly after the string
     var ji = factory.create("[\"\\uD801\\uDC37\",7]");
