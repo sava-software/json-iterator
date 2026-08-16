@@ -7,6 +7,7 @@
 systems.comodal.jsoniter.BaseJsonIterator,reduceScale,IncrementsMutator  # cause:liveness line 1021
 systems.comodal.jsoniter.BaseJsonIterator,reduceScale,RemoveConditionalMutator_ORDER_IF  # cause:liveness line 1021
 systems.comodal.jsoniter.BaseJsonIterator,skipObject,IncrementsMutator  # cause:liveness line 1122
+systems.comodal.jsoniter.BaseJsonIterator,skipObject,MathMutator  # cause:liveness line 1127
 systems.comodal.jsoniter.BytesJsonIterator,skipPastMultiByteEndQuote,MathMutator  # cause:liveness line 709
 systems.comodal.jsoniter.CharsJsonIterator,parse,IncrementsMutator  # cause:liveness line 136
 systems.comodal.jsoniter.CharsJsonIterator,skipPastEndQuote,MathMutator  # cause:liveness line 156

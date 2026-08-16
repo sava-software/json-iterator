@@ -407,6 +407,25 @@ recorded under "Bounding the reusable char buffer (2026-08-15)".
   cursor forward again, so on any object carrying a field name the cursor
   cycles over a fixed span instead of running off the front. Nothing is
   allocated inside the cycle.
+- `BaseJsonIterator.skipObject:1127` (string re-entry `head = i + 1` →
+  `head = i - 1`, admitted 2026-08-16): the assignment puts
+  `skipPastEndQuote()` on the character *before* the opening quote, so on two
+  adjacent quotes — an empty string — it consumes only the first and returns
+  `head = i`, and `i = head - 1` followed by the loop's `i++` restores the
+  cursor exactly. `i` never reaches the `i == tail` bound, which is the loop's
+  only exit. Transcribed and run outside the codebase over `{"":0}`: 500,000,000
+  iterations with `i` and `head` pinned at 2 and `level` never moving. It is a
+  skip, so the loop body writes nothing and no allocation can end it either.
+  Surfaced by `y_object_empty_key.json` in the JSONTestSuite corpus — nothing
+  here had run `skip()` across an empty-string key before, which is why 1922
+  mutants and a saturated fuzz campaign both missed it.
+  **This key also holds an accepted `SURVIVED` row at the same line, and that
+  row is now dead evidence rather than flip insurance**: a non-terminating
+  mutant has no speed at which it survives, so the row can never match again.
+  It is left in place because no plugin writer removes a preserved-timeout row
+  and a record deletion is the maintainer's call — but it is the repair item
+  AGENTS.md names, and repair is unavailable here because the watchdog is the
+  only thing that can detect a loop with no exit.
 - `BytesJsonIterator.skipPastMultiByteEndQuote:709` (escape-dispatch
   `buf[head++]` → `buf[head--]`, admitted 2026-08-03): the reversed cursor
   lands back on the backslash's *own* index, so the next pass reads the same
