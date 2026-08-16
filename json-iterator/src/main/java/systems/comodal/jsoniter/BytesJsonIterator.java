@@ -58,6 +58,16 @@ class BytesJsonIterator extends BaseJsonIterator {
     return (word & HIGH_BITS) != 0 || containsPattern(word ^ ESCAPE_PATTERN);
   }
 
+  /// A UTF-8 continuation byte is `10xxxxxx`. The decoders below masked the
+  /// bytes after a lead byte with `0x3F` without ever checking that, so any
+  /// byte at all was absorbed into the character — including the string's own
+  /// closing quote, which desynchronises the scan rather than corrupting a
+  /// value. Both the decoding and the skipping path check this; it is a
+  /// structural bound, not a strictness policy.
+  private static boolean isContinuation(final int b) {
+    return (b & 0xC0) == 0x80;
+  }
+
   @Override
   public JsonIterator reset(final byte[] buf) {
     this.buf = buf;
@@ -656,26 +666,53 @@ class BytesJsonIterator extends BaseJsonIterator {
           break;
         }
         final int u2 = buf[head++];
+        if (!isContinuation(u2)) {
+          throw reportError("parseMultiByteString", "invalid unicode character");
+        }
         if ((bc & 0xE0) == 0xC0) {
           bc = ((bc & 0x1F) << 6) + (u2 & 0x3F);
+          // C0 and C1 encode nothing a single byte cannot: the shortest form is
+          // the only legal one, and accepting the long form is how a byte-level
+          // filter and this parser come to disagree about the same document.
+          if (bc < 0x80) {
+            throw reportError("parseMultiByteString", "overlong encoding");
+          }
         } else {
           if (head == tail) {
             break;
           }
           final int u3 = buf[head++];
+          if (!isContinuation(u3)) {
+            throw reportError("parseMultiByteString", "invalid unicode character");
+          }
           if ((bc & 0xF0) == 0xE0) {
             bc = ((bc & 0x0F) << 12) + ((u2 & 0x3F) << 6) + (u3 & 0x3F);
+            if (bc < 0x800) {
+              throw reportError("parseMultiByteString", "overlong encoding");
+            }
+            // D800-DFFF are UTF-16 machinery and have no UTF-8 encoding. They
+            // decode into a lone surrogate that String.getBytes(UTF_8) then
+            // replaces with '?', so accepting them corrupts on the way back out.
+            if (bc >= 0xD800 && bc <= 0xDFFF) {
+              throw reportError("parseMultiByteString", "invalid unicode character");
+            }
           } else {
             if (head == tail) {
               break;
             }
             final int u4 = buf[head++];
+            if (!isContinuation(u4)) {
+              throw reportError("parseMultiByteString", "invalid unicode character");
+            }
             if ((bc & 0xF8) == 0xF0) {
               bc = ((bc & 0x07) << 18) + ((u2 & 0x3F) << 12) + ((u3 & 0x3F) << 6) + (u4 & 0x3F);
             } else {
               throw reportError("parseMultiByteString", "invalid unicode character");
             }
-            if (bc >= 0x10000) {
+            if (bc < 0x10000) {
+              throw reportError("parseMultiByteString", "overlong encoding");
+            }
+            {
               // check if valid unicode
               if (bc >= 0x110000) {
                 throw reportError("parseMultiByteString", "invalid unicode character");
@@ -761,16 +798,25 @@ class BytesJsonIterator extends BaseJsonIterator {
           break;
         }
         final int u2 = buf[head++];
+        if (!isContinuation(u2)) {
+          throw reportError("skipPastMultiByteEndQuote", "invalid unicode character");
+        }
         if ((bc & 0xE0) != 0xC0) {
           if (head == tail) {
             break;
           }
           final int u3 = buf[head++];
+          if (!isContinuation(u3)) {
+            throw reportError("skipPastMultiByteEndQuote", "invalid unicode character");
+          }
           if ((bc & 0xF0) != 0xE0) {
             if (head == tail) {
               break;
             }
             final int u4 = buf[head++];
+            if (!isContinuation(u4)) {
+              throw reportError("skipPastMultiByteEndQuote", "invalid unicode character");
+            }
             if ((bc & 0xF8) == 0xF0) {
               bc = ((bc & 0x07) << 18) + ((u2 & 0x3F) << 12) + ((u3 & 0x3F) << 6) + (u4 & 0x3F);
             } else {

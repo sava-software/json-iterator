@@ -446,6 +446,27 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   codebase: 500,000,000 iterations, `i` and `head` pinned at 2, zero allocation —
   `cause:liveness`). Nothing here had ever run `skip()` across an empty-string
   key, so 1922-mutant PIT runs and a saturated fuzz campaign both missed it.
+- **A malformed UTF-8 sequence moves the end of a string, not just its value.**
+  The multibyte decoders masked the bytes after a lead with `0x3F` without ever
+  checking they were continuation bytes, so `0xC2` sitting before a closing quote
+  absorbed the quote and the scan resynchronised on a later one: `["\xC2","]","x"]`
+  parsed as **one** element instead of three, on the read path *and* the skip path,
+  with no error. Treat continuation validation as a structural bound rather than a
+  strictness policy — it is what decides where the cursor lands, which is why both
+  paths carry it while only the read path rejects overlongs and UTF-8-encoded
+  surrogates. `readString` is now held to the JDK's strict decoder by
+  `TestMultiByteScanEdges.test_utf8_acceptance_matches_the_jdk_decoder`, which
+  varies **each byte position independently** — a sweep that varies only the second
+  byte never reaches the third and fourth continuation checks, which is how five
+  mutants survived the first version of that test.
+- **`fuzzJson`'s non-UTF-8 space was a blind spot by construction**, and it is where
+  the bug above lived through a saturated campaign: the harness could not compare
+  sources on input the char source cannot see, so it ran the byte path as
+  parses-or-rejects only — and a silent mis-parse is not a crash. It now holds that
+  space to RFC 8259 §8.1 instead (JSON text is UTF-8, so the byte source must
+  reject), bounded to what the parser actually consumed and decoded. **When a
+  harness skips a comparison, write down what is unchecked there** — that note is
+  the difference between a known gap and a blind one.
 - Multibyte lead bytes are **negative** as signed `byte`s, and `0x80` appears
   mid-character in ordinary text — neither is a safe sentinel.
 - **Never index a lookup table with a raw source value.** A signed byte is negative on

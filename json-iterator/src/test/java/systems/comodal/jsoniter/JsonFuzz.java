@@ -16,8 +16,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /// [JsonException] is the only accepted rejection on either path — any other
 /// throwable is a finding.
 ///
-/// Inputs that are not valid UTF-8 still run the bytes path as a
-/// parses-or-rejects robustness check; only the comparison is skipped.
+/// Inputs that are not well-formed UTF-8 cannot be compared — the char source
+/// never sees them — so they are held to RFC 8259 §8.1 instead: JSON text is
+/// UTF-8, therefore the byte source must reject them. That binds only what the
+/// parser actually consumed and decoded; see [#consumedWholeDocument].
 ///
 /// Deliberately has no Jazzer imports so it compiles with the regular test sources;
 /// the raw `byte[]` signature is all the driver needs.
@@ -44,15 +46,36 @@ public final class JsonFuzz {
 
   public static void fuzzerTestOneInput(final byte[] data) {
     final var byteEvents = new ArrayList<String>();
+    final var byteIterator = JsonIterator.parse(data);
     boolean bytesRejected = false;
     try {
-      walk(JsonIterator.parse(data), byteEvents, 0);
+      walk(byteIterator, byteEvents, 0);
     } catch (final JsonException expected) {
       bytesRejected = true;
     }
 
     final char[] chars = decodeStrict(data);
     if (chars == null) {
+      // RFC 8259 §8.1 makes JSON text UTF-8, so bytes that are not well-formed
+      // UTF-8 are not a document and the byte source must reject them. That is
+      // the only oracle available here — the char source cannot see this input
+      // at all — and without it the whole non-UTF-8 space was a blind spot in
+      // which a *silent mis-parse* left no trace: not a crash, and nothing to
+      // compare against. Unvalidated continuation bytes lived there through a
+      // saturated campaign, absorbing a string's own closing quote and
+      // resynchronising on a later one.
+      //
+      // Sound only when the walk decoded everything it reached *and* reached
+      // everything: past MAX_DEPTH it skips instead, and a skip checks a
+      // sequence's shape rather than its content, while bytes trailing the root
+      // value are never read at all.
+      if (!bytesRejected
+          && consumedWholeDocument(byteIterator, data)
+          && !byteEvents.contains("deep-array")
+          && !byteEvents.contains("deep-object")) {
+        throw new IllegalStateException(
+            "accepted a document that is not well-formed UTF-8: " + summarize(byteEvents));
+      }
       return;
     }
     final var charEvents = new ArrayList<String>();
@@ -146,6 +169,20 @@ public final class JsonFuzz {
       }
     }
     ji.reset(end);
+  }
+
+  /// The walk reads one value and stops, so bytes after it are never examined:
+  /// `-` followed by 0xFF parses as a number and leaves the 0xFF unread, which
+  /// is the pull-parser contract rather than a defect. The UTF-8 invariant only
+  /// binds what the parser actually consumed.
+  private static boolean consumedWholeDocument(final JsonIterator ji, final byte[] data) {
+    for (int i = ji.mark(); i < data.length; i++) {
+      final int c = data[i] & 0xff;
+      if (c != ' ' && c != '\n' && c != '\t' && c != '\r') {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static char[] decodeStrict(final byte[] data) {

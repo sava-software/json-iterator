@@ -20,6 +20,135 @@ final class TestMultiByteScanEdges {
     return doc;
   }
 
+  private static int sequenceLength(final int lead) {
+    if (lead >= 0xF0 && lead <= 0xF7) {
+      return 4;
+    }
+    if (lead >= 0xE0 && lead <= 0xEF) {
+      return 3;
+    }
+    return 2;
+  }
+
+  /// A sequence's *shape* is a legal lead followed by continuation bytes. That
+  /// is weaker than validity — an overlong is well-shaped — but it is what
+  /// decides where the sequence ends, and therefore where the cursor lands.
+  private static boolean wellShaped(final int[] seq) {
+    if (seq[0] < 0xC0 || seq[0] > 0xF7) {
+      return false;
+    }
+    for (int i = 1; i < seq.length; ++i) {
+      if ((seq[i] & 0xC0) != 0x80) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Holds `readString` to the JDK's strict decoder — an oracle independent of
+  /// this implementation — over every byte position of every sequence length,
+  /// rather than over a hand-picked list. Each position is varied
+  /// independently through a set that straddles the boundaries that matter
+  /// (0x7F/0x80 and 0xBF/0xC0 for continuations, plus 0x22, the closing quote
+  /// this used to absorb), which is what reaches the third and fourth
+  /// continuation checks at all: a sweep that varies only the second byte
+  /// leaves them untested.
+  ///
+  /// `skip()` is held to the weaker contract it actually owes: it decodes
+  /// nothing, so it may walk past an overlong, but a malformed *shape* moves
+  /// the end of the sequence and must reject.
+  @Test
+  void test_utf8_acceptance_matches_the_jdk_decoder() {
+    final var decoder = java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+        .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+        .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
+    final int[] leads = {0xC0, 0xC1, 0xC2, 0xDF, 0xE0, 0xE1, 0xEC, 0xED, 0xEE, 0xEF, 0xF0, 0xF1, 0xF4, 0xF5, 0xF8, 0xFF};
+    final int[] variants = {0x00, 0x22, 0x41, 0x7F, 0x80, 0x8F, 0x90, 0x9F, 0xA0, 0xBF, 0xC0, 0xFF};
+
+    for (final int lead : leads) {
+      final int len = sequenceLength(lead);
+      for (int position = 1; position < len; ++position) {
+        for (final int variant : variants) {
+          final int[] seq = new int[len];
+          seq[0] = lead;
+          for (int i = 1; i < len; ++i) {
+            seq[i] = 0xBF;
+          }
+          seq[position] = variant;
+          assertDecodesLikeTheJdk(decoder, seq);
+        }
+      }
+    }
+
+    // The code-point boundaries each length owns, in both their shortest form
+    // and the longer spelling of the same value.
+    for (final int[] seq : new int[][]{
+        {0xC2, 0x80},                    // U+0080, first 2-byte
+        {0xDF, 0xBF},                    // U+07FF, last 2-byte
+        {0xE0, 0xA0, 0x80},              // U+0800, first 3-byte
+        {0xE0, 0x9F, 0xBF},              // U+07FF spelled in 3 bytes: overlong
+        {0xED, 0x9F, 0xBF},              // U+D7FF, last before the surrogates
+        {0xEE, 0x80, 0x80},              // U+E000, first after them
+        {0xEF, 0xBF, 0xBF},              // U+FFFF, last 3-byte
+        {0xF0, 0x90, 0x80, 0x80},        // U+10000, first 4-byte
+        {0xF0, 0x8F, 0xBF, 0xBF},        // U+FFFF spelled in 4 bytes: overlong
+        {0xF4, 0x8F, 0xBF, 0xBF},        // U+10FFFF, last code point
+        {0xF4, 0x90, 0x80, 0x80}}) {     // U+110000, one past
+      assertDecodesLikeTheJdk(decoder, seq);
+    }
+  }
+
+  private static void assertDecodesLikeTheJdk(final java.nio.charset.CharsetDecoder decoder, final int[] seq) {
+    final byte[] doc = quoted(seq);
+    final var label = java.util.Arrays.toString(seq);
+
+    boolean jdkAccepts = true;
+    try {
+      decoder.reset().decode(java.nio.ByteBuffer.wrap(doc, 1, doc.length - 2));
+    } catch (final java.nio.charset.CharacterCodingException malformed) {
+      jdkAccepts = false;
+    }
+
+    boolean read = true;
+    try {
+      JsonIterator.parse(doc).readString();
+    } catch (final JsonException rejected) {
+      read = false;
+    }
+    assertEquals(jdkAccepts, read, () -> "readString disagrees with the JDK decoder on " + label);
+
+    if (!wellShaped(seq)) {
+      assertThrows(JsonException.class, () -> JsonIterator.parse(doc).skip(),
+          () -> "skip accepted a malformed sequence shape: " + label);
+    }
+  }
+
+  /// The sharp end of an unvalidated continuation byte: it is not a wrong
+  /// character, it is a wrong *document*. A lead byte immediately before the
+  /// closing quote used to absorb the quote, and the scan then re-synchronised
+  /// on a later one — turning three array elements into one, with no error.
+  @Test
+  void test_lead_byte_cannot_swallow_the_closing_quote() {
+    for (final int lead : new int[]{0xC2, 0xE1, 0xF0}) {
+      // "<lead>" — the closing quote is the byte a continuation was expected at
+      final byte[] doc = quoted(lead);
+      assertThrows(JsonException.class, () -> JsonIterator.parse(doc).readString(), "lead=" + lead);
+      assertThrows(JsonException.class, () -> JsonIterator.parse(doc).skip(), "skip lead=" + lead);
+
+      // and in a document with more to consume after it, where the old scan
+      // ran on into the following structure instead of stopping
+      final var array = new byte[]{'[', '"', (byte) lead, '"', ',', '"', ']', '"', ',', '"', 'z', '"', ']'};
+      assertThrows(JsonException.class,
+          () -> JsonIterator.parse(array).readList(JsonIterator::readString), "array lead=" + lead);
+      assertThrows(JsonException.class,
+          () -> JsonIterator.parse(array).skip(), "skip array lead=" + lead);
+    }
+
+    // the same documents with an ascii byte in place of the lead parse normally
+    final var clean = new byte[]{'[', '"', 'x', '"', ',', '"', ']', '"', ',', '"', 'z', '"', ']'};
+    assertEquals(java.util.List.of("x", "]", "z"), JsonIterator.parse(clean).readList(JsonIterator::readString));
+  }
+
   @Test
   void test_code_point_above_unicode_range_rejects() {
     // F4 90 80 80 is exactly U+110000 — one past the last plane — and the
@@ -39,12 +168,27 @@ final class TestMultiByteScanEdges {
   }
 
   @Test
-  void test_overlong_four_byte_below_supplementary_range() {
-    // F0 8F BF BF encodes U+FFFF in 4 bytes: below the surrogate-split
-    // threshold, so it must decode as the single char, not a split pair
-    final byte[] doc = quoted(0xF0, 0x8F, 0xBF, 0xBF);
-    assertEquals("￿", JsonIterator.parse(doc).readString());
-    JsonIterator.parse(doc).skip();
+  void test_supplementary_split_threshold() {
+    // The property this is really about: U+FFFF is the last code point below
+    // the surrogate-split threshold and U+10000 the first above it, so one
+    // decodes as a single char and the other as a pair. Spelled in the
+    // shortest form, which is the only legal one.
+    assertEquals("￿", JsonIterator.parse(quoted(0xEF, 0xBF, 0xBF)).readString());
+    JsonIterator.parse(quoted(0xEF, 0xBF, 0xBF)).skip();
+    assertEquals("𐀀", JsonIterator.parse(quoted(0xF0, 0x90, 0x80, 0x80)).readString());
+    JsonIterator.parse(quoted(0xF0, 0x90, 0x80, 0x80)).skip();
+
+    // This test used to assert that F0 8F BF BF — the 4-byte spelling of
+    // U+FFFF — decoded to that char, which read as a design statement but was
+    // an overlong encoding pinned as intended behaviour. RFC 3629 admits only
+    // the shortest form and the JDK's decoder rejects this one.
+    final byte[] overlong = quoted(0xF0, 0x8F, 0xBF, 0xBF);
+    assertThrows(JsonException.class, () -> JsonIterator.parse(overlong).readString());
+
+    // skip() still walks past it: it validates the sequence's *shape*, which is
+    // what keeps the cursor in the right place, and decodes nothing, so an
+    // overlong it steps over reaches no caller.
+    JsonIterator.parse(overlong).skip();
   }
 
   @Test

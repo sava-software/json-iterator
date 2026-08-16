@@ -22,6 +22,17 @@ crash that can return):
   as `[head - len, head)`, so a space swallowed mid-scan shifted the window
   and dropped leading digits: `"9007199254740993993 "` read as
   `7.199254740993993E15` (`TestDouble.test_space_terminates_number_token`).
+- `json/regression-utf8-quote-swallow` — a bare `0xC2` lead before a closing
+  quote. The multibyte decoders masked the byte after a lead with `0x3F`
+  without checking it was a continuation byte, so the string's own closing
+  quote was absorbed and the scan resynchronised on a later one: this
+  three-element array parsed as one element, on both the read and the skip
+  path, with no error
+  (`TestMultiByteScanEdges.test_lead_byte_cannot_swallow_the_closing_quote`).
+  Found by the JSONTestSuite corpus, not by fuzzing — the harness skipped its
+  comparison entirely on non-UTF-8 input, so a silent mis-parse there left no
+  trace. `JsonFuzz` now holds that space to "the byte source must reject",
+  which is the oracle that was missing.
 - `instant/regression-rfc-no-zone` — fixed-position field reads ran past the
   end of a truncated value: a negative-length zone `String` on the zoneless
   RFC-1123 form, stale buffer chars elsewhere
