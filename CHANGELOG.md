@@ -1,5 +1,21 @@
 # Changelog
 
+## [25.3.2](https://github.com/sava-software/json-iterator/compare/25.3.1...25.3.2) (2026-08-17)
+
+
+### Features
+
+* **build:** enable fuzzing and refine mutation baselines ([5fa9a31](https://github.com/sava-software/json-iterator/commit/5fa9a311ae9a350f134a5d9fdc56312ba45cc855))
+* **build:** upgrade sava-build plugin to 21.5.17 ([3d5f1af](https://github.com/sava-software/json-iterator/commit/3d5f1af8ff44803c00386138f443d71b6e7796fa))
+* **build:** upgrade sava-build plugin to 21.5.18 ([5ac6a22](https://github.com/sava-software/json-iterator/commit/5ac6a2243c7ca64e8ac96b4890c0df987f8486c6))
+* **pitest:** add audited timeout mutant configurations ([d491a26](https://github.com/sava-software/json-iterator/commit/d491a267227095495d190740974ec307f5265061))
+
+
+### Bug Fixes
+
+* bound the reusable decode buffer by the document ([d6e00fa](https://github.com/sava-software/json-iterator/commit/d6e00fad877cfeef6049ea62ac23db09063be07f))
+* validate UTF-8 continuation bytes, and reject overlong forms ([a4e4eda](https://github.com/sava-software/json-iterator/commit/a4e4eda5201beae149ea6acbbcac5f3350e3781c))
+
 ## [25.3.1](https://github.com/sava-software/json-iterator/compare/25.3.0...25.3.1) (2026-07-26)
 
 
