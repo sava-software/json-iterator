@@ -122,18 +122,24 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   2026-07-23 multiset re-triage is the proof it pays: two "siblings of accepted
   equivalents" were real lenient-literal-skip gaps, killed in `TestSkip` along
   with eight neighbouring rows the exact-offset assertions swept up.
-- **Three keys here hold an accepted survivor and an audited timeout at once** —
+- **Four keys here hold an accepted survivor and an audited timeout at once** —
   `CharsJsonIterator.skipPastEndQuote/MathMutator`,
-  `JIUtil.escapeQuotesChecked/IncrementsMutator`, and
-  `FieldMatcher.of/MathMutator`.
+  `JIUtil.escapeQuotesChecked/IncrementsMutator`,
+  `FieldMatcher.of/MathMutator`, and, since 2026-08-16,
+  `BaseJsonIterator.skipObject/MathMutator`.
   Under sava-build 21.5.20 all three reported a flip on every run in
   byte-identical populations (casebook: "The flip that fired forever"); the
   per-key count comparison that landed in 21.5.21 silenced them, so a warning at
   any of them is real again. A key whose survivor and timeout are the *same*
   mutant seen at two speeds is not flip insurance at all but a repair item;
   `widenToCharBuf/RemoveConditionalMutator_ORDER_IF` was one, and was repaired
-  on 2026-08-15 rather than insured.
-- **The audited timeout set here** is 6 `iterator` rows and 2 `util`; `numbers`
+  on 2026-08-15 rather than insured. `skipObject/MathMutator` is the fourth and
+  the exception that shows the rule's limit: it is the same mutant at two
+  speeds, but repair is unavailable because the mutated loop has no exit at any
+  speed, so the watchdog is the only thing that can detect it. Its `SURVIVED`
+  row is therefore dead evidence rather than insurance — a non-terminating
+  mutant never survives — and is a removal candidate, not a record to defend.
+- **The audited timeout set here** is 7 `iterator` rows and 2 `util`; `numbers`
   has never timed out, so it has no file and the check is inert for that suite.
   Every row carries a reviewed `# cause:` category and only `cause:liveness`
   certifies; causes live in `config/pitest/README.md` §"Timed-out mutants
@@ -403,15 +409,19 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   deleted on 2026-08-03. Campaigns are locally owned and run on purpose; no
   schedule, no dispatch, nothing to keep a task list in sync with.
 - **Three of the four targets are effectively saturated; don't budget hours of
-  wall clock.** Re-measured 2026-08-05 at 600s per target, width 1, 314M
-  executions total: `fuzzInstant` 326/832 and `fuzzNumber` 374/831 are
-  edge- and feature-identical to the 2026-07-24 figures, so those two are flat.
-  `fuzzDouble` moved from 401/962 to **403/963** across 104M executions — a
-  trickle, not a plateau, so "saturated" is an approximation there rather than a
-  fact. `fuzzJson` is the one that still explores and is also the slowest
-  (29.6k exec/s against 85k–234k; cov 472, ft 2864). Budget accordingly: more
-  time buys almost nothing on instant and number, and new coverage there needs a
-  harness or oracle change rather than a longer run.
+  wall clock.** Re-measured 2026-08-16 at 600s per target, width 1, 339M
+  executions total, zero findings: `fuzzJson` 502/2981, `fuzzDouble` 415/896,
+  `fuzzInstant` 339/875, `fuzzNumber` 387/864. Every target gained edges over the
+  2026-08-05 figures (472/2864, 403/963, 326/832, 374/831) and **that is not
+  exploration** — the UTF-8 validation added branches to `BytesJsonIterator`,
+  which all four harnesses parse through, so the new edges are new code rather
+  than new reach. Read a coverage jump against what changed in main before
+  reading it as progress. `fuzzJson` is still the one that explores and still the
+  slowest; its exec rate is not comparable across these two campaigns because the
+  2026-08-16 one ran on a contended machine. Budget accordingly: more time buys
+  almost nothing on instant and number, and new coverage there needs a harness or
+  oracle change rather than a longer run — which is exactly what the non-UTF-8
+  invariant was.
   **Width is deliberately 1.** Those per-target figures were measured with one
   target on the machine at a time, so a campaign that widens `fuzzAll` is not
   comparable against them — libFuzzer's exec rate, and therefore its coverage
@@ -497,6 +507,25 @@ static-initializer mutants that are unkillable by construction (see
 `JHex$INIT_DIGITS`). Don't re-propose without a measurement on a realistic alphabet.
 A branchless `c < 0x20 | c == '"' | c == '\\'` was measured too and is no better
 than the short-circuit form (269.8 vs 268.5).
+
+**Rejecting unescaped control characters was measured and declined (2026-08-16).**
+RFC 8259 §7 requires U+0000–U+001F inside a string to be escaped and this parser
+accepts them raw; the conformance corpus records it as `lenient-unescaped-control`.
+A full implementation exists and was benchmarked, and the answer was **no** on two
+independent grounds. It costs ~4% where it lands: `SourceBench.bytes_reset` twitter
++4.18%, solana +2.39%, `chars_reset` twitter +4.68%, each against a same-session
+control with error bars under 1.2% of score, while string-value reads
+(`valueDispatchTwitter_applyChars`) and `blockParse_matcher` — the pattern
+`jmh/README.md` calls the one real consumers use — were noise. The cost is
+irreducible: it concentrates in the per-byte tail loop that short field names spend
+their time in, and folding the three tests into one branch each measured
+*identically* (4.68% → 4.70% on the one row clean in both pairs), so branch count
+was the wrong theory and the price is simply per-character work in a loop whose
+body is otherwise two compares. And the benefit is close to nil — the identical
+`String` is reachable through the legal `\n` escape, so it stops malformed
+documents, not attackers. Don't re-propose it as a security measure; the UTF-8
+validation is what carried that value. Re-propose only with a workload where field
+names are not the dominant read.
 
 **Library javadoc never names downstream consumers.** This is a core library; its
 public docs must not reference consumer projects or their types (a `JupiterPrice`,

@@ -106,20 +106,32 @@ RFC 8259 §7 requires U+0000–U+001F inside a string to be escaped. The string
 scan here stops at `"` and `\`, so a raw control character passes through into
 the decoded `String`.
 
-Unlike the number family this one has **no prior written decision** behind it —
-it is recorded as measured behaviour, not ratified as intended, and this note is
-the marker that the row is unfinished business rather than an argument that it is
-correct.
+**Measured and declined, 2026-08-16.** This was the one family recorded as
+unfinished business rather than argued, so it was implemented and benchmarked
+rather than left as a note. The answer was no, on two independent grounds.
 
-It is not fixed here because the fix is not free and not local: rejecting a raw
-control character means a per-character test inside the string scan, which is the
-hottest loop in the library and the one every silent-corruption bug on record has
-lived in. This repo settles that kind of trade by measuring it (`EscapeBench`'s
-lookup table was measured and rejected on exactly this shape of argument), and a
-`byte[]`-source consumer pays the cost on every string it reads while the benefit
-is rejecting input that no surveyed consumer produces. That is a maintainer's
-decision with a benchmark attached, not something an added test may settle by
-writing the current behaviour into a table.
+*It costs about 4% where it lands.* `SourceBench.bytes_reset` twitter +4.18%,
+solana +2.39%, `chars_reset` twitter +4.68%, each against a same-session control
+with error bars under 1.2% of score. String-value reads
+(`valueDispatchTwitter_applyChars`) and `blockParse_matcher` were noise, which is
+the shape that named the cause: field names average around 12 bytes, so they spend
+their time in the per-byte tail loop rather than the SWAR word loop. Folding the
+tests into one branch each to recover that measured *identically* — 4.68% against
+4.70% on the one row clean in both pairs — so branch count was the wrong theory,
+and the price is per-character work in a loop whose body is otherwise two compares.
+
+*And it buys almost nothing.* The identical `String` is reachable through the legal
+`\n`, `\u001b` escape, which this parser decodes and hands back the same
+characters, so rejecting the raw form stops malformed documents rather than
+attackers. Nothing about it is a memory-safety or parser-differential fix: the two
+sources agree, the scan stays in bounds, and every parser that accepts these yields
+the same string. The security value people expect here belongs to the UTF-8
+validation instead — see `raw-utf8-invalid` below, where an unvalidated
+continuation byte could change the document's *structure*.
+
+Full detail lives in AGENTS.md under settled design decisions. Re-propose only
+with a workload where field names are not the dominant read — and not as a
+security measure.
 
 ## Implementation-defined cases
 
