@@ -36,9 +36,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /// The walk is iterative so that arbitrarily deep documents exercise the
 /// library's own (iterative) scanning rather than overflowing the harness
 /// stack: two corpus cases nest 100,000 and 50,000 levels deep. Object
-/// structure therefore goes through [JsonIterator#skipObjField()] rather than
-/// the recursive `testObject` callback — measured equivalent on this corpus,
-/// every case, both sources.
+/// structure therefore goes through [JsonIterator#applyObject(FieldBufferFunction)]
+/// one field at a time rather than the recursive `testObject` callback. That
+/// keeps the walk iterative while still decoding and validating every key.
 final class TestJsonTestSuite {
 
   private static final String CORPUS = "/jsontestsuite/test_parsing";
@@ -118,6 +118,10 @@ final class TestJsonTestSuite {
 
   static final List<Case> CASES = loadTable();
 
+  private static boolean readObjectField(final JsonIterator ji) {
+    return ji.applyObject((_, _, _, _) -> Boolean.TRUE) != null;
+  }
+
   /// Reads exactly one value, iteratively, decoding every scalar it passes so
   /// that malformed escapes and literals are rejected rather than skipped over.
   private static void walk(final JsonIterator ji) {
@@ -142,7 +146,7 @@ final class TestJsonTestSuite {
           }
         }
         case OBJECT -> {
-          if (ji.skipObjField() != null) {
+          if (readObjectField(ji)) {
             open.push(Boolean.FALSE);
             continue value;
           }
@@ -159,7 +163,7 @@ final class TestJsonTestSuite {
         if (array == null) {
           return;
         }
-        if (array ? ji.readArray() : ji.skipObjField() != null) {
+        if (array ? ji.readArray() : readObjectField(ji)) {
           continue value;
         }
         open.pop();
@@ -222,6 +226,16 @@ final class TestJsonTestSuite {
       return false;
     }
     return !trailing(ji.mark(), doc.length, i -> doc[i] & 0xff);
+  }
+
+  @Test
+  void test_walk_decodes_object_field_names() {
+    assertEquals(Verdict.REJECT, verdictOfBytes(new byte[]{
+        '{', '"', (byte) 0xC0, (byte) 0xAF, '"', ':', '0', '}'
+    }), "overlong UTF-8 key");
+    assertEquals(Verdict.REJECT, verdictOfBytes(new byte[]{
+        '{', '"', (byte) 0xED, (byte) 0xA0, (byte) 0x80, '"', ':', '0', '}'
+    }), "UTF-8 spelling of a surrogate key");
   }
 
   @ParameterizedTest

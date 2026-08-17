@@ -141,7 +141,7 @@ The 35 `i_` rows carry the choice this library makes, by family. 15 are accepted
 | --- | --- | --- |
 | `number-out-of-range` | 10 | accepts. Huge exponents, overflow and underflow are token-level valid; whether the value is representable is the typed reader's business, not the parser's |
 | `escaped-surrogate` | 10 | mixed, 4 accepted. `\u` escapes are validated as a pair, so an inverted or truncated pair is rejected, while a lone escaped surrogate that forms a well-formed UTF-16 unit is not. Distinct from `raw-utf8-invalid`: a surrogate *encoded in UTF-8* (`ED A0 80`) is rejected, because that is a byte sequence UTF-8 has no spelling for, whereas `\uD800` is a UTF-16 code unit the escape syntax can name |
-| `raw-utf8-invalid` | 10 | rejects, all ten. The byte source's decoder is held to the JDK's strict decoder by `TestMultiByteScanEdges.test_utf8_acceptance_matches_the_jdk_decoder`, which sweeps the whole 2-byte space and every 3-byte lead rather than a hand-picked list |
+| `raw-utf8-invalid` | 10 | rejects, all ten. The byte source's decoder is held to the JDK's strict decoder by `TestMultiByteScanEdges.test_utf8_acceptance_matches_the_jdk_decoder`: all C0-DF x 00-FF candidates are checked, every byte value is varied independently at each continuation position for every 3- and 4-byte lead, and accepted cases must match the decoded text and final cursor |
 | `utf16-not-utf8` | 3 | rejects. UTF-16 input is not UTF-8 input |
 | `byte-order-mark` | 1 | rejects. A BOM is not whitespace and no source strips one |
 | `deep-nesting` | 1 | accepts 500 nested arrays. There is no depth limit; the walk is iterative on both sides, and the corpus's 100,000- and 50,000-deep cases are rejected for running out of input, not for depth |

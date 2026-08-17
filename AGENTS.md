@@ -446,6 +446,17 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   driver used `readNumberAsString` and credited the library with 26 lenient number
   cases instead of 10, because a token scan hands back `"1+2"` and `"-"` whole and
   only a parse rejects them. A conformance driver that skips or scans measures itself.
+  The same trap bit object *keys* independently (external review, 2026-08-17): the
+  walk advanced objects with `skipObjField`, which routes keys through the shape-only
+  skip path, so an overlong- or surrogate-encoded key went unvalidated. It now uses
+  `applyObject`, the decoding read path. **Mutation testing could not have caught
+  this**, and the reason is worth keeping: keys and values share `parseMultiByteString`,
+  so every UTF-8-validation mutant was already killed by the value-position tests, and
+  the strengthened key tests killed **zero** new mutants (detected held at 1834/1950).
+  The gap was oracle coverage of an input class through an API, not a surviving mutant —
+  the harness is `Test*`, which the ratchet never mutates, so its own thoroughness is
+  checked only by an input that exercises the gap (the corpus had none) or by a review
+  that reasons about which paths it drives.
   Adding a case here is not free the way a unit
   test is: the class matches `targetTests`, so every case re-runs once per mutant.
   It paid for that on the first run — `y_object_empty_key.json` (`{"":0}`) is the

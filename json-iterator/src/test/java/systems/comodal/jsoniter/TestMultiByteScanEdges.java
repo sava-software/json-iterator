@@ -46,13 +46,12 @@ final class TestMultiByteScanEdges {
   }
 
   /// Holds `readString` to the JDK's strict decoder — an oracle independent of
-  /// this implementation — over every byte position of every sequence length,
-  /// rather than over a hand-picked list. Each position is varied
-  /// independently through a set that straddles the boundaries that matter
-  /// (0x7F/0x80 and 0xBF/0xC0 for continuations, plus 0x22, the closing quote
-  /// this used to absorb), which is what reaches the third and fourth
-  /// continuation checks at all: a sweep that varies only the second byte
-  /// leaves them untested.
+  /// this implementation — over every candidate lead and every byte value at
+  /// each continuation position. The 2-byte sweep is the full C0-DF x 00-FF
+  /// product; longer forms vary each continuation independently, which reaches
+  /// the third and fourth checks a second-byte-only sweep leaves untested.
+  /// Accepted inputs must also decode to the same text and leave both read and
+  /// skip cursors immediately after the closing quote.
   ///
   /// `skip()` is held to the weaker contract it actually owes: it decodes
   /// nothing, so it may walk past an overlong, but a malformed *shape* moves
@@ -62,13 +61,11 @@ final class TestMultiByteScanEdges {
     final var decoder = java.nio.charset.StandardCharsets.UTF_8.newDecoder()
         .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
         .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
-    final int[] leads = {0xC0, 0xC1, 0xC2, 0xDF, 0xE0, 0xE1, 0xEC, 0xED, 0xEE, 0xEF, 0xF0, 0xF1, 0xF4, 0xF5, 0xF8, 0xFF};
-    final int[] variants = {0x00, 0x22, 0x41, 0x7F, 0x80, 0x8F, 0x90, 0x9F, 0xA0, 0xBF, 0xC0, 0xFF};
 
-    for (final int lead : leads) {
+    for (int lead = 0xC0; lead <= 0xF7; ++lead) {
       final int len = sequenceLength(lead);
       for (int position = 1; position < len; ++position) {
-        for (final int variant : variants) {
+        for (int variant = 0; variant <= 0xFF; ++variant) {
           final int[] seq = new int[len];
           seq[0] = lead;
           for (int i = 1; i < len; ++i) {
@@ -78,6 +75,14 @@ final class TestMultiByteScanEdges {
           assertDecodesLikeTheJdk(decoder, seq);
         }
       }
+    }
+
+    // Continuation bytes cannot lead a sequence, and F8-FF have no UTF-8 form.
+    for (int lead = 0x80; lead <= 0xBF; ++lead) {
+      assertDecodesLikeTheJdk(decoder, new int[]{lead});
+    }
+    for (int lead = 0xF8; lead <= 0xFF; ++lead) {
+      assertDecodesLikeTheJdk(decoder, new int[]{lead, 0xBF, 0xBF, 0xBF});
     }
 
     // The code-point boundaries each length owns, in both their shortest form
@@ -102,25 +107,26 @@ final class TestMultiByteScanEdges {
     final byte[] doc = quoted(seq);
     final var label = java.util.Arrays.toString(seq);
 
-    boolean jdkAccepts = true;
+    final String expected;
     try {
-      decoder.reset().decode(java.nio.ByteBuffer.wrap(doc, 1, doc.length - 2));
+      expected = decoder.reset().decode(java.nio.ByteBuffer.wrap(doc, 1, doc.length - 2)).toString();
     } catch (final java.nio.charset.CharacterCodingException malformed) {
-      jdkAccepts = false;
+      assertThrows(JsonException.class, () -> JsonIterator.parse(doc).readString(),
+          () -> "readString accepted JDK-invalid UTF-8: " + label);
+      if (!wellShaped(seq)) {
+        assertThrows(JsonException.class, () -> JsonIterator.parse(doc).skip(),
+            () -> "skip accepted a malformed sequence shape: " + label);
+      }
+      return;
     }
 
-    boolean read = true;
-    try {
-      JsonIterator.parse(doc).readString();
-    } catch (final JsonException rejected) {
-      read = false;
-    }
-    assertEquals(jdkAccepts, read, () -> "readString disagrees with the JDK decoder on " + label);
+    final var reader = JsonIterator.parse(doc);
+    assertEquals(expected, reader.readString(), () -> "readString decoded differently from the JDK: " + label);
+    assertEquals(doc.length, reader.mark(), () -> "readString misplaced the cursor: " + label);
 
-    if (!wellShaped(seq)) {
-      assertThrows(JsonException.class, () -> JsonIterator.parse(doc).skip(),
-          () -> "skip accepted a malformed sequence shape: " + label);
-    }
+    final var skipper = JsonIterator.parse(doc);
+    skipper.skip();
+    assertEquals(doc.length, skipper.mark(), () -> "skip misplaced the cursor: " + label);
   }
 
   /// The sharp end of an unvalidated continuation byte: it is not a wrong
@@ -246,7 +252,7 @@ final class TestMultiByteScanEdges {
     final byte[] doc = "{\"alpha\":1,\"bravo\":2}".getBytes();
     final char[][] seen = new char[2][];
     final int[] n = {0};
-    JsonIterator.parse(doc, 32).testObject((buf, offset, len, ji) -> {
+    JsonIterator.parse(doc, 32).testObject((buf, _, len, ji) -> {
       assertEquals(5, len);
       seen[n[0]++] = buf;
       ji.skip();
