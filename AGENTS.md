@@ -68,8 +68,13 @@ last of which is inventoried in `HARDENING_NOTES.md`.
      the block against `hardeningAgentTemplate` before moving it, because a
      changed bullet can require code rather than prose. `hardeningAgentTemplateDiff`
      compares the bounded block below against the installed template. Acknowledged
-     together with both plugin pins for sava-build 21.5.26. -->
-<!-- hardening-template sha256:90537d1eb1dd -->
+     together with both plugin pins for sava-build 21.5.28. The 21.5.26 -> 21.5.28
+     step rewrites one bullet: the timeout-quiet retirement rule, relaxed so that a
+     plugin fingerprint change alone no longer resets the streak. Topically live here
+     -- 9 `cause:liveness` timeout rows across `iterator` and `util` -- but inert,
+     because every quiet count is 0, and pinned there: all 7 audited `iterator` keys
+     time out on every run observed, so no run is ever quiet enough to accrue. -->
+<!-- hardening-template sha256:f866084114e0 -->
 <!-- hardening-template block:start -->
 
 - **Suite choice is reachability, not habit.** `pitestNumbers` mutates
