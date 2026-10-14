@@ -1,5 +1,12 @@
 # Changelog
 
+## [25.3.3](https://github.com/sava-software/json-iterator/compare/25.3.2...25.3.3) (2026-10-14)
+
+
+### Bug Fixes
+
+* **ci:** restrict workflow token permissions ([d55b7cb](https://github.com/sava-software/json-iterator/commit/d55b7cb07ee7873bf12e29dabee9f11cd28a2ec3))
+
 ## [25.3.2](https://github.com/sava-software/json-iterator/compare/25.3.1...25.3.2) (2026-08-17)
 
 
