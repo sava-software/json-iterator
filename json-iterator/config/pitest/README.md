@@ -20,27 +20,24 @@ A new unkilled mutant has exactly three legal outcomes:
 2. **Refactor** — restructure so the mutant cannot exist.
 3. **Accept it knowingly** — re-run through the suite's named baseline writer
    and record the reason below. `hardeningHelp` lists them, and which one is
-   not a detail: these baselines are already bound and fully triaged, so a
+   not a detail: these baselines are already provenance-bound, so a
    reviewed *additive* acceptance is `pitest<Suite>BaselineUnion`, which
    appends the new rows and leaves every existing one alone.
    `pitest<Suite>BaselineUpdate` rewrites the record from the report and drops
    rows the run did not match, which on a baseline carrying flip insurance and
    argued siblings loses evidence rather than adding it — reach for it only
-   when a whole-record rewrite is the intent (the 2026-08-01 pass is the one
-   time that was true here, and it took a per-key diff first).
+   when a reviewed whole-record rewrite is the intent.
    `pitest<Suite>BaselineRebase` is for a reviewed PIT, PIT-plugin/tool-artifact,
    ArcMutate-base, or certificate transition only. Acceptance is for mutants
    that are *equivalent with respect to observable behavior*, not for "hard to
    test"; the structural `NO_COVERAGE` cases below have separate reachability
    arguments, not claims of observed equivalence. The refresh seeds
-   each new row `# untriaged`; finishing triage means replacing that with a
-   short family label whose argument lives in a section below (mentioned there
-   as `# <label>` — the verify and debt listing warn on labels with no such
-   mention, so a typo can't open a phantom family). Rows accepted before label
-   seeding arrived (sava-build 21.5.10) carry no label and print as
-   `unlabeled` in the verify's per-label counts — their arguments are complete
-   below; label a row with its family when touching it rather than by bulk
-   inference.
+   each new row `# untriaged`. Family arguments live below; a missing label
+   or a recognized legacy label does not establish completed triage. The
+   installed 21.6.9 writers preserve existing notes (`BaselineRetag` changes
+   only line metadata), so there is no supported family-label editing task.
+   Do not hand-edit rows to silence label warnings; reconcile their method
+   and semantic branch against the current argument instead.
 
 Line numbers left the baseline key in sava-build 21.5.20 (these files were
 migrated with `migrateMutationBaselines` on 2026-08-01, row identities
@@ -75,25 +72,43 @@ newly committed seeds — including promoted fuzz findings — face PIT's mutant
 automatically. The suites' `targetTests` include `*SeedReplayTest` so the
 replays participate as killers.
 
-## Triaged equivalent mutants (accepted with reasons)
+## Acceptance arguments in force
 
-Triaged 2026-07-18 across all three suites; grouped by the principle that
-makes them equivalent. The baseline CSVs carry the exact keys.
+The baseline CSVs carry exact keys and sibling multiplicities. The families
+below name the affected methods, the reason for retaining their records,
+and the oracle and changes that require renewed review. A passing ratchet
+is not independent proof that an argument covers every accepted sibling.
 
-**Slow-path / alternate-path routing** — both paths are result-identical, the
+### Slow-path / alternate-path routing
+
+**Reason** — both paths are result-identical, the
 mutant only changes which one runs (performance/allocation, not behavior):
 - `DoubleParser.parse` scan mutants that route more inputs to `slow()`, which
   delegates to `Double.parseDouble` — a bit-exact oracle by construction.
   Empirically confirmed over a ~1M-value deterministic corpus.
 - `readInt`/`readLong` fast-vs-slow path selection and re-routing of
   already-terminated digit runs; `BytesJsonIterator.parse` SWAR-word-loop vs
-  `parseTail` selection; `CharsJsonIterator.parse`/`parseFieldName` forcing
+  `parseTail` selection; byte field-name/equality guards forcing a full-name
+  scalar parse; `CharsJsonIterator.parse`/`parseFieldName` forcing
   `handleEscapes` on escape-free content (content-identical copy);
+  `CharsJsonIterator.parseFieldEquals` and `parseFieldEqualsSlow` forcing
+  full-name decode instead of the prefix path;
   `FieldMatcher.match` ascii-check boundary forcing the UTF-8 ground-truth
   path; `JIUtil.escapeQuotes*` prefix-fast-forward skips (the generic scan
-  re-finds the same first special char).
+  re-finds the same first special char). `BytesJsonIterator.parseTail` and
+  `skipPastSingleByteEndQuote` can route an additional `]` character through
+  the general parser without changing the returned text or cursor.
 
-**Arithmetic identities**:
+Oracle: decoded value, cursor position and rejection contract of the alternate
+path; `Double.parseDouble` supplies the independent numeric oracle. Invalidated
+by a path that changes rejection, position, output or allocation complexity.
+Routing fewer malformed inputs to the reference parser is not covered.
+In `BytesJsonIterator.parseFieldEquals`, forcing the escape-check branch
+into whole-name decoding is routing only. Disabling that branch is a
+different direction: an escaped-name witness must still reach decoding.
+
+### Arithmetic identities
+
 - `InvertNegs` on the `MIN_VALUE` overflow checks: `-val == MIN` ⇔
   `val == MIN` in two's complement.
 - `DoubleParser` `×10⁰ ≡ ÷10⁰`, Eisel–Lemire vs Clinger agreement at the
@@ -104,55 +119,179 @@ mutant only changes which one runs (performance/allocation, not behavior):
   of n to −n (scan loops) or 2−n (checked backward counts) — same parity
   either way, so the direction is unobservable.
 
-**Unreachable defense-in-depth** — the guarded state cannot arise because an
+Oracle: two's-complement arithmetic and parity identities; numeric boundary
+tests compare the JDK parsers. Invalidated by a wider consumer of the escape
+count, changed numeric precision or rounding rules, or different overflow guards.
+
+### DoubleParser rounding and saturation
+
+Members: `DoubleParser.parse`'s exponent-clamp equality boundary, and the
+retained routing/refinement/rounding directions in `computeDouble` and
+`computeFloat`. The argument is directional; it does not accept all mutants
+sharing those methods or mutator names.
+
+- Fast-scan mutants in `parse` retain the original input window when they
+  fall back to `slow`. Narrowed digit bounds, early termination and rereading
+  a fraction/exponent digit leave trailing content that triggers the same
+  reference parse. Increasing the digit count or rejecting the 19-digit fast
+  case also selects fallback. This relies on in-bounds nonnegative offsets
+  and the unchanged trailing-content validation.
+- At exponent-clamp equality, one additional decimal accumulation still
+  saturates to the same signed zero or infinity: a mantissa of at most 19
+  decimal digits cannot offset an exponent near `0x10000000`.
+- Clinger-boundary/forced-fallback directions move the `2^53-1` double or
+  `2^24-1` float mantissa boundary to Eisel–Lemire. The conversion paths must
+  agree bit for bit. Multiplication versus division at exponent zero is
+  multiplication versus division by the table entry one.
+- Forcing product refinement computes an additional limb even when the
+  ambiguity guard says it is unnecessary. Outside that ambiguity the added
+  precision cannot alter the extracted and rounded answer. This relies on
+  the Eisel–Lemire masks and limb arithmetic, not simply fallback routing.
+- Sending the minimum-normal binary exponent through the subnormal branch
+  has a zero shift at that boundary and reaches the same implicit-bit and
+  rounding encoding.
+- For `computeFloat`'s decimal exponent `-65` boundary, a mantissa below
+  `10^19` gives magnitude below `10^-46`, below half the smallest subnormal
+  (`2^-150`); either direction rounds to signed zero.
+- Expanded halfway-test exponent bounds cannot create an actionable exact
+  halfway state outside the original domain. The lower-product comparison
+  excluding one rather than including it relies on that value not coinciding
+  with the actionable upper-product tie state. For float endpoint exponents
+  `-17` and `10`, the normalized significand bounds and midpoint low bits
+  likewise make the extra tie correction ineffective.
+
+Oracle: exact JDK double/float bits, saturation and malformed-token rejection
+(including exception messages). The recorded approximately million-value
+fixed-seed corpus supports the conversion-path agreement. The tie/refinement
+argument relies on the mask/product invariants; this cleanup does not claim
+an additional exhaustive arithmetic sweep. Reassess after a power-table,
+mask, precision, shift, bias, rounding predicate, mantissa bound, exponent
+clamp or fallback-grammar change.
+
+### Unreachable defense-in-depth
+
+**Reason** — the guarded state cannot arise because an
 earlier limit check already rejected it: slow-path wrapped-accumulator
 `== 0` cases in `readIntSlowPath`/`readLongSlowPath`, the `scaleLong`
 single-step wrap check, `FieldMatcher.hash` len == 8 word agreement,
-capacity-sizing mutants in `FieldMatcher.of` (any power-of-two capacity ≥
+capacity-sizing mutants in `FieldMatcher.of` (any power-of-two capacity greater than
 field count matches identically), and the `numEscapes == 0` fallback return
-in `CharsJsonIterator.parseFieldEqualsSlow` (line 434, 2 NO_COVERAGE): both
+in `CharsJsonIterator.parseFieldEqualsSlow` (`NO_COVERAGE`): both
 entries into that method preclude it — the truncation entry throws inside
 `parse(from)` before any return, and the backslash entry guarantees
 `numEscapes >= 1`. Kept as defense against a future `parse` change; a
 refactor that removes the branch retires the rows with it.
 
-**Static-initializer table** (`JHex$INIT_DIGITS`): built once per PIT minion
-JVM before mutants activate, so table-construction mutants are unkillable by
-construction. The per-call `decode` mutants all die.
+Oracle: the predecessor guards and public malformed-input tests. Reassess
+if a caller bypasses them, buffer/refill semantics change, or the guarded
+state becomes reachable. Capacity changes in `FieldMatcher.of` are covered
+only while the table remains a power of two with an empty slot after every entry is inserted. An unknown
+lookup relies on that empty slot to terminate.
 
-**Throw-terminated blocks** — `NO_COVERAGE` that no test can ever clear,
-because PIT's block coverage probes a block at its *end*: a `return f(...)`
-whose call throws for every input reaching it never completes its block, so
-the line reads unreached no matter what executes it, and its return-value
-mutants can never change status (the throw happens before the mutated return).
-Established empirically on 2026-08-02: `TestDouble` had fed quoted `"1e"`
-through `readDouble()` since the parser landed, and `DoubleParser.parse:136`
-read `NO_COVERAGE` in every report regardless. The rows, all
-executed by tests that assert the throw:
-- `DoubleParser.parse` 105/136/142/147 — `return slow(...)` for inputs ending
-  after a sign or exponent marker (`-`, `1e`, `1e±`, `1e±x`); the reference
-  parser throws for every such input, with message parity pinned by
-  `TestDoubleParser.test_sign_and_exponent_marker_at_end_of_input` and the
-  wrapped-message loop in `TestDouble.test_specials`.
-- `BytesJsonIterator.parseFieldEquals` 452/466 and
-  `CharsJsonIterator.parseFieldEquals` 407 — truncation bail-outs into
-  `parseFieldEqualsSlow`, whose `parse` reports the incomplete document (no
-  source refills: streams are read fully upfront, so `tail` is always the
-  document end). Executed by `TestSkip.test_skip_until_truncated_field_name`.
+### Allocation routing in iterator support paths
 
-The retired name of this family was **NC→SURVIVED traps** — the fear that
-covering these lines would surface the return-value mutants as new SURVIVED
-entries. That mechanism was wrong: the mutants stay `NO_COVERAGE` under any
-test, so the deliberate test absence bought nothing and cost real contract
-coverage — closing it killed 10 accepted SURVIVED siblings whose routing
-arguments only held while malformed and truncated inputs went unasserted
-(see the 2026-08-02 section). The one honest trap instance remains history:
-the `JIUtil.escapeQuotes*` branches, taken knowingly on 2026-07-26 — the
-backslash-run tests killed 20 accepted mutants at the cost of two stranded
-`# escape parity` increments. Public-API branches with no test were worth
-more than the trap avoided, both times.
+Members: `BaseJsonIterator.contextWindow`'s initial `StringBuilder` capacity
+arithmetic, `BytesJsonIterator.widenToCharBuf`'s exact-fit extra growth, and
+`CharsJsonIterator.handleEscapes`'s oversized temporary array and forced trim.
+These change initial capacity or a bounded copy, while the append/trim logic
+still selects the same content. They do not remove growth amortisation.
 
-**Multibyte scan paths**:
+Oracle: error-context text, decoded string content and buffer-reuse tests.
+Reassess if builder capacity becomes a reported value, temporary-array tails
+become visible, size arithmetic can overflow for reachable inputs, or these
+changes remove an allocation contract rather than a sizing hint.
+
+### Truncated literal loops
+
+Members: `BaseJsonIterator.skipLiteral`'s loop-boundary and forced-loop
+mutants on the truncated-input branch. Every entry to this branch has fewer
+remaining source characters than the literal requires. The inner tail guard
+therefore throws before the loop could finish, including the extra-iteration
+direction. It cannot accept a malformed token or change its first-error offset.
+
+Oracle: `TestSkip.test_skip_corrupted_literals_reject_at_exact_offset`,
+including every truncation position and literal. Reassess if the helper gains
+an entry with enough remaining input, the tail check changes, input refills,
+or error reporting moves outside the loop.
+
+### Redundant end checks in numeric lookahead
+
+Members: `BytesJsonIterator.peekChar` and `CharsJsonIterator.peekChar`
+no-argument overloads' forced-read guard mutants. Their only caller is
+`assertNotLeadingZero`, which returns before calling them when `head == tail`.
+Removing the repeated end check cannot expose a read at the document end.
+
+Oracle: that call graph and the truncated-number tests. Reassess on any new
+caller, a changed predecessor end check, or incremental input/refill support.
+
+### Quote escaping prefix and completion routing
+
+Members: `JIUtil.escapeQuotes` and `escapeQuotesRemoveNewLines` prefix-arm
+boundary/forced-generic mutants. A generic scan rediscovers the first quote
+or newline; an empty prefix copy has the same output as the index-zero arm.
+`escapeQuotesChecked` can route an `indexOf` miss through the full helper or
+perform one extra `indexOf` at the end; both return the same input instance.
+In `escapeQuotes`, the no-op conjunction can omit its `from == 0` test:
+`dest == 0` means no quote has been emitted and therefore `from == 0` already.
+
+Oracle: escaped-quote parity, newline stripping and same-instance no-op
+assertions in `TestJIUtil`. Reassess if the generic scan starts with different
+parity/state, prefix position advances without emitting output, or the end
+lookup/no-op contract changes. This does not cover bypassing parity at a
+quote preceded by exactly one backslash in `escapeQuotesRemoveNewLinesChecked`.
+
+### FieldMatcher capacity and word agreement
+
+Members: `FieldMatcher.of` capacity rounding/boundary/shift mutants,
+`FieldMatcher.hash`'s eight-byte boundary, and `FieldMatcher.match`'s
+ASCII/DEL checks that select UTF-8 fallback.
+
+Reason: the accepted sizing directions retain a power-of-two table with
+strictly more slots than names. Empty slots terminate unknown-name probes;
+capacity equal to the name count is not sufficient. The eight-byte scalar
+hash packs the same big-endian word as the word load, with no last-word
+remainder. UTF-8 encoding preserves ASCII and DEL, so forcing fallback
+changes routing rather than declared-name resolution.
+
+Oracle: `TestFieldMatcher` checks declared indices, unknown names, duplicate
+rejection and byte/char agreement. Reassess if load bounds, word endianness,
+hash mixing, fallback encoding or reachable size-arithmetic limits change.
+The `names.length << 2` to `>> 2` sizing mutant that fills the table is a
+liveness timeout below, not an accepted capacity direction.
+
+### Table construction must be tested after activation
+
+`JHex$INIT_DIGITS.initDigits` and `ValueType$INIT_TYPES.initValueTypes`
+initialize cached tables before PIT activates mutants in the minion. Public
+lookup assertions alone therefore cannot detect changed builders. Those
+mutants are not behavioural equivalents. `TestLookupTableInitialization`
+invokes each private builder after activation and checks its returned table
+against an independent per-entry mapping, including invalid entries.
+
+Do not restore an initialization acceptance merely because the cached public
+table passes. Reassess the fixture if helper signatures or module access
+change; a fresh defining class loader is another way to exercise construction.
+
+### Throw-terminated blocks
+
+Members: `DoubleParser.parse` return-value mutants on `return slow(...)`
+after a sign or exponent marker, and `BytesJsonIterator.parseFieldEquals` /
+`CharsJsonIterator.parseFieldEquals` boolean-return mutants on truncation
+bail-outs into `parseFieldEqualsSlow`.
+
+Reason: PIT probes block ends, but these blocks always throw before the
+mutated return can execute. Their `NO_COVERAGE` records are a structural
+coverage limitation, not an untested contract or an equivalence claim.
+
+Oracle: `TestDoubleParser.test_sign_and_exponent_marker_at_end_of_input`
+and `TestDouble.test_specials` check JDK rejection/message parity for `-`,
+`1e`, `1e±` and `1e±x`; `TestSkip.test_skip_until_truncated_field_name` checks
+truncated field names. Streams are read fully, so `tail` is the document end.
+Invalidate this argument if `slow` can return on these inputs, refilling is
+introduced, truncation recovers instead of throwing, or PIT changes its probes.
+
+### Multibyte scan paths
+
 - `containsMultiByteOrEscapePattern`: over-detection mutants only route the
   word loop to the byte-accurate slow path; the under-detection direction is
   harmless because no UTF-8 lead/continuation byte (0x80–0xF4) aliases the
@@ -185,44 +324,27 @@ more than the trap avoided, both times.
     reports "invalid surrogate" where the real code reports
     "incomplete string, offset: N". Killed on both sources by
     `TestSkip.test_skip_truncated_escape_reports_cut_offset`.
-- `parseMultiByteString` grow-check always-grow mutants: allocation-only,
-  same family as the sized-array-reader equivalents `TestAllocation` kills —
-  the never-grow directions are killed, only always-grow is accepted.
-- `escapeJson` / `ensureCapacity` buffer sizing.
-  Label: `# allocation routing`, triaged 2026-07-25 with the `char[]` rewrite.
-  Four rows, all
-  producing byte-identical output because every shortfall is corrected by
-  `ensureCapacity` before anything is written:
-  - `escapeJson:83` `new char[len + 8 + (len >> 3)]`, two MathMutator siblings.
-    Only the *initial* capacity moves; a smaller one just grows sooner and a
-    larger one wastes a little. The third sibling (`len - 8`) is killed — it
-    goes negative on short input and throws.
-  - `ensureCapacity:135` `needed <= out.length` → `<`: at exact equality the
-    mutant grows a buffer that already fits. Same array contents.
-  - `ensureCapacity:138` `out.length << 1` → `>> 1`: `Math.max(needed, half)`
-    is then always `needed`, so the buffer is sized exactly instead of doubled —
-    correct output, just more frequent growth.
-  **Narrowed 2026-08-05 to constant-factor sizing only.** The fourth row of this
-  family — `ensureCapacity:138` `Math.max(needed, out.length << 1)` -> `>> 1` —
-  was *not* allocation routing: it drops the doubling headroom, so a densely
-  escaped input reallocates once per escape instead of three times in total,
-  which is a complexity-class change wearing an identical output.
-  `TestAllocation.test_escape_growth_doubles_rather_than_sizing_to_each_escape`
-  kills it (512 control characters, 64 KiB bound against megabytes); util
-  43 -> 42 rows, 351 -> 352 of 394. The three rows that remain are genuine:
-  `ensureCapacity:135` grows once more than needed at exact equality, and the
-  two `escapeJson:83` initial-capacity mutants pick a different constant. Those
-  cost a bounded multiple, never a different growth curve, so no bound
-  separates them from correct behaviour without becoming the thin margin this
-  file warns about.
-  Deliberately not chased with `TestAllocation`: per AGENTS.md the allocation
-  harness is a last resort, and these are precisely the "incidental
-  micro-optimization only an allocation bound could observe" case it names as
-  accept-worthy. The *observable* directions here are killed —
-  `TestJIUtil.testEscapeJsonGrowsPastInitialCapacity` kills both under-request
-  mutants on line 92 (`n + span - 6` runs off the end of a 64-control-character
-  buffer; `n - span + 6` off a 15-char one where a 13-char span meets the first
-  growth point).
+
+Oracle: the recorded exhaustive sweeps and the content/position sweep tests.
+Reassess if surrogate classification, error context, cursor recovery after
+rejection, or word-loop guard ordering changes.
+
+### Constant-factor allocation routing
+
+Label: `# allocation routing`. Members: `JIUtil.escapeJson` arithmetic
+mutants in its initial capacity, and `JIUtil.ensureCapacity`'s exact-fit
+boundary (`needed <= out.length` to `<`). A different initial size or one
+unnecessary exact-fit copy preserves output and changes only a bounded
+allocation factor. Every shortfall is corrected before writing.
+
+Oracle: `TestJIUtil.testEscapeJsonGrowsPastInitialCapacity` checks output and
+capacity shortfalls; the growth-complexity tests below guard amortisation.
+Reassess on new size limits, changed copy boundaries, or an allocation
+contract that distinguishes these constant factors. Removing doubling
+headroom is explicitly outside this family.
+
+### Word pattern over-detection
+
 - `matchPattern` (the Hacker's Delight zero-byte finder): the three surviving
   MathMutator siblings (`|→&` twice, dropped `~`) each flag a strict superset
   of lanes — verified per-lane over all 256 byte values (no cross-lane
@@ -239,7 +361,9 @@ more than the trap avoided, both times.
   corrupt and are killed. Any refactor that gives quote matching its own
   pattern function or reorders the guard voids this argument.
 
-**ASCII word-loop tail handling** (`skipPastEndQuote`, `parseString`,
+### ASCII word-loop tail handling
+
+Members (`skipPastEndQuote`, `parseString`,
 `parseBase64String` in `BytesJsonIterator`): the divergent directions are
 killed by the length sweeps in `TestString`/`TestSkip`
 (`*_at_buffer_tail_across_lengths`: forced word-loop entry reads past an
@@ -261,84 +385,50 @@ timeout). The accepted remainder is equivalent by construction:
   it (invalid input throws first), so the copy is defensive; forcing it is
   allocation-only.
 
-## Amortised char-buffer growth (2026-08-05)
+Oracle: the independent expected content and post-read positions in the
+`TestString`/`TestSkip` length sweeps, and JDK base64 decoding. Reassess if
+word/scalar paths stop sharing validation, word width/alignment changes,
+or the decoder stops sizing valid output exactly.
 
-`BytesJsonIterator` guards every `charBuf` append with
-`if (charBuf.length == j) doubleReusableCharBuffer();`. The *never-grow*
-direction of each guard corrupts output and dies to
-`TestMultiByteScanEdges.test_char_buffer_growth_through_surrogate_split`. The
-*always-grow* direction is content-identical — the string still decodes
-correctly, it just allocated 2^N getting there — so no `assertEquals` can see
-it. Lines 659 and 663 therefore sat in the accepted baseline as survivors, and
-line 672 was "killed" only by `TestString.test_long_string` exhausting the heap,
-which races PIT's watchdog: it timed out under a loaded certification on
-2026-08-05 and read `KILLED` on the same commit solo.
+## Reusable buffer bounds and amortisation
 
-`TestAllocation.test_char_buffer_grows_amortised_not_per_character` closes the
-family by asserting the property directly — decoding 54 chars from a 2-char
-buffer allocates a few hundred bytes, where per-character doubling allocates
-about a megabyte. Baseline 121 -> 119; `iterator` 1798 -> 1800 of 1919.
+Label: `# bounded reusable buffer`. Members: `BytesJsonIterator.doubleReusableCharBuffer`
+guard boundary (`>=` to `>`) and never-fire mutants. Every decode pass consumes
+at least as many source bytes as it appends chars; input is never refilled
+mid-parse. A grow request at or beyond `tail` is therefore unreachable in
+unmutated code, including malformed input. These guard mutants are accepted
+because the state they distinguish cannot occur. `widenToCharBuf`'s exact-fit
+boundary is constant-factor allocation routing: it may grow an already
+sufficient buffer, preserving field content and reuse thereafter.
 
-`widenToCharBuf:200` `MathMutator` (`Math.max(len, charBuf.length << 1)` ->
-`>> 1`) closed the family on the same day. It is content-safe because
-`Math.max` still admits `len`; what it removes is the doubling headroom, so the
-cost is repeated reallocation across a *sequence* of widening reads rather than
-within one — invisible to any single-read assertion.
-`TestAllocation.test_field_name_widening_keeps_doubling_headroom` walks one
-object whose field names grow 64..192: amortised growth reallocates three times,
-exact sizing on all 129. It uses `testObject` deliberately, because the
-`FieldBufferPredicate` contract allocates nothing per field, so buffer growth is
-the only thing the counter can see — the first attempt went through
-`applyCharsAsInt`, which reaches a different `parse` overload that never calls
-`widenToCharBuf`, and the mutant survived it. Baseline 119 -> 118;
-`iterator` 1800 -> 1802 of 1919.
+Oracle: the input-consumption bound plus
+`TestMultiByteScanEdges.test_char_buffer_growth_through_surrogate_split` and
+`test_field_buffer_is_reused_when_the_name_already_fits`. Reassess if refill,
+expanding transformations, append-before-check ordering or caller invariants
+change. Forced/negated guards and cursor reversals are not accepted by this
+argument: the bound makes non-advancing parse loops throw rather than exhaust
+memory.
 
-The "always-grow is content-identical" premise above held only while growth was
-unbounded; see the next section, which removed it. Both tests stay — they now
-guard *amortisation*, which is still invisible to any `assertEquals`, rather than
-being the only thing that could see the mutant at all.
+Allocation-complexity mutants are not equivalents. These tests retain the
+empirical separation that guards the family:
 
-## Bounding the reusable char buffer (2026-08-15)
+- `TestAllocation.test_char_buffer_grows_amortised_not_per_character` decodes
+  54 chars from a two-char buffer with an 8192-byte bound. Amortised growth
+  costs hundreds of bytes; per-character doubling is outside the contract.
+  The document clamp also makes repeated unnecessary growth throw, so a
+  content assertion can detect that direction independently.
+- `test_field_name_widening_keeps_doubling_headroom` walks field names of
+  lengths 64..192 through `testObject`: amortised growth reallocates three
+  times, exact sizing on all 129. The 8192-byte bound separates about 900
+  bytes from about 33000. `applyCharsAsInt` is not a substitute: its overload
+  does not reach `widenToCharBuf`.
+- `test_escape_growth_doubles_rather_than_sizing_to_each_escape` uses 512
+  control characters and a 64-KiB bound against per-escape sizing's megabytes.
+  Halving `ensureCapacity`'s doubling shift is a complexity change even when
+  the resulting text is identical.
 
-`doubleReusableCharBuffer` doubled with no clamp, so past 2^30 chars
-`charBuf.length << 1` overflowed negative — a real `NegativeArraySizeException`
-independent of any mutant. It is now bounded by the document: every decode step
-consumes at least as many source bytes as it writes chars, `buf` is never
-refilled mid-parse (`reset(InputStream)` reads the stream whole), and every
-caller grows only when the buffer is exactly full — so a grow request at or past
-`tail` cannot happen for any input, valid or malformed, unless the cursor stopped
-advancing. `widenToCharBuf` takes the same clamp.
-
-That closed both non-certifying timeout findings, which is why they are no longer
-in the audited set:
-
-- `parseMultiByteString` `MathMutator`, every cursor reversal in the method —
-  previously `cause:harness`. The reversed cursor still spins, but the loop now
-  ends in a `JsonException` within milliseconds instead of racing PIT's watchdog
-  against the heap. All of them read `KILLED`.
-- `widenToCharBuf` `RemoveConditionalMutator_ORDER_IF` — previously
-  `cause:resource`, and simultaneously an accepted `SURVIVED` row. Forcing the
-  grow branch now allocates a bounded amount, so
-  `test_field_name_widening_keeps_doubling_headroom` reaches its assertion
-  instead of the heap ceiling. Killed, and the accepted row pruned.
-  Its `ConditionalsBoundaryMutator` sibling (`>` -> `>=`) is unaffected and
-  stays accepted: one extra grow at the exact-fit boundary is far inside the
-  8192-byte bound.
-
-`TestMultiByteScanEdges.test_field_buffer_is_reused_when_the_name_already_fits`
-was added alongside, asserting the same widening contract through buffer identity
-rather than byte counts — `TestAllocation` is skipped entirely on a JVM without
-thread allocation counters, and this kill should not depend on that capability.
-
-Two new accepted survivors, label `# bounded reusable buffer`: the guard's
-boundary direction (`>=` -> `>`) and its never-fire direction. Both are
-equivalent by construction — the guarded state is unreachable, so no test can
-distinguish them — which is the disclosed price of the bound. The other two
-directions are killed: forcing the guard throws on every grow, and negating it
-throws on the first.
-
-Baseline 118 -> 119; audited timeouts 10 -> 8; `iterator` 1802 -> 1803 of 1922,
-timed out 7 -> 5.
+Measured results escape through volatile sinks. Do not weaken these bounds
+on a survivor before checking the measured call path and escape analysis.
 
 ## Timed-out mutants (audited set)
 
@@ -363,52 +453,26 @@ demonstrated finite covering-path/watchdog race being repaired, and
 `cause:untriaged` for a seeded row nobody has read yet. A run under
 `-PstrictTimeoutAudit` — which `hardeningCertify` forces — fails on all three.
 
-The distinction that matters here is **allocation**, and it splits this repo's
-otherwise identical reversed-cursor family in two. `buf[head++] -> buf[head--]`
-pins the cursor on the backslash it just read, so the loop never advances. In a
-*skip* path nothing is written and the loop simply never ends: liveness. In a
-*parse* path the same non-advancing loop appends one char to `charBuf` every
-pass and doubles the buffer, so it ends after all — by exhausting the heap.
-That is a finite fault racing the watchdog, and it is not liveness however much
-the loop looks like it. Measure before classifying: transcribe the loop, run
-it, and see whether it stops.
-
-Keys are deliberately line-less, so drift cannot churn membership, and `# line`
-tags are diagnostic metadata for review only. Source-line movement never warns,
-never fails, and never requires re-anchoring — adding a method or reflowing an
-expression above a mutated line is not a hardening record change. What the
-line-less key *does* cost is resolution: a new timed-out mutant inside an
-already-audited method+mutator matches the existing member silently. That is why
-each cause below names the line it argues about and, where the key covers more
-than one mutant, says so — re-read those lines whenever the code at them
-changes, because a clean run certifies "no new method+mutator", not "no new
-mutant". Cause is key-level too: a liveness token claims every sibling under its
-key, so a key that mixes liveness with a finite cause cannot be recorded
-honestly at all until the site is split or removed.
-
-Members flip `KILLED`↔`TIMED_OUT` run to run, so per-run counts sit at or below
-the set size — but a *finite* flip is a repair item, not a recorded cause. The
-2026-08-15 history-free observations had 5 of the 6 `iterator` members time out
-(`skipPastMultiByteEndQuote` did not) across three consecutive runs.
-
-As of 2026-08-15 — 8 members, 6 `iterator` + 2 `util`, `numbers` none, and all
-eight are honest liveness. Two `BytesJsonIterator` members were retired the same
-day by repair rather than by a quiet streak; the change that closed them is
-recorded under "Bounding the reusable char buffer (2026-08-15)".
+Cause is key-level: the argument must cover every timed-out sibling under
+the method and mutator. A new sibling can match existing membership, so
+review changes to the actual loops rather than trusting a line tag.
+Skip loops that write nothing can be liveness failures; parse loops that
+append are finite when the document bound forces rejection. Finite faults
+are not accepted as liveness merely because they race the watchdog.
 
 **iterator — cause:liveness**
 
-- `BaseJsonIterator.reduceScale:1021`, two mutants (`scale--` → `scale++`;
+- `BaseJsonIterator.reduceScale`, two mutants (`scale--` → `scale++`;
   loop condition → `true`): the counter crossing the negative `scaleLimit` is
   the loop's only exit; both remove it and the divide loop spins on a settled
   quotient of 0. Long division allocates nothing, so nothing else can end it.
-- `BaseJsonIterator.skipObject:1122` (scan cursor `i++` → `i--`): the
+- `BaseJsonIterator.skipObject` (scan cursor `i++` → `i--`): the
   `i == tail` bound is an equality a backward walk never meets, and the
   string-skip re-entry (`i = head - 1` after `skipPastEndQuote()`) pulls the
   cursor forward again, so on any object carrying a field name the cursor
   cycles over a fixed span instead of running off the front. Nothing is
   allocated inside the cycle.
-- `BaseJsonIterator.skipObject:1127` (string re-entry `head = i + 1` →
+- `BaseJsonIterator.skipObject` (string re-entry `head = i + 1` →
   `head = i - 1`, admitted 2026-08-16): the assignment puts
   `skipPastEndQuote()` on the character *before* the opening quote, so on two
   adjacent quotes — an empty string — it consumes only the first and returns
@@ -418,19 +482,17 @@ recorded under "Bounding the reusable char buffer (2026-08-15)".
   iterations with `i` and `head` pinned at 2 and `level` never moving. It is a
   skip, so the loop body writes nothing and no allocation can end it either.
   Surfaced by `y_object_empty_key.json` in the JSONTestSuite corpus — nothing
-  here had run `skip()` across an empty-string key before, which is why 1922
-  mutants and a saturated fuzz campaign both missed it.
-  **This key also holds an accepted `SURVIVED` row at the same line, and that
-  row is now dead evidence rather than flip insurance**: a non-terminating
-  mutant has no speed at which it survives, so the row can never match again.
-  It is left in place because the supported writers preserve the same-key
-  timeout budget; accepted rows must never be deleted by hand. It is the repair item
-  AGENTS.md names, and repair is unavailable here because the watchdog is the
-  only thing that can detect a loop with no exit.
-- `BytesJsonIterator.skipPastMultiByteEndQuote:709` (escape-dispatch
+  here had run `skip()` across an empty-string key before. The corpus case
+  remains a witness for this input class.
+  There is no accepted `SURVIVED` row under this key. Object-string tests can
+  reject the mutated result before the minion reaches the endless witness,
+  yielding `KILLED`; that does not make the nonterminating input disappear.
+  Keep the audited timeout membership while this endless witness exists;
+  a killed-first observation does not prove the loop has been repaired.
+- `BytesJsonIterator.skipPastMultiByteEndQuote` (escape-dispatch
   `buf[head++]` → `buf[head--]`, admitted 2026-08-03): the reversed cursor
   lands back on the backslash's *own* index, so the next pass reads the same
-  `\` at line 683, re-enters the same branch and restores the same state — a
+  `\` at the loop head, re-enters the same branch and restores the same state — a
   fixed point with no exit and no fault. It is a skip, so the loop body writes
   nothing: transcribed and run outside the codebase on 2026-08-15 it completed
   500,000,000 iterations with `head` pinned and zero allocation. What makes the
@@ -441,28 +503,28 @@ recorded under "Bounding the reusable char buffer (2026-08-15)".
   the member reads `TIMED_OUT` or `KILLED` according to which the minion reaches
   first — observed both ways within an hour on 2026-08-03. Removing the timeout
   would therefore mean removing a legitimate covering input, not fixing a
-  harness bound. The sibling reversal at line 683 is reliably `KILLED`, which is
+  harness bound. The sibling reversal at the loop head is reliably `KILLED`, which is
   the contrast worth keeping: at the loop head a backward cursor immediately
-  misreads and the scan diverges observably, while at 690 it is invisible
-  because the loop never advances at all. The continuation-byte read at line 737
-  is the same fixed point under the same key and the same liveness token.
-- `CharsJsonIterator.parse:136` (escape skip `++i` → `--i`): cancels the for
+  misreads and the scan diverges observably, while at escape dispatch it is invisible
+  because the loop never advances at all. The continuation-byte read has
+  the same fixed point under the same key and the same liveness token.
+- `CharsJsonIterator.parse` (escape skip `++i` → `--i`): cancels the for
   loop's own `++i`, pinning the cursor on the same backslash — a pure
   oscillation with no exit and no fault. `numEscapes` increments and wraps;
   nothing is allocated.
-- `CharsJsonIterator.skipPastEndQuote:156` (`buf[head++]` → `buf[head--]`):
-  the same allocation-free fixed point as `skipPastMultiByteEndQuote:709`, and
+- `CharsJsonIterator.skipPastEndQuote` (`buf[head++]` → `buf[head--]`):
+  the same allocation-free fixed point as `skipPastMultiByteEndQuote`, and
   for the same reason — this is the chars-source *skip* path, so the loop body
-  writes nothing. **Not** the same family as `parseMultiByteString:575`, which
-  an earlier revision of this file claimed; that one appends.
+  writes nothing. `parseMultiByteString` instead appends and is bounded
+  by the document; that finite fault is not this liveness family.
 
 **util — cause:liveness**
 
-- `JIUtil.escapeQuotesChecked:170` (do-while `++from` → `--from`): after an
+- `JIUtil.escapeQuotesChecked` (do-while `++from` → `--from`): after an
   odd, already-escaped quote the backward `from` makes `indexOf('"', from)`
   re-find the same quote every pass (a negative fromIndex clamps to 0), so
   the loop never reaches `len`. `indexOf` and `charAt` allocate nothing.
-- `FieldMatcher.of:51` (`names.length << 2` → `>> 2`): collapses the table
+- `FieldMatcher.of` (`names.length << 2` → `>> 2`): collapses the table
   capacity below the entry count, and the linear-probe insert loop exits only
   on an empty slot or a duplicate name — a full table offers neither. The probe
   walks a fixed `int[]`; nothing grows.
@@ -477,18 +539,17 @@ evidence the race is gone: the `\n`-carrying covering test removed, or the escap
 dispatch restructured so the reversed cursor can no longer land on its own
 backslash.
 
-The other route out is repair, and it is what closed the two `BytesJsonIterator`
-members on 2026-08-15. Note what licenses their removal: not an enumeration of
-the sites that used to spin. The key is line-less, so retiring it asserts that
-*no* mutant under that method and mutator can time out — and an enumeration would
-have missed `parseMultiByteString`'s 2-byte continuation read, a third spinning
-cursor nobody had listed. The licence is a loop bound instead: every pass of that
-loop returns, throws, breaks, or appends at least one char, and appends now stop
-at `tail`, so the loop terminates no matter which cursor a mutation reverses.
-Prefer a structural argument of that shape over a site list whenever a line-less
-key is retired.
+Repair is the other route out. For a parse loop that appends, the document
+bound licenses retirement only when every pass returns, throws, breaks or
+appends a char, and appends stop at `tail`. That proves termination for every
+cursor-reversal sibling under the line-less key; enumerating known spinning
+sites does not. Retire stale timeout membership only after the installed
+history-free/provenance checks permit it; quiet observations and coordinates
+absent from the population have different retirement rules.
 
-## Mutator-set trial (2026-07-21)
+## Mutator measurements that determine configuration
+
+### Big-number arithmetic trial (2026-07-21)
 
 Per HARDENING.md ("the mutator set bounds what the ratchet can see"),
 `EXPERIMENTAL_BIG_INTEGER` was trialed on every suite: `iterator` 1904 → 1904,
@@ -498,7 +559,7 @@ chars; no `add`/`multiply`-family arithmetic exists in mutated classes for the
 mutator to rewrite. Left off (enabling a mutator that cannot fire is baseline
 churn for nothing); re-trial if Big arithmetic is ever introduced.
 
-## Mutator-set trial (2026-07-22)
+### Fluent receiver trial (2026-07-22)
 
 `EXPERIMENTAL_NAKED_RECEIVER` (fluent calls returning their receiver are
 expressions, invisible to `VoidMethodCallMutator`), via `pitestMutatorTrial
@@ -513,136 +574,3 @@ position-after reads across all widths (the long/int variants already had
 them, which is what killed their mutants in trial); 1 was a `NO_COVERAGE` row
 on `JsonIterParserFactory.loadParser`, killed with the rest of the
 ServiceLoader family on 2026-08-02.
-
-## Multiset re-triage (2026-07-23)
-
-sava-build 21.5.9's verify compares baselines as multisets, which exposed
-sibling survivors the earlier unique-row comparison had collapsed into their
-accepted twins — 4 in `iterator`, 14 in `numbers`, 2 in `util`, every one
-sharing `class,method,line,mutator,status` with an already-accepted row.
-Re-triaged individually:
-
-- **Killed** (real gaps found by the expansion): the lenient-literal-skip
-  directions in `BaseJsonIterator.skipTrue`/`skipLiteral` — leniency on the
-  `'r'`/`'u'` checks silently *accepted* corrupt documents (`tque`, `trqe`),
-  and the truncated-tail `skipLiteral` siblings threw at the wrong offset or
-  through `peekChar`'s EOF funnel instead of `expected <literal>` at the
-  first divergence. All killed by
-  `TestSkip.test_skip_corrupted_literals_reject_at_exact_offset` (every
-  corruption position × every literal × fast and truncated paths, exact
-  message + offset, all sources); the previously accepted rows at those keys
-  died with them and left the baseline.
-- **Accepted**: the `matchPattern` over-detection siblings (see the
-  multibyte-scan family note above) and the `DoubleParser` /
-  `JHex$INIT_DIGITS` sibling occurrences, whose family arguments
-  (slow-path routing to the `Double.parseDouble` oracle with the dangerous
-  directions observably killed; static-initializer tables built before
-  mutants activate) are line-level and cover every operand direction at
-  their coordinates. The baselines now carry one row per sibling mutant.
-
-## Unargued NO_COVERAGE pass (2026-08-01)
-
-Seven `iterator` `NO_COVERAGE` rows carried no argument anywhere in this file:
-`readNumberOrNumberString` (4), `skipUntil` (2), `closeObj` (1). They were
-`unlabeled`, and an unlabeled row is exempt from the family-label mention
-warning, so nothing had ever surfaced them — the label state read as "settled
-before labels existed" while the argument it pointed at did not exist.
-
-None of them was an equivalence candidate. All three methods are covered
-public API whose *branches* were unreached, which is the case the doctrine
-calls mechanical work rather than acceptance:
-
-- `readNumberOrNumberString` — every existing caller passed a **quoted**
-  number, so only the `STRING` arm ever ran. The bare-number, `null`, and
-  wrong-type arms had no coverage at all, which is why `return ""` for
-  `readNumberAsString()` and `return ""` in place of `null` were both
-  invisible. Killed by
-  `TestFloat.test_read_number_or_number_string_across_value_types`, which
-  pins all four arms including the error's op and the type it names.
-- `skipUntil` — every existing test entered through `{` followed by a field,
-  so the two other arms behind that brace never executed: an object that ends
-  before any field (`{}` → "not found", not an error) and a brace followed by
-  neither a field nor `}` (`{5}` → error, not a quiet "not found"). The two
-  answers must not collapse into one. Killed by
-  `TestSkip.test_skip_until_opening_brace_arms`, which also swept up the
-  line-411 `EQUAL_IF` survivor.
-- `closeObj` — the failure path was covered in `TestErrorReporting`; the
-  success arm that matches `}` and hands the iterator back for chaining had
-  no test, so returning `null` instead was indistinguishable. Killed by
-  `TestObject.test_close_obj_returns_the_iterator`.
-
-Result: `iterator` 1776→1787 of 1919 detected, baseline 143→132 rows,
-`NO_COVERAGE` rows 21→14. `numbers` and `util` were unaffected (the new tests
-are in `Test*` classes all three suites match, but they exercise no code those
-suites mutate). Refresh took two passes for a line-less-key reason worth
-remembering: the shrink-only prune dropped only 8 of the 11, because the
-two dead `skipUntil` line-420 rows share `class,method,mutator` with live
-survivors at 397/401 and prune keeps any coordinate still unkilled at another
-status. A full baseline rewrite on a solo run finished the job after a
-per-key diff of report against baseline confirmed the only mismatches were
-those 3 rows — no accepted row was missing a counterpart to a timeout, so
-there was no flip insurance to lose.
-
-The remaining `NO_COVERAGE` debt was re-triaged the next day, below.
-
-## NO_COVERAGE re-triage (2026-08-02)
-
-The 18 rows deferred above, resolved in three different directions —
-notably, *none* of them was what its recorded argument said it was:
-
-- **The ServiceLoader family (6 rows) was killed, disproving the
-  unreachable-in-harness acceptance.** The claim held for the module path but
-  ignored that PIT minions always run on the class path, where a
-  `META-INF/services` file in test resources *is* scanned.
-  `TestParserFactoryLoading` registers two fixture factories (nested inside
-  the `Test*` class so they stay out of the mutated population) and branches
-  on a `ServiceLoader` probe: on the module path it asserts the no-factory
-  error, on the class path it asserts prefix resolution, wrong-factory
-  rejection, and the error message — killing all six mutants, the
-  `NakedReceiverMutator` included. Deterministic in both environments, so it
-  satisfies the never-commit-environment-dependent-results rule. This is the
-  fleet's second disproven "the harness cannot reach this" (sava-build
-  HARDENING.md dates the first 2026-07-26); the acceptance had named the
-  missing capability as "a blackbox suite with its own module descriptor",
-  which was one capability more than the kill actually needed.
-- **The 12 trap rows were never traps** — see the Throw-terminated blocks
-  family above for the mechanism (PIT block coverage cannot observe a block
-  that always exits by throw). 10 rows stay `NO_COVERAGE` permanently with
-  their contracts now asserted; 2 (`parseFieldEqualsSlow` 434) moved to the
-  unreachable defense-in-depth family as dead defensive code.
-- **The new contract tests killed 10 accepted SURVIVED siblings as a
-  side-effect** — 5 `DoubleParser.parse` boundary/conditional mutants whose
-  slow-path-routing arguments only held while no test asserted the
-  reference-parser throw for `-`/`1e`/`1e±`/`1e±x` (a mutant routing those
-  *away* from `slow` returned numbers where the contract demands the legacy
-  exception), and 5 `parseFieldEquals` prefix-compare mutants with no
-  truncation-shaped witness. Routing arguments are direction-specific: "more
-  inputs to the oracle" is equivalent, "fewer" never was, and only the
-  malformed inputs could tell the two apart.
-
-Result: `iterator` 1787→1798 of 1919 (baseline 127→121 after the interleaved
-prunes/updates; net 132→121 across the pass), `numbers` 250→255 of 326
-(baseline 76→71), `NO_COVERAGE` rows 25→12, every remaining one argued under
-a mechanism verified this pass. `qualityGate` green.
-
-## Convergence check (2026-07-21)
-
-Per HARDENING.md's convergence method: two solo passes per suite and two
-`qualityGate` passes, report directories deleted between runs, diffed on
-per-mutant status keyed `(class, method, line, mutator)` — **zero differences**
-in all nine comparisons (solo-vs-solo, gate-vs-gate, solo-vs-gate, per suite).
-The stale-acceptance sweep (each baseline row against the union of unkilled
-sets across all four runs) matched **every** row in at least one mode — no row
-is widening the gate for nothing. The `TIMED_OUT` rows (7 iterator, 2 util)
-were stable in both modes, so the baselines carry no flip-insurance rows to
-revisit. The abstract-base `@Execution`/`@TestInstance` instability cannot
-apply here: the test suite has no abstract test classes and uses neither
-annotation.
-
-The baseline is otherwise fully triaged; no untriaged debt remains
-(the `JsonIterParser` bufSize-shim family closed 2026-07-21 with the shim's
-removal — 25.3.0 carried the `forRemoval` marker — and `TestJsonIterParser`
-covering the surviving convenience overloads).
-
-Shrinking the baseline is always an improvement; growing it requires a
-reason here.

@@ -46,7 +46,7 @@ final class TestIO {
     assertTrue(ji.readArray());
     assertEquals(2, ji.readInt());
     assertFalse(ji.readArray());
-    ji.reset(mark);
+    assertSame(ji, ji.reset(mark));
     assertTrue(ji.readArray());
     assertEquals(1, ji.readInt());
   }
@@ -65,20 +65,20 @@ final class TestIO {
     var ji = JsonIterator.parse("[]").reset(bytes, head, tail);
     final int mark = ji.mark();
     assertEquals(1, ji.skipUntil("a").readInt());
-    ji.reset(mark);
+    assertSame(ji, ji.reset(mark));
     assertEquals(2, ji.skipUntil("b").readInt());
     // the sub-range ends after the document: seeking a missing field must not
     // walk into the stale content beyond tail
-    ji.reset(mark);
+    assertSame(ji, ji.reset(mark));
     assertNull(ji.skipUntil("stale"));
 
     final char[] chars = padded.toCharArray();
     ji = JsonIterator.parse(new char[]{'[', ']'}).reset(chars, head, tail);
     final int charMark = ji.mark();
     assertEquals(1, ji.skipUntil("a").readInt());
-    ji.reset(charMark);
+    assertSame(ji, ji.reset(charMark));
     assertEquals(2, ji.skipUntil("b").readInt());
-    ji.reset(charMark);
+    assertSame(ji, ji.reset(charMark));
     assertNull(ji.skipUntil("stale"));
 
     // a sub-range cut mid-field rejects instead of completing from the stale

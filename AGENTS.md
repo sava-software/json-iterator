@@ -30,9 +30,9 @@ Build and test with `./gradlew check`. Dependencies resolve from GitHub Packages
 (sava-build's `hardening` extension in `json-iterator/build.gradle.kts`): PIT mutation
 suites `pitestIterator` / `pitestNumbers` / `pitestUtil` (reports under
 `build/reports/pitest/<suite>/`) and the Jazzer fuzz targets described under
-correctness landmines. The PIT baselines are fully triaged — every accepted
-mutant has a written reason in `json-iterator/config/pitest/README.md`, with no
-untriaged debt.
+correctness landmines. The PIT baselines and current family arguments live under
+`json-iterator/config/pitest/`. A green ratchet or a legacy unlabeled row is
+not proof of completed triage; reconcile each accepted row with its argument.
 
 To build against an unpublished sava-build change, publish sava-build to its local test
 repo and point this build (or `jmh/`) at it — the property belongs in
@@ -149,16 +149,16 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   explicit local `fuzzAll -PmaxFuzzTime=600 -PmaxParallelFuzzTargets=1`
   campaign (§ fuzzing) plus a
   change-scoped jmh A/B per benchmark discipline.
-- **These baselines' rows predate label support** (notes 21.5.10, refresh seeding
-  21.5.12) and print as `unlabeled` — recorded state, not new debt. Label a row
-  with its `config/pitest/README.md` family when you touch it, never by bulk
-  inference: a misassigned label reads as finished triage. When a claimed
-  equivalence spans a sweepable domain, verify it empirically — reimplement both
-  variants, diff them over the range, and record the range in the note. A sweep
-  survives refactors that rot a prose argument.
+- **Legacy baseline labels are metadata, not proof of triage.** Rows predating
+  label support still print as `unlabeled`. The 21.6.9 writers preserve notes
+  and expose no family-label editor; do not hand-edit rows to relabel them.
+  Reconcile each method and semantic branch with its current README argument.
+  When an equivalence spans a sweepable domain, verify it empirically and
+  retain the sweep domain with the argument.
 - **Nothing here memoizes**, so the cache-miss fixture trap does not currently
-  apply: `JHex$INIT_DIGITS` is a static table with its own family argument, not a
-  cache. This binds any future one.
+  apply: `JHex$INIT_DIGITS` and `ValueType$INIT_TYPES` build static tables, not
+  caches; fresh helper construction is checked by
+  `TestLookupTableInitialization`. Any future memoization needs a cache-miss fixture.
 - **Baseline provenance.** These files moved to line-less keys on 2026-08-01
   (parse/re-render, no mutation run, every row identity preserved — counts have
   moved since, so read them from the CSVs). That retired the whole drift
@@ -177,27 +177,23 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   be an announced toolchain transition rather than silent population churn. Never
   hand-edit either file; the rebase task writes them.
 - **Identical rows are siblings, never hand-dedupe.** These baselines carry such
-  rows at `matchPattern`, the `DoubleParser` scan guards, and `INIT_DIGITS`. The
+  rows at `matchPattern` and the `DoubleParser` scan guards. The
   2026-07-23 multiset re-triage is the proof it pays: two "siblings of accepted
   equivalents" were real lenient-literal-skip gaps, killed in `TestSkip` along
   with eight neighbouring rows the exact-offset assertions swept up.
-- **Four keys here hold an accepted survivor and an audited timeout at once** —
+- **Three keys hold accepted survivor siblings alongside audited timeouts** —
   `CharsJsonIterator.skipPastEndQuote/MathMutator`,
-  `JIUtil.escapeQuotesChecked/IncrementsMutator`,
-  `FieldMatcher.of/MathMutator`, and, since 2026-08-16,
-  `BaseJsonIterator.skipObject/MathMutator`.
-  Under sava-build 21.5.20 all three reported a flip on every run in
-  byte-identical populations (casebook: "The flip that fired forever"); the
-  per-key count comparison that landed in 21.5.21 silenced them, so a warning at
-  any of them is real again. A key whose survivor and timeout are the *same*
-  mutant seen at two speeds is not flip insurance at all but a repair item;
-  `widenToCharBuf/RemoveConditionalMutator_ORDER_IF` was one, and was repaired
-  on 2026-08-15 rather than insured. `skipObject/MathMutator` is the fourth and
-  the exception that shows the rule's limit: it is the same mutant at two
-  speeds, but repair is unavailable because the mutated loop has no exit at any
-  speed, so the watchdog is the only thing that can detect it. Its `SURVIVED`
-  row is therefore dead evidence rather than insurance — a non-terminating
-  mutant never survives — and is a removal candidate, not a record to defend.
+  `JIUtil.escapeQuotesChecked/IncrementsMutator` and
+  `FieldMatcher.of/MathMutator`. Under sava-build 21.5.20 all three reported a
+  flip on every run in byte-identical populations (casebook: "The flip that
+  fired forever"); the per-key count comparison in 21.5.21 silenced them, so
+  a warning at any of them is real again. `BaseJsonIterator.skipObject/MathMutator`
+  has timeout membership but no accepted survivor: object-string tests can
+  kill its mutated result before the minion reaches the endless witness.
+  The audited timeout membership remains:
+  an empty-key input still provides a genuinely nonterminating witness, even
+  when another covering test kills the mutant first. An accepted survivor
+  and an audited timeout are separate claims with separate retirement rules.
 - **The audited timeout set here** is 7 `iterator` rows and 2 `util`; `numbers`
   has never timed out, so it has no file and the check is inert for that suite.
   Every row carries a reviewed `# cause:` category and only `cause:liveness`
@@ -573,9 +569,8 @@ but **8–9% slower than the shipped code on realistic mixed-case text**, where 
 guard becomes an unpredictable branch. The full picture, `clean_long` / `mixed_long`
 / `low_long` in ns/op: table 92 / 293 / 268, three comparisons 268 / 268 / 269. The
 table's cost tracks the *predictability* of its guard, worst at a 41/59 split; the
-comparisons are flat across every alphabet. A table would also add
-static-initializer mutants that are unkillable by construction (see
-`JHex$INIT_DIGITS`). Don't re-propose without a measurement on a realistic alphabet.
+comparisons are flat across every alphabet. Don't re-propose without a
+measurement on a realistic alphabet.
 A branchless `c < 0x20 | c == '"' | c == '\\'` was measured too and is no better
 than the short-circuit form (269.8 vs 268.5).
 

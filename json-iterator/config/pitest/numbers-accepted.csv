@@ -67,6 +67,5 @@ systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SU
 systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 108
 systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 120
 systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 146
-systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 146
 systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 158
 systems.comodal.jsoniter.DoubleParser,parse,RemoveConditionalMutator_ORDER_IF,SURVIVED # line 165

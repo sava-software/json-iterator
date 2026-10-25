@@ -318,6 +318,9 @@ final class TestJIUtil {
     assertEquals("\\\\\\\"", JIUtil.escapeQuotesRemoveNewLinesChecked("\\\\\""));
     final var oddRunAtStart = "\\\\\\\"";
     assertSame(oddRunAtStart, JIUtil.escapeQuotesRemoveNewLinesChecked(oddRunAtStart));
+    final var escapedAtStart = "\\\"";
+    assertSame(escapedAtStart, JIUtil.escapeQuotesRemoveNewLinesChecked(escapedAtStart));
+    assertEquals(escapedAtStart, JIUtil.escapeQuotesRemoveNewLinesChecked(escapedAtStart + '\n'));
     // A single escaped quote scans past; a later newline still routes to the
     // strip with everything before it preserved verbatim.
     final var escapedOnly = "a\\\"";

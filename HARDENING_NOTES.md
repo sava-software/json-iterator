@@ -42,6 +42,16 @@ acceptance was larger than what the kill needed.) A real main-source
 provider would still need the dual declaration — `module-info` *and*
 `META-INF/services`.
 
+## Cached initialization needs a fresh construction oracle
+
+Public lookups read `JHex` and `ValueType` tables initialized before PIT
+activates mutants. That can hide broken builders even when public lookup
+assertions cover every table entry. `TestLookupTableInitialization` calls
+the private builders reflectively inside each test and checks the returned
+arrays against independent mappings. These are testable lifecycle gaps,
+not equivalent mutations or permanently unkillable initializers. Keep that
+fixture aligned if helper signatures or module access change.
+
 ## PIT block coverage cannot see throw-terminated blocks
 
 Coverage probes sit at block *ends*, so a `return f(...)` whose call throws

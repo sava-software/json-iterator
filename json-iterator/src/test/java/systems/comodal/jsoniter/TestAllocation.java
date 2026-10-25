@@ -18,6 +18,11 @@ final class TestAllocation {
 
   private static final ThreadMXBean THREADS = (ThreadMXBean) ManagementFactory.getThreadMXBean();
 
+  // Volatile stores make measured results escape; reading only a length, or
+  // discarding a result, can let the JIT eliminate the allocation under test.
+  private static volatile Object referenceSink;
+  private static volatile long primitiveSink;
+
   @BeforeAll
   static void requireAllocationCounters() {
     assumeTrue(THREADS.isThreadAllocatedMemorySupported());
@@ -29,17 +34,23 @@ final class TestAllocation {
   /// Minimum allocation over repeated runs: the floor discards runs where
   /// JIT or GC machinery happened to allocate on this thread.
   private static long minAllocated(final Runnable op) {
-    op.run(); // lazy-init and warmup outside the measurement
-    long min = Long.MAX_VALUE;
-    for (int i = 0; i < 32; ++i) {
-      final long before = THREADS.getCurrentThreadAllocatedBytes();
-      op.run();
-      final long allocated = THREADS.getCurrentThreadAllocatedBytes() - before;
-      if (allocated < min) {
-        min = allocated;
+    try {
+      op.run(); // lazy-init and warmup outside the measurement
+      long min = Long.MAX_VALUE;
+      for (int i = 0; i < 32; ++i) {
+        final long before = THREADS.getCurrentThreadAllocatedBytes();
+        op.run();
+        final long allocated = THREADS.getCurrentThreadAllocatedBytes() - before;
+        if (allocated < min) {
+          min = allocated;
+        }
       }
+      return min;
+    } finally {
+      // Do not retain one test's buffers across later tests or PIT mutants.
+      referenceSink = null;
+      primitiveSink = 0;
     }
-    return min;
   }
 
   @Test
@@ -47,12 +58,12 @@ final class TestAllocation {
     final byte[] empty = "[]".getBytes();
     final byte[] nul = "null".getBytes();
     final var ji = JsonIterator.parse(empty);
-    assertEquals(0, minAllocated(() -> ji.reset(empty).readLongArray(8)));
-    assertEquals(0, minAllocated(() -> ji.reset(nul).readLongArray(8)));
-    assertEquals(0, minAllocated(() -> ji.reset(empty).readIntArray(8)));
-    assertEquals(0, minAllocated(() -> ji.reset(nul).readIntArray(8)));
-    assertEquals(0, minAllocated(() -> ji.reset(empty).readByteArray(8)));
-    assertEquals(0, minAllocated(() -> ji.reset(nul).readByteArray(8)));
+    assertEquals(0, minAllocated(() -> referenceSink = ji.reset(empty).readLongArray(8)));
+    assertEquals(0, minAllocated(() -> referenceSink = ji.reset(nul).readLongArray(8)));
+    assertEquals(0, minAllocated(() -> referenceSink = ji.reset(empty).readIntArray(8)));
+    assertEquals(0, minAllocated(() -> referenceSink = ji.reset(nul).readIntArray(8)));
+    assertEquals(0, minAllocated(() -> referenceSink = ji.reset(empty).readByteArray(8)));
+    assertEquals(0, minAllocated(() -> referenceSink = ji.reset(nul).readByteArray(8)));
   }
 
   @Test
@@ -61,23 +72,20 @@ final class TestAllocation {
     final var ji = JsonIterator.parse(json);
     // each bound admits exactly one array of the element type (header + data,
     // padded); any grow or trim copy at least doubles it
-    final long longs = minAllocated(() -> ji.reset(json).readLongArray(3));
+    final long longs = minAllocated(() -> referenceSink = ji.reset(json).readLongArray(3));
     assertTrue(longs > 0 && longs <= 64, "long[3] read allocated " + longs + " bytes");
-    final long ints = minAllocated(() -> ji.reset(json).readIntArray(3));
+    final long ints = minAllocated(() -> referenceSink = ji.reset(json).readIntArray(3));
     assertTrue(ints > 0 && ints <= 48, "int[3] read allocated " + ints + " bytes");
-    final long bytes = minAllocated(() -> ji.reset(json).readByteArray(3));
+    final long bytes = minAllocated(() -> referenceSink = ji.reset(json).readByteArray(3));
     assertTrue(bytes > 0 && bytes <= 32, "byte[3] read allocated " + bytes + " bytes");
   }
 
-  /// The reusable char buffer must grow *amortised* — double only when full —
-  /// so decoding N chars costs O(log N) grows. Every "grow always" mutant on
-  /// those guards is content-identical (the string still decodes correctly), so
-  /// no assertEquals can see it; the only thing that changes is how much was
-  /// allocated getting there. Starting from a 2-char buffer, correct decoding
-  /// allocates a few hundred bytes, while a per-character double allocates
-  /// 2^N — megabytes here. Without this bound those mutants either survive or,
-  /// worse, are "killed" only by exhausting the heap in a long-string test,
-  /// which races the PIT timeout and fails a loaded certification at random.
+  /// Decoding from a small reusable buffer must complete within a bounded
+  /// allocation budget. Correct doubling costs a few hundred bytes here.
+  /// Growth is also capped by the document length: growing before the buffer
+  /// fills can exhaust that cap and reject valid input, which this read must
+  /// not do. The separate field-name test checks amortised growth over a
+  /// sequence of reads.
   @Test
   void test_char_buffer_grows_amortised_not_per_character() {
     // supplementary chars exercise the surrogate-split grows, the ascii tail the
@@ -86,16 +94,11 @@ final class TestAllocation {
     final byte[] doc = ('"' + text + '"').getBytes(java.nio.charset.StandardCharsets.UTF_8);
     // correctness first: the bound below is only meaningful if the read is right
     assertEquals(text, JsonIterator.parse(doc, 2).readString());
-    final long allocated = minAllocated(() -> {
-      final var read = JsonIterator.parse(doc, 2).readString();
-      if (read.isEmpty()) {
-        throw new AssertionError("unreachable; keeps the decode observable");
-      }
-    });
+    final long allocated = minAllocated(() -> referenceSink = JsonIterator.parse(doc, 2).readString());
     assertTrue(
         allocated > 0 && allocated <= 8192,
         "decoding " + text.length() + " chars from a 2-char buffer allocated " + allocated
-            + " bytes; amortised doubling costs a few hundred, per-character doubling megabytes");
+            + " bytes; bounded doubling costs a few hundred");
   }
 
   /// Field names decode through the ascii fast path's
@@ -127,9 +130,8 @@ final class TestAllocation {
       // fresh iterator per measurement, or charBuf is already at full size and
       // neither the correct nor the mutated sizing reallocates at all
       JsonIterator.parse(json, 8).testObject((buf, offset, len, ji) -> {
-        if (len == 0) {
-          throw new AssertionError("unreachable; keeps the decode observable");
-        }
+        // Publish every buffer, including those replaced by later growth.
+        referenceSink = buf;
         ji.skip();
         return true;
       });
@@ -153,11 +155,7 @@ final class TestAllocation {
     final var escaped = JIUtil.escapeJson(dense);
     // correctness first: the bound below only means something if the escape is right
     assertEquals(512 * 6, escaped.length());
-    final long allocated = minAllocated(() -> {
-      if (JIUtil.escapeJson(dense).isEmpty()) {
-        throw new AssertionError("unreachable; keeps the escape observable");
-      }
-    });
+    final long allocated = minAllocated(() -> referenceSink = JIUtil.escapeJson(dense));
     assertTrue(
         allocated > 0 && allocated <= 65_536,
         "escaping 512 control characters allocated " + allocated
@@ -169,9 +167,9 @@ final class TestAllocation {
     final byte[] number = "42".getBytes();
     final byte[] string = "\"nope\"".getBytes();
     final var ji = JsonIterator.parse(number);
-    assertEquals(0, minAllocated(() -> ji.reset(number).readLongOr(-1L)));
-    assertEquals(0, minAllocated(() -> ji.reset(string).readLongOr(-1L)));
-    assertEquals(0, minAllocated(() -> ji.reset(number).readIntOr(-1)));
-    assertEquals(0, minAllocated(() -> ji.reset(string).readIntOr(-1)));
+    assertEquals(0, minAllocated(() -> primitiveSink = ji.reset(number).readLongOr(-1L)));
+    assertEquals(0, minAllocated(() -> primitiveSink = ji.reset(string).readLongOr(-1L)));
+    assertEquals(0, minAllocated(() -> primitiveSink = ji.reset(number).readIntOr(-1)));
+    assertEquals(0, minAllocated(() -> primitiveSink = ji.reset(string).readIntOr(-1)));
   }
 }
