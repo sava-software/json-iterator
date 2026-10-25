@@ -80,13 +80,15 @@ against the build, not against the machine. Under sava-build's
 the runner hashes this repo's receipt into an immutable run bundle under
 sava-build's `build/hardening/local-fuzz-runs/`, retained by the sava-build
 release owner outside the tree it certifies. A campaign run standalone from
-here is retained by nobody beyond this machine. The certification receipt has
-the same shape as of sava-build 21.5.26: it lands at
-`.pitest-history/pitest-certification.tsv`, survives `clean`, and is replaced —
-not accumulated — by the next certification, which deletes it up front and
-republishes only on success. So a failed re-certification leaves no receipt at
-all; copy the last good one into the release record before re-running, not
-before the next `clean`. The recorded release budget is
+here is retained by nobody beyond this machine. The certification receipt also
+lands outside `build/`, at
+`.pitest-history/pitest-certification.tsv`, and survives `clean`. A new attempt
+retains the last successful TSV with a sibling `.running` marker that makes
+it historical. Failure retains that marker with the refusal reason; success
+replaces the TSV and clears the marker. Preserve completed receipts with the
+release record before a later successful run replaces them. The installed
+`hardeningHelp` owns the receipt schemas and marker-state details. The recorded
+release budget is
 `-PmaxFuzzTime=600` per target; the saturation measurement behind that number
 is in `AGENTS.md`, and three of the four targets buy no new coverage past it.
 There is no GitHub fuzz workflow: `.github/workflows/fuzz.yml` was deleted on

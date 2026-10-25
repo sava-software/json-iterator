@@ -28,9 +28,11 @@ A new unkilled mutant has exactly three legal outcomes:
    argued siblings loses evidence rather than adding it — reach for it only
    when a whole-record rewrite is the intent (the 2026-08-01 pass is the one
    time that was true here, and it took a per-key diff first).
-   `pitest<Suite>BaselineRebase` is for a reviewed PIT/toolchain transition
-   only. Acceptance is for mutants that are *equivalent with
-   respect to observable behavior*, not for "hard to test". The refresh seeds
+   `pitest<Suite>BaselineRebase` is for a reviewed PIT, PIT-plugin/tool-artifact,
+   ArcMutate-base, or certificate transition only. Acceptance is for mutants
+   that are *equivalent with respect to observable behavior*, not for "hard to
+   test"; the structural `NO_COVERAGE` cases below have separate reachability
+   arguments, not claims of observed equivalence. The refresh seeds
    each new row `# untriaged`; finishing triage means replacing that with a
    short family label whose argument lives in a section below (mentioned there
    as `# <label>` — the verify and debt listing warn on labels with no such
@@ -43,9 +45,8 @@ A new unkilled mutant has exactly three legal outcomes:
 Line numbers left the baseline key in sava-build 21.5.20 (these files were
 migrated with `migrateMutationBaselines` on 2026-08-01, row identities
 unchanged), so an unrelated edit to a mutated file churns nothing. What is
-left is a `# line N` tag — review metadata, not identity, rewritten only by a
-full `BaselineUpdate` or by a `BaselinePrune` whose removal-candidate preview
-is empty, not by every writer — plus a **line-drift
+left is a `# line N` tag — review metadata, not identity, refreshed with
+`BaselineRetag` when metadata alone needs updating — plus a **line-drift
 advisory** when a key is unkilled only at lines no tag names — the code an
 acceptance argues about moved, or a new mutant landed under an old
 acceptance. Re-read the argument below when that fires; the price of the
@@ -422,8 +423,8 @@ recorded under "Bounding the reusable char buffer (2026-08-15)".
   **This key also holds an accepted `SURVIVED` row at the same line, and that
   row is now dead evidence rather than flip insurance**: a non-terminating
   mutant has no speed at which it survives, so the row can never match again.
-  It is left in place because no plugin writer removes a preserved-timeout row
-  and a record deletion is the maintainer's call — but it is the repair item
+  It is left in place because the supported writers preserve the same-key
+  timeout budget; accepted rows must never be deleted by hand. It is the repair item
   AGENTS.md names, and repair is unavailable here because the watchdog is the
   only thing that can detect a loop with no exit.
 - `BytesJsonIterator.skipPastMultiByteEndQuote:709` (escape-dispatch

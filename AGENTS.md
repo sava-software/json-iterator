@@ -62,26 +62,81 @@ the plugin cannot know: which suite owns which class, what has been measured,
 why a mutant was accepted, and what a green gate still does not prove — the
 last of which is inventoried in `HARDENING_NOTES.md`.
 
-<!-- The block below is this repo's adaptation of the agent-instructions
-     template in sava-build's HARDENING.md. `agentsTemplateInSync` (in `check`)
-     fails until the marker acknowledges the resolved plugin's digest; re-diff
-     the block against `hardeningAgentTemplate` before moving it, because a
-     changed bullet can require code rather than prose. `hardeningAgentTemplateDiff`
-     compares the bounded block below against the installed template. Acknowledged
-     together with both plugin pins for sava-build 21.5.28. The 21.5.26 -> 21.5.28
-     step rewrites one bullet: the timeout-quiet retirement rule, relaxed so that a
-     plugin fingerprint change alone no longer resets the streak. Topically live here
-     -- 9 `cause:liveness` timeout rows across `iterator` and `util` -- but inert,
-     because every quiet count is 0, and pinned there: all 7 audited `iterator` keys
-     time out on every run observed, so no run is ever quiet enough to accrue. -->
-<!-- hardening-template sha256:f866084114e0 -->
+The block below is copied from the installed sava-build 21.6.9
+`hardeningAgentTemplate`. Its delimiters support replacement on upgrade; there is no
+digest gate. Repository-specific facts and qualifications follow outside the block.
+
 <!-- hardening-template block:start -->
+- Work with the module's `test` task. The mutation suites are a final gate, run once per
+  unpushed range when the work is complete and reviewed, before the push: each
+  `pitest<Suite>` whose mutated code the range can reach, including suites in dependent
+  modules, plus `mutationOwnershipAudit` when production classes or target/exclusion
+  rules changed. Never per commit, amend or review round; a change the gate forces goes
+  back through review as a delta. `hardeningCertify` (or `:hardeningCertifyAll`) and
+  `fuzzAll` are the pre-release checks this repo's notes assign an owner to.
+- Test-only edits owe the suites whose mutated code those tests exercise; when scope
+  is unclear, run `./gradlew qualityGate` from the Gradle root. Doc and comment
+  edits owe no suite; a build-script edit only when it changes what
+  PIT is given. A change the gate forced owes it again by the same reachability rule
+  once reviewed. `pitest<Suite>Verify` answers one way: it keeps its report while only
+  recompiled Java sources changed and every recompiled class is byte-identical, which
+  proves that suite is owed nothing; a refusal (a moved line, a resource, a build
+  script, `src/main/java` under ArcMutate) names its cause and proves nothing by itself.
+- When the gate reports unkilled mutants, iterate on one cluster with
+  `-PmutateOnly=<class-glob>`. Before any record decision, re-run unscoped with
+  `-PnoMutationHistory`: a `[history]` report cannot support adding, removing, or
+  relabelling records.
+- An unkilled mutant has three outcomes: kill it with a test that asserts the
+  property it breaks, refactor it out of existence, or accept it with a written
+  reason in `config/pitest/README.md` and a family label on the row. Refreshes seed
+  rows `# untriaged`; triage replaces that label. Never accept a `NO_COVERAGE`
+  mutant as equivalent; it is an untested line.
+- A mutant is a question, not a specification. State the intended property and an
+  oracle independent of the implementation before writing the killing test. If they
+  contradict current behaviour, prove the bug with a failing regression test first,
+  then fix production; never lock a bug in with a passing assertion.
+- Write records only through the installed writer tasks: `BaselineUnion` adds reviewed
+  rows, `BaselineRetag` refreshes `# line` metadata, `BaselinePrune` deletes only after
+  two matching fresh history-free previews, `BaselineUpdate` is for a first seed or a
+  reviewed complete rewrite, and `pitest<Suite>BaselineRebase` follows a PIT,
+  PIT-plugin/tool-artifact, ArcMutate-base, or certificate change. Never hand-edit
+  baseline rows or provenance stamps.
+- Baseline keys are line-less (`class,method,mutator,STATUS`); `# line` tags are
+  review metadata that belong to their row: `BaselineRetag` refreshes them, a hand
+  edit is a hand-edited row. Identical rows are sibling mutants and the comparison
+  is a multiset: never hand-dedupe.
+- `config/pitest/README.md` holds the arguments in force, each updated in place and
+  never appended to as a pass report: a family's members, reason, oracle and the
+  condition that invalidates it; an audited timeout's cause. The totals the build prints
+  are not restated there; the measurements it cannot reconstruct are kept.
+- A new `TIMED_OUT` mutant is a reviewer stop, never detection. Record it in
+  `config/pitest/<suite>-timeouts.csv` with a cause and argue it in the README; only
+  `cause:liveness` certifies. A member whose coordinate has left the population is
+  removed by hand after one fresh history-free run with valid committed provenance
+  omits it; while provenance is invalid, repair or rebase it first.
+- Tests are deterministic: fixed seeds, no sleeps, a clock with a non-zero origin,
+  stubs that return distinguishable non-default values, and the subject built inside
+  the test body. Exclusions must cover the test source set, not a naming convention.
+- Git-ignored scratch sources (`Integ.java` drivers) never sit in a hardened project's
+  `main` or `test` source set; keep them in a git-ignored `scratch` source set instead.
+- Verify by the absence of failures: trust the exit code and the `.running`
+  sentinel, not a summary. `MINION_DIED` and `RUN_ERROR` are not results; re-run once
+  on a quiet machine. A suite that got faster without getting narrower is a bug report.
+- Fuzz findings become a committed seed input and a named regression test. Run
+  `fuzzAll` locally with an explicit `-PmaxFuzzTime` and `-PmaxParallelFuzzTargets`
+  before a release. Where one thing has two representations, fuzz the differential.
+- `./gradlew :module:hardeningHelp` lists the installed tasks and options;
+  sava-build's HARDENING.md holds the argument behind every rule above.
+<!-- hardening-template block:end -->
+
+## Local hardening context
 
 - **Suite choice is reachability, not habit.** `pitestNumbers` mutates
   `DoubleParser`; `pitestUtil` mutates `JHex`/`JIUtil`/`InstantParser`/
   `FieldMatcher`; `pitestIterator` mutates everything else. The first two finish
-  in ~10s, `pitestIterator` costs ~90s. Test-only edits still owe the suite whose
-  mutants those tests kill; doc, build-script and comment changes owe no suite.
+  in ~10s, `pitestIterator` costs ~90s. For a plugin upgrade, the project owes
+  these suites unless every intervening release rules out changes to PIT or
+  its inputs; this upgrade changes the PIT toolchain.
   Adding, removing, renaming or moving a production class — or editing the
   `targetClasses`/`excludedClasses` globs in `json-iterator/build.gradle.kts` —
   additionally owes the cheap whole-population `mutationOwnershipAudit` before
@@ -111,13 +166,12 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   dead by construction rather than by classifier. Expect line-drift advisories on
   runs after a record rewrite: legacy line fields were allowed to lag, and
   promoting them to tags surfaces the lag as re-read prompts, not regressions.
-- **Mutation provenance here is fully bound as of 2026-08-04.** All three
-  suites carry the paired record — `<suite>-pitest-version` at PIT 1.25.9 and
-  `<suite>-pitest-toolchain.tsv` — adopted through `pitest<Suite>BaselineRebase`,
-  which retained every accepted row and added none: 1.25.9 generates exactly the
-  populations 1.25.8 did (1919/326/394). That closed two older states: `util` was
-  legacy-unversioned, and `iterator`/`numbers` were *torn* (a version stamp with
-  no sidecar), which the plugin now fails closed on. The sidecars record ArcMutate
+- **Mutation provenance is bound to PIT 1.30.0.** All three suites carry the
+  paired record — `<suite>-pitest-version` and `<suite>-pitest-toolchain.tsv` —
+  adopted with sava-build 21.6.9 on 2026-10-25 through
+  `pitest<Suite>BaselineRebase`, after fresh full history-free review runs.
+  Each writer retained every accepted row and added none; the accepted and
+  timeout CSVs were unchanged. The sidecars record ArcMutate
   as `absent` on all three — the machine-checked form of the namespace decision in
   `HARDENING_NOTES.md`, so a certificate appearing at this repo's root would now
   be an announced toolchain transition rather than silent population churn. Never
@@ -178,10 +232,9 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   `TestString`): PIT re-runs the covering tests once per mutant, so a single real
   wait costs minutes across a suite. Per-run exploration is the fuzz targets' job
   — don't reintroduce `new Random().nextLong()` seeding.
-- **Three template rules have no subject in this repo yet, and bind any future
-  one:** nothing reads a clock (`InstantParser` parses input, it never asks for
-  *now*), there are no stubs or fakes, and no collection-returning API routes
-  through an unmodifiable copy.
+- **Determinism rules with no current subject here:** nothing reads a clock
+  (`InstantParser` parses input, it never asks for *now*), there are no stubs or
+  fakes, and no collection-returning API routes through an unmodifiable copy.
 - **Kill rates are bounded by the mutator set.** `BigInteger`/`BigDecimal`
   arithmetic is method calls, invisible to `STRONGER`'s arithmetic mutators.
   Trialed `EXPERIMENTAL_BIG_INTEGER` on 2026-07-21 across all three suites: zero
@@ -216,7 +269,9 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   the parser landed and `DoubleParser.parse:136` read `NO_COVERAGE` in every
   report regardless. Before writing a test purely to flip a `NO_COVERAGE` row,
   check whether its block can complete. What such a row is owed is a test
-  asserting the throw's contract, not coverage.
+  asserting the throw's contract, not coverage. These are the structural
+  exception described in sava-build's HARDENING.md; their acceptance is a
+  coverage-probe limitation, not a claim of behavioural equivalence.
 - **"No untriaged debt" is a claim about labels, not arguments.** On 2026-08-01
   seven `NO_COVERAGE` rows in `readNumberOrNumberString`, `skipUntil` and
   `closeObj` turned out to have no argument anywhere in `config/pitest/README.md`
@@ -321,7 +376,6 @@ last of which is inventoried in `HARDENING_NOTES.md`.
   on 2026-08-03 a post-`clean` `check` came back in 698ms with `:test`
   `FROM-CACHE` and zero `PASSED` lines. Confirm the task actually executed before
   reporting a run as evidence.
-<!-- hardening-template block:end -->
 
 ## Correctness landmines
 
@@ -388,13 +442,14 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   -PmaxParallelFuzzTargets=1`; `fuzzAll` derives its dependencies from the four
   registrations, so it cannot drift from a hand-written task list the way a
   workflow can, and it writes
-  `.pitest-history/local-fuzz.tsv` after every selected target succeeds (schema
-  4 as of sava-build 21.5.23, carrying the plugin JAR hash, the budget, the
-  parallel width and per-target execution counts). That path is deliberately
-  outside `build/`, so unlike the certification receipt it survives `clean` — it
-  is still git-ignored machine-local state, so it is durable against the build,
-  not against the machine. A campaign whose seconds and outcome nobody retained
-  is a recollection, not a record, and it becomes evidence one of two ways:
+  `.pitest-history/local-fuzz.tsv` after every selected target succeeds. Both
+  that receipt and `.pitest-history/pitest-certification.tsv` survive `clean`;
+  they are git-ignored machine-local state, durable against the build rather
+  than against the machine. A sibling `.running` marker makes a retained TSV
+  historical; only successful publication clears it. Read the installed
+  `hardeningHelp` for receipt schemas and refusal-state details. A campaign
+  whose seconds and outcome nobody retained is a recollection, not a record,
+  and it becomes evidence one of two ways:
   - **Driven by sava-build's `tools/local-fuzz.sh --release --seconds <N>`**
     (the fleet path): the runner finds this repo's `local-fuzz.tsv`, hashes it,
     and copies it into an immutable SHA-bound run bundle under *sava-build's*
@@ -404,9 +459,9 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
     it certifies — and `--verify-receipt` rehashes it without rerunning Gradle.
     Nothing here is retained, and nothing needs to be.
   - **Run standalone from this repo**: nothing copies it anywhere. The fuzz
-    receipt at least survives `clean`; `build/hardening/pitest-certification.tsv`
-    does not, so whoever certifies copies that one into the release record
-    before the next `clean` or the evidence is gone.
+    and certification receipts survive `clean`, but subsequent successful runs
+    replace them. The release owner retains the completed receipts with the
+    release record before that happens; no standalone runner copies them.
 
   `--continue` lets independent
   targets finish after one finds a crash; Gradle still exits non-zero.
