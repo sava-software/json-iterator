@@ -62,7 +62,7 @@ the plugin cannot know: which suite owns which class, what has been measured,
 why a mutant was accepted, and what a green gate still does not prove — the
 last of which is inventoried in `HARDENING_NOTES.md`.
 
-The block below is copied from the installed sava-build 21.6.9
+The block below is copied from the installed sava-build 21.7.1
 `hardeningAgentTemplate`. Its delimiters support replacement on upgrade; there is no
 digest gate. Repository-specific facts and qualifications follow outside the block.
 
@@ -150,7 +150,7 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   campaign (§ fuzzing) plus a
   change-scoped jmh A/B per benchmark discipline.
 - **Legacy baseline labels are metadata, not proof of triage.** Rows predating
-  label support still print as `unlabeled`. The 21.6.9 writers preserve notes
+  label support still print as `unlabeled`. The installed writers preserve notes
   and expose no family-label editor; do not hand-edit rows to relabel them.
   Reconcile each method and semantic branch with its current README argument.
   When an equivalence spans a sweepable domain, verify it empirically and

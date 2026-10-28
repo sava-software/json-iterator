@@ -34,7 +34,7 @@ A new unkilled mutant has exactly three legal outcomes:
    arguments, not claims of observed equivalence. The refresh seeds
    each new row `# untriaged`. Family arguments live below; a missing label
    or a recognized legacy label does not establish completed triage. The
-   installed 21.6.9 writers preserve existing notes (`BaselineRetag` changes
+   installed writers preserve existing notes (`BaselineRetag` changes
    only line metadata), so there is no supported family-label editing task.
    Do not hand-edit rows to silence label warnings; reconcile their method
    and semantic branch against the current argument instead.
