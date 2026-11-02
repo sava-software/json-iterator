@@ -771,8 +771,21 @@ Runs are archived timestamped under `jmh/jmh-results/` (outside `build/`, so `cl
 cannot erase measurement history), and `build/results/jmh/results.txt` is re-rendered
 after each run as a newest-wins merge across all archived runs — so subset runs converge
 on a full scoreboard, but rows can be of mixed vintage. Delete an archive file to drop a
-bad run's rows. Every benchmark cross-checks its variants' checksums at `@Setup`; with
-`-foe true` a disagreement is a hard failure, not noise.
+bad run's rows. Every benchmark cross-checks its variants' checksums at `@Setup`, but JMH
+stops on a failed benchmark only under `-foe true`, and the Gradle `jmh` task never
+passes it while the pinned sava-build requires jmh-gradle-plugin 0.7.3: that plugin
+passes `failOnError = true` as `-foe 1`, which JMH reads as false, whatever
+`-PjmhFailOnError` says. JMH then moves past any failed benchmark: a throwing `@Setup`
+prints `<failure>`, a fork that dies (say on a bad `-PjmhJvmArgsAppend` flag) prints
+`<forked VM failed with exit code N>`, and the task still ends `BUILD SUCCESSFUL`.
+Depending on how and when it failed, a failed benchmark posts no row, so the merge keeps
+its previous one, or a short row with a `Cnt` below forks × measurement iterations, which
+replaces it. So before reading `results.txt`, check that the archive the run wrote (the
+newest `jmh/jmh-results/results-*.txt`) has a row for every benchmark and parameter set
+the run started, each with a `Cnt` of forks × measurement iterations (24 at
+`-PjmhFork=3` with the default 8 iterations), or run the jar directly with `-foe true`
+(`jmh/README.md`). Plugin 0.7.4 passes `true`; drop this caveat in the commit that adopts
+a sava-build release requiring 0.7.4 or later.
 
 **Scope the run to the change; don't default to the full suite.** A full-suite
 `-PjmhFork=3` run costs hours; a change-scoped `-PjmhIncludes` subset gives

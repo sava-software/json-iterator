@@ -22,7 +22,8 @@ convention plugin (pinned to the published sava-build in this build's
 root `AGENTS.md`). Every
 default it sets is overridable per invocation: `-PjmhFork`, `-PjmhIncludes`,
 `-PjmhWarmupIterations`, `-PjmhWarmup`, `-PjmhIterations`,
-`-PjmhTimeOnIteration`, `-PjmhFailOnError`, and
+`-PjmhTimeOnIteration`, `-PjmhFailOnError` (no effect while the pinned
+sava-build requires jmh-gradle-plugin 0.7.3; see the end of this section), and
 `-PjmhJvmArgsAppend="<flag> <flag>..."` — the last replacing the service
 flag set wholesale (e.g. to A/B the GC). For anything the extension does not
 expose (profilers, output formats), build the fat jar once and drive JMH
@@ -63,7 +64,21 @@ close verdicts (a ±134 error that was really ±8 in isolation has happened);
 treat any row with an error above ~10% of its score as contaminated and
 re-run it alone. Every benchmark's `@Setup` cross-checks that all variants of
 a workload produce identical checksums, and `-foe true` turns any
-disagreement into a hard failure.
+disagreement into a hard failure, as in the direct run above. The Gradle `jmh`
+task cannot pass it while the pinned sava-build requires jmh-gradle-plugin
+0.7.3: the plugin turns `failOnError = true` into `-foe 1`, which JMH reads as
+false. A Gradle run therefore moves past any failed benchmark: a throwing
+`@Setup` prints `<failure>`, a fork that dies (say on a bad
+`-PjmhJvmArgsAppend` flag) prints `<forked VM failed with exit code N>`, and
+the task still succeeds. Depending on how and when it failed, the benchmark
+posts no row, so the merge keeps its previous one, or a short row with a `Cnt`
+below forks × measurement iterations, which replaces it. Before trusting
+`results.txt`, check that the archive the run wrote (the newest
+`jmh-results/results-*.txt`) has a row for every benchmark and parameter set
+the run started, each with a `Cnt` of forks × measurement iterations (24 at
+`-PjmhFork=3` with the default 8 iterations), or run the jar directly with
+`-foe true`. Plugin 0.7.4 passes `true`; drop this caveat in the commit that
+adopts a sava-build release requiring 0.7.4 or later.
 
 ## Benchmarks
 
