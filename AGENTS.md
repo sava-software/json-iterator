@@ -62,7 +62,7 @@ the plugin cannot know: which suite owns which class, what has been measured,
 why a mutant was accepted, and what a green gate still does not prove — the
 last of which is inventoried in `HARDENING_NOTES.md`.
 
-The block below is copied from the installed sava-build 21.7.1
+The block below is copied from the installed sava-build 21.8.2
 `hardeningAgentTemplate`. Its delimiters support replacement on upgrade; there is no
 digest gate. Repository-specific facts and qualifications follow outside the block.
 
@@ -136,7 +136,8 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   `FieldMatcher`; `pitestIterator` mutates everything else. The first two finish
   in ~10s, `pitestIterator` costs ~90s. For a plugin upgrade, the project owes
   these suites unless every intervening release rules out changes to PIT or
-  its inputs; this upgrade changes the PIT toolchain.
+  its inputs; sava-build's release notes list commit subjects and rule out
+  nothing, so each bump owes them once at its gate.
   Adding, removing, renaming or moving a production class — or editing the
   `targetClasses`/`excludedClasses` globs in `json-iterator/build.gradle.kts` —
   additionally owes the cheap whole-population `mutationOwnershipAudit` before

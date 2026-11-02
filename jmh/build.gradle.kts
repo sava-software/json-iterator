@@ -1,7 +1,7 @@
 plugins {
   java
   // Keep in sync with the root build's settings.gradle.kts plugins block.
-  id("software.sava.build.feature.jmh") version "21.7.1"
+  id("software.sava.build.feature.jmh") version "21.8.2"
 }
 
 repositories {
