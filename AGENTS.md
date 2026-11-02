@@ -34,17 +34,53 @@ correctness landmines. The PIT baselines and current family arguments live under
 `json-iterator/config/pitest/`. A green ratchet or a legacy unlabeled row is
 not proof of completed triage; reconcile each accepted row with its argument.
 
+Gradle verifies every artifact and metadata file either build resolves, settings
+plugins included, against `gradle/verification-metadata.xml` and its keyring
+`gradle/verification-keyring.keys`. `gradle/verification/version-scoped-keys.txt`
+lists the keys sava-build's guard (`verificationPolicy`, under `check`) holds to exact
+versions, and the root `gradle.properties` carries the `strict` declaration the guard
+requires. sava-build's README, "Verifying sava artifacts", owns the rules and the
+update procedure; what it cannot know about this repo:
+
+- **Two builds, one policy.** `jmh/` is a standalone build, so `jmh/gradle/` holds
+  relative symlinks to the root's metadata and keyring. Run a dependency or policy
+  change through both, without the configuration cache (a reused entry resolves
+  nothing): `./gradlew --no-configuration-cache check resolveVerificationTools`, then
+  `./gradlew --no-configuration-cache -p jmh check jmhJar`. The release job resolves
+  under the same policy; `:aggregation:zipCentralPortalDeployment -Pversion=<any>`
+  builds its Central bundle locally, unsigned, when a change might reach that path.
+- **Regenerate from the root, then from `-p jmh`.** Only the jmh build meets JMH 1.36
+  and its generators, asm 9.0, the `feature.jmh` plugin marker and three old releases
+  under keys that must not vouch (commons-math3 3.2, commons-parent 28, apache 13). A
+  write run from there writes through the metadata link but replaces the keyring link
+  with a copy: diff it against the root's keyring, merge anything new, and re-create
+  the link.
+- **Entries a warm write run never names; keep them through a trim.** The
+  `gradle:gradle` rule (the Gradle sources zip IntelliJ fetches, under Gradle Inc.'s
+  current signing subkey) and the jmh plugin's `-sources.jar` pin are IDE-only: only an
+  IntelliJ sync with download sources on exercises them, and the root window's reaches
+  both, since sava-build puts the jmh plugin on the root's settings classpath. The
+  `org.ow2:ow2:1.5` POM pin is cold-only: asm 9.0, which only the jmh build resolves,
+  names that unsigned parent, and Gradle reads it only while no parsed asm 9.0 metadata
+  is cached, so only `-p jmh` from an empty `GRADLE_USER_HOME` exercises it. A trim's
+  proof, a write run that changes nothing, cannot see a cold-only entry go missing, so
+  after a trim re-run both builds from an empty `GRADLE_USER_HOME`.
+
 To build against an unpublished sava-build change, publish sava-build to its local test
 repo and point this build (or `jmh/`) at it — the property belongs in
 `~/.gradle/gradle.properties` or on the CLI, never in `settings.gradle.kts`:
 
 ```sh
 (cd ../sava-build; ./gradlew publishSavaBuildTestPublicationToSavaTestRepoRepository)
-./gradlew check -PsavaBuildLocalRepo=../sava-build/build/sava-test-repo
+./gradlew check -PsavaBuildLocalRepo=../sava-build/build/sava-test-repo --dependency-verification lenient
 ```
 
 While set, every `software.sava.build*` plugin id resolves to the `0.0.0-test` module
-from that repo and the pinned versions are ignored (a warning is logged). **The publish
+from that repo and the pinned versions are ignored (a warning is logged). That module is
+unsigned local build output, which the strict policy refuses, so every command run with
+the property (all of them, while it sits in `~/.gradle/gradle.properties`) also passes
+`--dependency-verification lenient`; that mode never goes in a `gradle.properties`, and
+`0.0.0-test` never gets trust in the policy. **The publish
 is not automatic** — re-run it after every sava-build edit, or the build silently keeps
 the previously published jar. When done, drop the property and bump the pinned versions
 (the `plugins {}` block in `settings.gradle.kts` *and* the `feature.jmh` version in
@@ -148,7 +184,7 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   PIT suites are too slow for hosted runners. Don't wire the full gate into CI to
   "fix" that; it's a decision. The pre-release ritual is certification plus an
   explicit local `fuzzAll -PmaxFuzzTime=600 -PmaxParallelFuzzTargets=1`
-  campaign (§ fuzzing) plus a
+  campaign (§ fuzzing) plus `verificationKeyStatus` from the root plus a
   change-scoped jmh A/B per benchmark discipline.
 - **Legacy baseline labels are metadata, not proof of triage.** Rows predating
   label support still print as `unlabeled`. The installed writers preserve notes

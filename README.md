@@ -46,6 +46,11 @@ savaGithubPackagesPassword=GITHUB_TOKEN
 ./gradlew check
 ```
 
+Gradle checks the signature or checksum of every dependency, build plugins included, against
+[`gradle/verification-metadata.xml`](gradle/verification-metadata.xml). After changing a
+dependency or plugin version, update that policy as sava-build's README describes ("Verifying
+sava artifacts"); [AGENTS.md](AGENTS.md) notes what is specific to this repository.
+
 ## Credits
 
 Originally adapted from the [stream parsing features](http://jsoniter.com/java-features.html#iterator-to-rescue)

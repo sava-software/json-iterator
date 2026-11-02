@@ -153,11 +153,20 @@ package (`packages=software.sava.*`). Every class this repo mutates is
 fails — the shared `software.sava` Maven group is not the scope field, and
 package scope alone would not be enough anyway. Do not copy
 `arcmutate-licence.txt` here: activation is presence-based, with no scope
-check in the plugin, so nothing but this paragraph stands between an
-accidental copy and an unlicensed run. Every suite runs on open-source PIT and
-re-earns each status from scratch — which is what `hardeningCertify` forces
-even where history *is* available. `.pitest-history/` stays in `.gitignore`
-regardless: the verify's run-to-run status stash lives there.
+check in the plugin. The dependency verification policy trusts no key for
+`com.arcmutate`, so a copy puts `com.arcmutate:base` on the `pitest`
+configuration every suite launches PIT from, and strict resolution refuses it
+(`resolveVerificationTools` refused `com.arcmutate:base:1.7.2` and its parent
+POM with a dummy licence on 2026-11-02). A lenient run, as every
+`-PsavaBuildLocalRepo` command is, only reports that refusal; there the
+toolchain sidecars, which record ArcMutate as absent, are what announce it
+(`AGENTS.md`, "Mutation provenance is bound to PIT 1.30.0"). A regeneration
+run with a licence present would draft that trust back, so a `com.arcmutate`
+rule in a policy diff is this decision being overturned, never routine.
+Every suite runs on open-source PIT and re-earns each status from scratch —
+which is what `hardeningCertify` forces even where history *is* available.
+`.pitest-history/` stays in `.gitignore` regardless: the verify's run-to-run
+status stash lives there.
 
 ## The same-key swap
 

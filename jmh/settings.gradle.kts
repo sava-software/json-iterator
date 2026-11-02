@@ -1,8 +1,10 @@
 pluginManagement {
   // Same local-dev toggle as the root build (see ../settings.gradle.kts): point
   // '-PsavaBuildLocalRepo=<path to sava-build>/build/sava-test-repo' at a published
-  // local test repo to bench against an unpublished sava-build change. The publish is
-  // NOT automatic — re-run sava-build's publish task after every edit there. This
+  // local test repo to bench against an unpublished sava-build change, passing
+  // '--dependency-verification lenient' with it, since the strict policy (gradle/ here
+  // links to the root's) refuses the unsigned 0.0.0-test module. The publish is NOT
+  // automatic — re-run sava-build's publish task after every edit there. This
   // block stays silent about it: this build applies no sava-build settings plugin,
   // but 'includeBuild("..")' configures the root's, whose end-of-build notice covers
   // the whole composite. Prefer an absolute property value — a relative one is
