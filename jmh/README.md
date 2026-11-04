@@ -22,8 +22,9 @@ convention plugin (pinned to the published sava-build in this build's
 root `AGENTS.md`). Every
 default it sets is overridable per invocation: `-PjmhFork`, `-PjmhIncludes`,
 `-PjmhWarmupIterations`, `-PjmhWarmup`, `-PjmhIterations`,
-`-PjmhTimeOnIteration`, `-PjmhFailOnError`, `-PjmhVersion` (the JMH harness,
-1.37 by default), and `-PjmhJvmArgsAppend="<flag> <flag>..."` — the last
+`-PjmhTimeOnIteration`, `-PjmhFailOnError`, `-PjmhVersion` (the JMH harness:
+1.37 by default, and the only version whose whole dependency graph the root's
+verification policy covers), and `-PjmhJvmArgsAppend="<flag> <flag>..."` — the last
 replacing the service flag set wholesale (e.g. to A/B the GC). For anything
 the extension does not expose (profilers, output formats), build the fat jar
 once and drive JMH directly. Each Gradle run that writes results has its raw

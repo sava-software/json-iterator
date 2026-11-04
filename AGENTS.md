@@ -50,9 +50,10 @@ update procedure; what it cannot know about this repo:
   under the same policy; `:aggregation:zipCentralPortalDeployment -Pversion=<any>`
   builds its Central bundle locally, unsigned, when a change might reach that path.
 - **Regenerate from the root, then from `-p jmh`.** Only the jmh build meets JMH's
-  generators, asm 9.0 and the `feature.jmh` plugin marker; under `-PjmhVersion=1.36` it
-  also meets JMH 1.36 and three old releases under keys that must not vouch
-  (commons-math3 3.2, commons-parent 28, apache 13). A write run from there writes
+  generators, asm 9.0 and the `feature.jmh` plugin marker. The policy covers JMH 1.37
+  alone: through JMH 1.36's jmh-core, `-PjmhVersion=1.36` also meets three old releases
+  under keys that must not vouch (commons-math3 3.2, commons-parent 28, apache 13), which
+  the policy does not trust, so such a run is refused. A write run from there writes
   through the metadata link but replaces the keyring link with a copy: diff it against
   the root's keyring, merge anything new, and re-create the link.
 - **Entries a warm write run never names; keep them through a trim.** The
