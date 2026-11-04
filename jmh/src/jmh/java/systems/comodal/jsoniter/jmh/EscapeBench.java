@@ -91,11 +91,9 @@ public class EscapeBench {
     };
 
     // Cross-check every candidate against the shipped implementation. A
-    // disagreement throws here, so no variant of this shape posts a score in
-    // that run. That fails the run only under JMH -foe true, which the Gradle
-    // jmh task cannot pass while the pinned sava-build requires
-    // jmh-gradle-plugin 0.7.3 (AGENTS.md, Benchmark discipline): there the
-    // merged results.txt keeps the shape's previous rows.
+    // disagreement throws here, and under sava-build's failOnError default
+    // (JMH -foe true) that fails the jmh run, so a faster-but-wrong candidate
+    // cannot post a score.
     check(current(), runs());
     check(current(), runsClean());
     check(current(), runsTable());

@@ -22,18 +22,20 @@ convention plugin (pinned to the published sava-build in this build's
 root `AGENTS.md`). Every
 default it sets is overridable per invocation: `-PjmhFork`, `-PjmhIncludes`,
 `-PjmhWarmupIterations`, `-PjmhWarmup`, `-PjmhIterations`,
-`-PjmhTimeOnIteration`, `-PjmhFailOnError` (no effect while the pinned
-sava-build requires jmh-gradle-plugin 0.7.3; see the end of this section), and
-`-PjmhJvmArgsAppend="<flag> <flag>..."` — the last replacing the service
-flag set wholesale (e.g. to A/B the GC). For anything the extension does not
-expose (profilers, output formats), build the fat jar once and drive JMH
-directly. Each Gradle run's raw output is archived timestamped under
-`jmh-results/` (in the project directory, outside `build/`, so `clean`
-cannot erase measurement history), and `build/results/jmh/results.txt` is
-re-rendered after every run as the merge of all archived runs (newest row
-wins per benchmark) — so subset runs converge on a full scoreboard. The
+`-PjmhTimeOnIteration`, `-PjmhFailOnError`, `-PjmhVersion` (the JMH harness,
+1.37 by default), and `-PjmhJvmArgsAppend="<flag> <flag>..."` — the last
+replacing the service flag set wholesale (e.g. to A/B the GC). For anything
+the extension does not expose (profilers, output formats), build the fat jar
+once and drive JMH directly. Each Gradle run that writes results has its raw
+output archived timestamped under `jmh-results/` (in the project directory,
+outside `build/`, so `clean` cannot erase measurement history), and
+`build/results/jmh/results.txt` is then re-rendered as the merge of all
+archived runs (newest row wins per benchmark) — so subset runs converge on a
+full scoreboard. The
 archive is the source of truth: delete an archive file to drop a bad run's
-rows from the next merge, and mind that rows can be of mixed vintage.
+rows from the next merge, and mind that rows can be of mixed vintage, and of
+mixed harness: the archives through `results-20260816-175731.txt` ran on
+JMH 1.36, and later runs on 1.37 unless `-PjmhVersion` overrides it.
 
 ```sh
 ../gradlew jmhJar
@@ -64,21 +66,13 @@ close verdicts (a ±134 error that was really ±8 in isolation has happened);
 treat any row with an error above ~10% of its score as contaminated and
 re-run it alone. Every benchmark's `@Setup` cross-checks that all variants of
 a workload produce identical checksums, and `-foe true` turns any
-disagreement into a hard failure, as in the direct run above. The Gradle `jmh`
-task cannot pass it while the pinned sava-build requires jmh-gradle-plugin
-0.7.3: the plugin turns `failOnError = true` into `-foe 1`, which JMH reads as
-false. A Gradle run therefore moves past any failed benchmark: a throwing
-`@Setup` prints `<failure>`, a fork that dies (say on a bad
-`-PjmhJvmArgsAppend` flag) prints `<forked VM failed with exit code N>`, and
-the task still succeeds. Depending on how and when it failed, the benchmark
-posts no row, so the merge keeps its previous one, or a short row with a `Cnt`
-below forks × measurement iterations, which replaces it. Before trusting
-`results.txt`, check that the archive the run wrote (the newest
-`jmh-results/results-*.txt`) has a row for every benchmark and parameter set
-the run started, each with a `Cnt` of forks × measurement iterations (24 at
-`-PjmhFork=3` with the default 8 iterations), or run the jar directly with
-`-foe true`. Plugin 0.7.4 passes `true`; drop this caveat in the commit that
-adopts a sava-build release requiring 0.7.4 or later.
+disagreement into a hard failure. The direct run above passes it itself; the
+Gradle `jmh` task passes it by default (`-PjmhFailOnError=false` turns it
+off), so any benchmark error, such as a throwing `@Setup` or a fork that dies,
+fails the task, and the failed run archives nothing. JMH stops at the first
+error, so scores the run had already measured appear only in its console
+output; `-PjmhFailOnError=false` keeps going and archives them, leaving the
+failed benchmark with no row or a short one.
 
 ## Benchmarks
 
@@ -152,6 +146,11 @@ iterate the resulting array — there is no incremental parse. The `-prof gc` ru
 | solana alloc/op | 575,858 B | 5,331,826 B | **+4,755,968 B** | 4,755,919 B |
 
 One full-document copy per call, to within ~50 bytes (±0.009 B/op error).
+These figures, like the allocation rates below, are JMH 1.36's. JMH 1.37's gc
+profiler reads the JVM-wide `getTotalThreadAllocatedBytes()`, which counts
+every thread: the profiler's own, which 1.36 left out, and threads that end
+between its snapshots. Re-measure both sources before comparing a 1.37 run
+with them.
 
 The trap is that **this barely shows up in the parse timing.** A same-session control
 run puts the latency cost at just **+3.1%, identically on both documents** (455 vs 441 µs

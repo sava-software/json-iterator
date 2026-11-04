@@ -49,12 +49,12 @@ update procedure; what it cannot know about this repo:
   `./gradlew --no-configuration-cache -p jmh check jmhJar`. The release job resolves
   under the same policy; `:aggregation:zipCentralPortalDeployment -Pversion=<any>`
   builds its Central bundle locally, unsigned, when a change might reach that path.
-- **Regenerate from the root, then from `-p jmh`.** Only the jmh build meets JMH 1.36
-  and its generators, asm 9.0, the `feature.jmh` plugin marker and three old releases
-  under keys that must not vouch (commons-math3 3.2, commons-parent 28, apache 13). A
-  write run from there writes through the metadata link but replaces the keyring link
-  with a copy: diff it against the root's keyring, merge anything new, and re-create
-  the link.
+- **Regenerate from the root, then from `-p jmh`.** Only the jmh build meets JMH's
+  generators, asm 9.0 and the `feature.jmh` plugin marker; under `-PjmhVersion=1.36` it
+  also meets JMH 1.36 and three old releases under keys that must not vouch
+  (commons-math3 3.2, commons-parent 28, apache 13). A write run from there writes
+  through the metadata link but replaces the keyring link with a copy: diff it against
+  the root's keyring, merge anything new, and re-create the link.
 - **Entries a warm write run never names; keep them through a trim.** The
   `gradle:gradle` rule (the Gradle sources zip IntelliJ fetches, under Gradle Inc.'s
   current signing subkey) and the jmh plugin's `-sources.jar` pin are IDE-only: only an
@@ -98,7 +98,7 @@ the plugin cannot know: which suite owns which class, what has been measured,
 why a mutant was accepted, and what a green gate still does not prove — the
 last of which is inventoried in `HARDENING_NOTES.md`.
 
-The block below is copied from the installed sava-build 21.8.2
+The block below is copied from the installed sava-build 21.8.3
 `hardeningAgentTemplate`. Its delimiters support replacement on upgrade; there is no
 digest gate. Repository-specific facts and qualifications follow outside the block.
 
@@ -707,7 +707,10 @@ Two corollaries that are easy to get backwards:
   cost is only **+3.1%** (identically on both documents, same-session control) while the
   allocation rate goes 22× and GC time 43×. Judge the stream API by
   `gc.alloc.rate.norm`, not by the score; in a long-running service the collector pays
-  what the benchmark doesn't.
+  what the benchmark doesn't. These are JMH 1.36 figures. 1.37's gc profiler reads the
+  JVM-wide `getTotalThreadAllocatedBytes()`, which counts every thread: the profiler's own,
+  which 1.36 left out, and threads that end between its snapshots. Re-measure before
+  comparing a 1.37 figure with them.
 
 **Three features were reviewed for promotion in 2026-07 and rejected on the merits.**
 They exist, fully implemented, on the `vectorize-archive` tag. Don't resurrect them
@@ -767,25 +770,20 @@ of its score as contaminated and re-run it alone.
 ./gradlew -p jmh jmh -PjmhFork=3 -PjmhIncludes=kindDispatch
 ```
 
-Runs are archived timestamped under `jmh/jmh-results/` (outside `build/`, so `clean`
-cannot erase measurement history), and `build/results/jmh/results.txt` is re-rendered
-after each run as a newest-wins merge across all archived runs — so subset runs converge
-on a full scoreboard, but rows can be of mixed vintage. Delete an archive file to drop a
-bad run's rows. Every benchmark cross-checks its variants' checksums at `@Setup`, but JMH
-stops on a failed benchmark only under `-foe true`, and the Gradle `jmh` task never
-passes it while the pinned sava-build requires jmh-gradle-plugin 0.7.3: that plugin
-passes `failOnError = true` as `-foe 1`, which JMH reads as false, whatever
-`-PjmhFailOnError` says. JMH then moves past any failed benchmark: a throwing `@Setup`
-prints `<failure>`, a fork that dies (say on a bad `-PjmhJvmArgsAppend` flag) prints
-`<forked VM failed with exit code N>`, and the task still ends `BUILD SUCCESSFUL`.
-Depending on how and when it failed, a failed benchmark posts no row, so the merge keeps
-its previous one, or a short row with a `Cnt` below forks × measurement iterations, which
-replaces it. So before reading `results.txt`, check that the archive the run wrote (the
-newest `jmh/jmh-results/results-*.txt`) has a row for every benchmark and parameter set
-the run started, each with a `Cnt` of forks × measurement iterations (24 at
-`-PjmhFork=3` with the default 8 iterations), or run the jar directly with `-foe true`
-(`jmh/README.md`). Plugin 0.7.4 passes `true`; drop this caveat in the commit that adopts
-a sava-build release requiring 0.7.4 or later.
+Each run that writes results is archived timestamped under `jmh/jmh-results/` (outside
+`build/`, so `clean` cannot erase measurement history), and `build/results/jmh/results.txt`
+is re-rendered after each such run as a newest-wins merge across all archived runs — so
+subset runs converge on a full scoreboard, but rows can be of mixed vintage, and of mixed
+harness: the archives through `results-20260816-175731.txt` ran on JMH 1.36, and later runs
+on 1.37 (sava-build's default since 21.8.3) unless `-PjmhVersion` overrides it. Delete an
+archive file to drop a bad run's rows. Every benchmark cross-checks its variants' checksums
+at `@Setup`, and sava-build's `failOnError` default reaches JMH as `-foe true`: the first
+benchmark error (a throwing `@Setup`, a fork that dies) stops the run and fails the `jmh`
+task, and the failed run archives nothing, so the scores of benchmarks that finished before
+it survive only in its console output. `-PjmhFailOnError=false` lets JMH run past a failed
+benchmark and archive the rest; the failed one then posts no row, or a short one with a
+`Cnt` below forks × measurement iterations, and only the log says so, with `<failure>` or
+`<forked VM failed with exit code N>`.
 
 **Scope the run to the change; don't default to the full suite.** A full-suite
 `-PjmhFork=3` run costs hours; a change-scoped `-PjmhIncludes` subset gives
@@ -877,6 +875,7 @@ fiction, and it survived precisely because it sounded like an answer. If the err
 over the threshold, there is nothing to explain yet.
 
 Allocation is measurable even when the machine is noisy, and it can be the whole story:
-`-prof gc` reports `gc.alloc.rate.norm` (bytes per op) to ~0.01 B/op regardless of CPU
-contention. Reach for it whenever an API might be paying in GC rather than in latency —
-the stream source ties on score and allocates 22× more.
+under JMH 1.36, `-prof gc` reported `gc.alloc.rate.norm` (bytes per op) to ~0.01 B/op
+regardless of CPU contention; under 1.37, which also counts the profiler's own thread,
+that precision has not been re-measured. Reach for it whenever an API might be paying in
+GC rather than in latency — the stream source ties on score and allocates 22× more.
