@@ -147,11 +147,30 @@ iterate the resulting array — there is no incremental parse. The `-prof gc` ru
 | solana alloc/op | 575,858 B | 5,331,826 B | **+4,755,968 B** | 4,755,919 B |
 
 One full-document copy per call, to within ~50 bytes (±0.009 B/op error).
-These figures, like the allocation rates below, are JMH 1.36's. JMH 1.37's gc
-profiler reads the JVM-wide `getTotalThreadAllocatedBytes()`, which counts
-every thread: the profiler's own, which 1.36 left out, and threads that end
-between its snapshots. Re-measure both sources before comparing a 1.37 run
-with them.
+These figures, like the allocation rates, GC counts and GC times below, are
+JMH 1.36's. JMH 1.37's gc profiler reads the JVM-wide
+`getTotalThreadAllocatedBytes()`, which counts every thread: the profiler's
+own, which 1.36 left out, and threads that end between its snapshots.
+Re-measured under 1.37 on 2026-11-04 (`-f 3`, direct jar run, 1 s
+iterations):
+
+| | `bytes_reset` | `stream_reset` | delta |
+|---|---|---|---|
+| twitter alloc/op | 30,341 B (±0.3) | 661,869 B (±0.04) | **+631,528 B** |
+| solana alloc/op | 575,908 B (±7.1) | 5,331,872 B (±7.1) | **+4,755,964 B** |
+
+The delta, the copy itself, is unchanged: to the byte on twitter, and to
+within 4 B on solana. Each absolute figure rose by about 10 KB per 1 s
+iteration spread over that iteration's ops: +5 B on twitter (~2,000 ops per
+iteration) and +46–50 B on solana (~200). Because that cost is fixed per
+iteration, its per-op share moves with the op count, and contention moves the
+op count: this run was on a loaded machine, and solana, whose scores erred by
+±14–15%, read to ±7 B/op where twitter stayed within ±0.31. A delta cancels
+the cost only as far as its two rows' op counts match. What remains is about
+10 KB times the difference of their per-op times in seconds, which is solana's
+4 B here, since its rows differed by 0.4 ms/op. So compare absolute
+`gc.alloc.rate.norm` only within one JMH version, and expect 1.37 figures to
+sit a little higher the fewer ops an iteration runs.
 
 The trap is that **this barely shows up in the parse timing.** A same-session control
 run puts the latency cost at just **+3.1%, identically on both documents** (455 vs 441 µs

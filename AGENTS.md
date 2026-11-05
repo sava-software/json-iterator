@@ -708,10 +708,13 @@ Two corollaries that are easy to get backwards:
   cost is only **+3.1%** (identically on both documents, same-session control) while the
   allocation rate goes 22× and GC time 43×. Judge the stream API by
   `gc.alloc.rate.norm`, not by the score; in a long-running service the collector pays
-  what the benchmark doesn't. These are JMH 1.36 figures. 1.37's gc profiler reads the
+  what the benchmark doesn't. Those are JMH 1.36 figures. 1.37's gc profiler reads the
   JVM-wide `getTotalThreadAllocatedBytes()`, which counts every thread: the profiler's own,
-  which 1.36 left out, and threads that end between its snapshots. Re-measure before
-  comparing a 1.37 figure with them.
+  which 1.36 left out, and threads that end between its snapshots. Re-measured under 1.37
+  (2026-11-04, `jmh/README.md`), the copy is unchanged to within 4 B (+631,528 and
+  +4,755,964 B/op), but every absolute figure carries about 10 KB per 1 s iteration spread
+  over its ops (+5 B/op on twitter, +46–50 B/op on solana): compare absolute
+  `gc.alloc.rate.norm` only within one JMH version.
 
 **Three features were reviewed for promotion in 2026-07 and rejected on the merits.**
 They exist, fully implemented, on the `vectorize-archive` tag. Don't resurrect them
@@ -876,7 +879,14 @@ fiction, and it survived precisely because it sounded like an answer. If the err
 over the threshold, there is nothing to explain yet.
 
 Allocation is measurable even when the machine is noisy, and it can be the whole story:
-under JMH 1.36, `-prof gc` reported `gc.alloc.rate.norm` (bytes per op) to ~0.01 B/op
-regardless of CPU contention; under 1.37, which also counts the profiler's own thread,
-that precision has not been re-measured. Reach for it whenever an API might be paying in
-GC rather than in latency — the stream source ties on score and allocates 22× more.
+`-prof gc` reports `gc.alloc.rate.norm` (bytes per op), which one JMH 1.36 run read to
+±0.009 B/op. It is not proof against contention, though. Each iteration carries a fixed
+cost that is spread over its ops, so the figure moves with the op count, and contention
+moves the op count. Under 1.36 that cost was the benchmark thread's per-iteration result
+objects, a few hundred bytes; 1.37 also counts the profiler's own thread, about 10 KB. On
+a loaded machine (2026-11-04), twitter's ~2,000 ops per 1 s iteration still read to
+±0.04–0.3 B/op under 1.37, but solana's ~200 read to ±7 B/op. A delta between two rows
+cancels the cost only as far as their op counts match: what remains is about 10 KB times
+the difference of their per-op times in seconds, which left 4 B on solana's copy, whose
+rows differed by 0.4 ms/op. Reach for it whenever an API might be paying in GC rather
+than in latency — the stream source ties on score and allocates 22× more.
