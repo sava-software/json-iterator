@@ -23,7 +23,12 @@ pluginManagement {
   }
   repositories {
     if (savaBuildLocalRepo != null) {
-      maven(url = savaBuildLocalRepo)
+      maven(url = savaBuildLocalRepo) {
+        content {
+          includeModule("software.sava", "sava-build")
+          includeGroupByRegex("software[.]sava[.]build([.].*)?")
+        }
+      }
     }
     gradlePluginPortal()
     mavenCentral()
@@ -35,6 +40,10 @@ pluginManagement {
       maven {
         name = "savaGithubPackages"
         url = uri("https://maven.pkg.github.com/sava-software/sava-build")
+        content {
+          includeModule("software.sava", "sava-build")
+          includeGroupByRegex("software[.]sava[.]build([.].*)?")
+        }
         credentials {
           username = gprUser
           password = gprToken

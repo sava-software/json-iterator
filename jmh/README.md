@@ -56,8 +56,17 @@ covers the forked benchmark JVMs too.
 The first argument is a regex over benchmark names (e.g. `'dispatchTwitter'`,
 `'blockParse_matcher$'`).
 
-The JDK used by Gradle is pinned in `gradle.properties`
-(`org.gradle.java.installations.paths`); adjust it to a local JDK 27 install.
+The benchmark toolchain requires JDK 27. Install it locally; automatic JDK downloads
+are disabled for this build. Gradle normally detects installed JDKs. If yours is
+outside its search locations, configure the path in `~/.gradle/gradle.properties`
+so machine-specific locations stay outside this repository:
+
+```properties
+org.gradle.java.installations.paths=/absolute/path/to/jdk-27
+```
+
+On macOS, the path ends in `Contents/Home` inside the JDK bundle. This selects the
+benchmark toolchain; the Gradle daemon may use another supported JDK.
 
 **Always compare with at least `-f 3`, and run in isolation.** Single-fork
 results on this codebase swing 10–20% on JIT inlining luck alone — a real 21%
