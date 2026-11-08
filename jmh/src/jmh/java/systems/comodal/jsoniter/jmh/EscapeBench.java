@@ -91,9 +91,9 @@ public class EscapeBench {
     };
 
     // Cross-check every candidate against the shipped implementation. A
-    // disagreement throws here, and under sava-build's failOnError default
-    // (JMH -foe true) that fails the jmh run, so a faster-but-wrong candidate
-    // cannot post a score.
+    // disagreement throws here, and the jmh task fails on error at the end of
+    // the run and leaves the failed attempts' rows out of the archive, so a
+    // shape on which any candidate is wrong posts no score for any candidate.
     check(current(), runs());
     check(current(), runsClean());
     check(current(), runsTable());

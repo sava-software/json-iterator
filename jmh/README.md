@@ -18,25 +18,30 @@ cd jmh
 Configuration comes from the shared `software.sava.build.feature.jmh`
 convention plugin (pinned to the published sava-build in this build's
 `build.gradle.kts` plugins block, kept in step with the root `settings.gradle.kts`;
-`-PsavaBuildLocalRepo` overrides it with a local test-repo publish — see the
+the JMH Gradle plugin declared beside it follows `jmh-gradle-plugin` in sava-build's
+`gradle/libs.versions.toml` instead, and the feature refuses an older one;
+`-PsavaBuildLocalRepo` overrides the feature with a local test-repo publish — see the
 root `AGENTS.md`). Every
 default it sets is overridable per invocation: `-PjmhFork`, `-PjmhIncludes`,
 `-PjmhWarmupIterations`, `-PjmhWarmup`, `-PjmhIterations`,
-`-PjmhTimeOnIteration`, `-PjmhFailOnError`, `-PjmhVersion` (the JMH harness:
-1.37 by default, and the only version whose whole dependency graph the root's
+`-PjmhTimeOnIteration`, `-PjmhFailOnError`, `-PjmhFailFast`, `-PjmhVersion` (the JMH
+harness: 1.37 by default, and the only version whose whole dependency graph the root's
 verification policy covers), and `-PjmhJvmArgsAppend="<flag> <flag>..."` — the last
 replacing the service flag set wholesale (e.g. to A/B the GC). For anything
 the extension does not expose (profilers, output formats), build the fat jar
-once and drive JMH directly. Each Gradle run that writes results has its raw
-output archived timestamped under `jmh-results/` (in the project directory,
-outside `build/`, so `clean` cannot erase measurement history), and
-`build/results/jmh/results.txt` is then re-rendered as the merge of all
-archived runs (newest row wins per benchmark) — so subset runs converge on a
-full scoreboard. The
+once and drive JMH directly. Each Gradle run that writes a row has its results
+table archived under `jmh-results/` (in the project directory, outside `build/`,
+so `clean` cannot erase measurement history) and its console output saved as
+`build/results/jmh/output.txt`, and `build/results/jmh/results.txt` is then
+re-rendered as the merge of all archived runs (newest row wins per benchmark,
+mode and parameter values, under JMH's parameter columns) — so subset runs
+converge on a full scoreboard. The
 archive is the source of truth: delete an archive file to drop a bad run's
 rows from the next merge, and mind that rows can be of mixed vintage, and of
 mixed harness: the archives through `results-20260816-175731.txt` ran on
-JMH 1.36, and later runs on 1.37 unless `-PjmhVersion` overrides it.
+JMH 1.36, and later runs on 1.37 unless `-PjmhVersion` overrides it. Archive
+stamps (`results-<yyyyMMdd-HHmmss>.txt`) are UTC from sava-build 21.8.5, local
+time before.
 
 ```sh
 ../gradlew jmhJar
@@ -75,14 +80,15 @@ benchmark runs on the same machine inflate error bars enough to flip
 close verdicts (a ±134 error that was really ±8 in isolation has happened);
 treat any row with an error above ~10% of its score as contaminated and
 re-run it alone. Every benchmark's `@Setup` cross-checks that all variants of
-a workload produce identical checksums, and `-foe true` turns any
-disagreement into a hard failure. The direct run above passes it itself; the
-Gradle `jmh` task passes it by default (`-PjmhFailOnError=false` turns it
-off), so any benchmark error, such as a throwing `@Setup` or a fork that dies,
-fails the task, and the failed run archives nothing. JMH stops at the first
-error, so scores the run had already measured appear only in its console
-output; `-PjmhFailOnError=false` keeps going and archives them, leaving the
-failed benchmark with no row or a short one.
+a workload produce identical checksums, and a disagreement throws. The direct
+run above passes `-foe true`, so JMH stops there. The Gradle `jmh` task instead
+fails on error at the end of the run: every benchmark runs, a benchmark that
+errors (a throwing `@Setup`, a fork that dies) is named with its parameters and
+fails the task once the run is over, its rows are left out of the archive while
+the passing benchmarks' rows are kept and merged, and the console output is
+saved as `build/results/jmh/output.txt`. `-PjmhFailOnError=false` turns that
+failure into a warning; `-PjmhFailFast=true` has JMH stop at the first error
+instead, which archives nothing and saves no output.
 
 ## Benchmarks
 

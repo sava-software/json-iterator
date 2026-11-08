@@ -50,17 +50,29 @@ update procedure; what it cannot know about this repo:
   under the same policy; `:aggregation:zipCentralPortalDeployment -Pversion=<any>`
   builds its Central bundle locally, unsigned, when a change might reach that path.
 - **Regenerate from the root, then from `-p jmh`.** Only the jmh build meets JMH's
-  generators, asm 9.0 and the `feature.jmh` plugin marker. The policy covers JMH 1.37
-  alone: through JMH 1.36's jmh-core, `-PjmhVersion=1.36` also meets three old releases
-  under keys that must not vouch (commons-math3 3.2, commons-parent 28, apache 13), which
-  the policy does not trust, so such a run is refused. A write run from there writes
-  through the metadata link but replaces the keyring link with a copy: diff it against
-  the root's keyring, merge anything new, and re-create the link.
+  generators, asm 9.0, the two plugin markers (`feature.jmh`'s and `me.champeau.jmh`'s),
+  the jmh plugin's jar and module pins, and jmh-core 1.37 with its chain: jopt-simple
+  5.0.4's scope, commons-math3 3.6.1 and its parents commons-parent 39 and apache 16. The
+  root's write run and `check` pass without every one of them, so a trim is proven only
+  when `-p jmh check jmhJar` has passed too. The policy covers JMH 1.37 alone: through JMH
+  1.36's jmh-core, `-PjmhVersion=1.36` also meets three old releases under keys that must
+  not vouch (commons-math3 3.2, commons-parent 28, apache 13), which the policy does not
+  trust, so such a run is refused. A write run from there writes through the metadata
+  link but replaces the keyring link with a copy: diff it against the root's keyring,
+  merge what you reviewed, and re-create the link. A key a trim dropped comes back from
+  git history, its rule, list line and keyring block together (`git show <trim commit>
+  -- gradle/verification-metadata.xml gradle/verification-keyring.keys
+  gradle/verification/version-scoped-keys.txt | git apply -R`; c99be45 is the trim that
+  dropped JMH 1.36's chain), never from a write run, which consults key servers and
+  writes the key back in shapes the guard refuses.
 - **Entries a warm write run never names; keep them through a trim.** The
   `gradle:gradle` rule (the Gradle sources zip IntelliJ fetches, under Gradle Inc.'s
   current signing subkey) and the jmh plugin's `-sources.jar` pin are IDE-only: only an
-  IntelliJ sync with download sources on exercises them, and the root window's reaches
-  both, since sava-build puts the jmh plugin on the root's settings classpath. The
+  IntelliJ sync with download sources on exercises them. The root window's sync reaches
+  the first. The plugin sits on the jmh build's classpath alone, since sava-build does not
+  put it on the root's settings classpath, so only a sync of `jmh/` opened as its own
+  IntelliJ project can exercise the second (sava-build's README, "Adopting and updating",
+  step 5); a command-line `-p jmh check jmhJar` never fetches a sources jar. The
   `org.ow2:ow2:1.5` POM pin is cold-only: asm 9.0, which only the jmh build resolves,
   names that unsigned parent, and Gradle reads it only while no parsed asm 9.0 metadata
   is cached, so only `-p jmh` from an empty `GRADLE_USER_HOME` exercises it. A trim's
@@ -85,7 +97,11 @@ the property (all of them, while it sits in `~/.gradle/gradle.properties`) also 
 is not automatic** — re-run it after every sava-build edit, or the build silently keeps
 the previously published jar. When done, drop the property and bump the pinned versions
 (the `plugins {}` block in `settings.gradle.kts` *and* the `feature.jmh` version in
-`jmh/build.gradle.kts`) to the released sava-build.
+`jmh/build.gradle.kts`) to the released sava-build. The third id in
+`jmh/build.gradle.kts`'s plugins block, `id("me.champeau.jmh") version "<version>" apply
+false`, follows `jmh-gradle-plugin` in
+sava-build's `gradle/libs.versions.toml` instead, and the policy's pins for that plugin
+(its jar, module metadata, marker POM and sources jar) move with it.
 
 ## Verification & the mutation ratchet
 
@@ -99,7 +115,7 @@ the plugin cannot know: which suite owns which class, what has been measured,
 why a mutant was accepted, and what a green gate still does not prove — the
 last of which is inventoried in `HARDENING_NOTES.md`.
 
-The block below is copied from the installed sava-build 21.8.3
+The block below is copied from the installed sava-build 21.8.6
 `hardeningAgentTemplate`. Its delimiters support replacement on upgrade; there is no
 digest gate. Repository-specific facts and qualifications follow outside the block.
 
@@ -171,10 +187,11 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
 - **Suite choice is reachability, not habit.** `pitestNumbers` mutates
   `DoubleParser`; `pitestUtil` mutates `JHex`/`JIUtil`/`InstantParser`/
   `FieldMatcher`; `pitestIterator` mutates everything else. The first two finish
-  in ~10s, `pitestIterator` costs ~90s. For a plugin upgrade, the project owes
-  these suites unless every intervening release rules out changes to PIT or
-  its inputs; sava-build's release notes list commit subjects and rule out
-  nothing, so each bump owes them once at its gate.
+  in ~10s, `pitestIterator` costs ~90s. Whether a sava-build bump owes them is
+  sava-build's rule, in its README ("Upgrading the plugin") and HARDENING.md
+  (Lifecycle) at the new pin: it is decided from the files that changed between
+  the two pins, never from release notes, and a bump that cannot be ruled out
+  owes the suites once at its gate.
   Adding, removing, renaming or moving a production class — or editing the
   `targetClasses`/`excludedClasses` globs in `json-iterator/build.gradle.kts` —
   additionally owes the cheap whole-population `mutationOwnershipAudit` before
@@ -774,20 +791,22 @@ of its score as contaminated and re-run it alone.
 ./gradlew -p jmh jmh -PjmhFork=3 -PjmhIncludes=kindDispatch
 ```
 
-Each run that writes results is archived timestamped under `jmh/jmh-results/` (outside
-`build/`, so `clean` cannot erase measurement history), and `build/results/jmh/results.txt`
-is re-rendered after each such run as a newest-wins merge across all archived runs — so
-subset runs converge on a full scoreboard, but rows can be of mixed vintage, and of mixed
-harness: the archives through `results-20260816-175731.txt` ran on JMH 1.36, and later runs
-on 1.37 (sava-build's default since 21.8.3) unless `-PjmhVersion` overrides it. Delete an
-archive file to drop a bad run's rows. Every benchmark cross-checks its variants' checksums
-at `@Setup`, and sava-build's `failOnError` default reaches JMH as `-foe true`: the first
-benchmark error (a throwing `@Setup`, a fork that dies) stops the run and fails the `jmh`
-task, and the failed run archives nothing, so the scores of benchmarks that finished before
-it survive only in its console output. `-PjmhFailOnError=false` lets JMH run past a failed
-benchmark and archive the rest; the failed one then posts no row, or a short one with a
-`Cnt` below forks × measurement iterations, and only the log says so, with `<failure>` or
-`<forked VM failed with exit code N>`.
+Each run that writes a row is archived under `jmh/jmh-results/` (outside `build/`, so
+`clean` cannot erase measurement history), and `build/results/jmh/results.txt` is
+re-rendered after each such run as a newest-wins merge across all archived runs, per
+benchmark, mode and parameter values, under JMH's parameter columns (`N/A` where a row
+has none) — so subset runs converge on a full scoreboard, but rows can be of mixed
+vintage, and of mixed harness: the archives through `results-20260816-175731.txt` ran on
+JMH 1.36, and later runs on 1.37 (sava-build's default since 21.8.3) unless `-PjmhVersion`
+overrides it. Archive stamps are UTC from sava-build 21.8.5, local time before. Delete an
+archive file to drop a bad run's rows. Every benchmark cross-checks its variants'
+checksums at `@Setup`, and the `jmh` task fails on error at the end of the run: every
+benchmark runs, a benchmark that errors (a throwing `@Setup`, a fork that dies) is named
+with its parameters and fails the task once the run is over, its rows (a late failure's
+short row included) are left out of the archive while the passing benchmarks' rows are
+kept and merged, and the run's console output is saved as `build/results/jmh/output.txt`.
+`-PjmhFailOnError=false` turns that failure into a warning; `-PjmhFailFast=true` has JMH
+stop at the first error instead, which archives nothing and saves no output.
 
 **Scope the run to the change; don't default to the full suite.** A full-suite
 `-PjmhFork=3` run costs hours; a change-scoped `-PjmhIncludes` subset gives
