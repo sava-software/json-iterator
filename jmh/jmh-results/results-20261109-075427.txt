@@ -1,0 +1,3 @@
+Benchmark                                 Mode  Cnt    Score    Error  Units
+MigrationBench.kindDispatch_matchString   avgt   24  515.834 ±  6.274  us/op
+MigrationBench.kindDispatch_stringSwitch  avgt   24  585.727 ± 18.673  us/op

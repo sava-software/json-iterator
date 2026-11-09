@@ -29,7 +29,7 @@ Build and test with `./gradlew check`. Dependencies resolve from GitHub Packages
 `~/.gradle/gradle.properties` (see `README.md`). Beyond `check`, the hardening tasks
 (sava-build's `hardening` extension in `json-iterator/build.gradle.kts`): PIT mutation
 suites `pitestIterator` / `pitestNumbers` / `pitestUtil` (reports under
-`build/reports/pitest/<suite>/`) and the Jazzer fuzz targets described under
+`json-iterator/build/reports/pitest/<suite>/`) and the Jazzer fuzz targets described under
 correctness landmines. The PIT baselines and current family arguments live under
 `json-iterator/config/pitest/`. A green ratchet or a legacy unlabeled row is
 not proof of completed triage; reconcile each accepted row with its argument.
@@ -388,7 +388,7 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   adding, removing or relabelling an accepted or timeout record has no subject
   here for the same reason.
 - **A scoped report is a preview, and the tooling enforces it.**
-  `-PmutateOnly=<class-glob>` writes to `build/reports/pitest-scoped/` instead of
+  `-PmutateOnly=<class-glob>` writes to `json-iterator/build/reports/pitest-scoped/` instead of
   the suite's report directory, prints `ratchet skipped`, and cannot advance a
   baseline row, a timeout classification, or the quiet-run counter — so use it
   freely to iterate on a cluster, then re-run the suite unscoped with
@@ -493,8 +493,8 @@ on the chars path. A scan-path change that passes a smoke test can still be badl
   -PmaxParallelFuzzTargets=1`; `fuzzAll` derives its dependencies from the four
   registrations, so it cannot drift from a hand-written task list the way a
   workflow can, and it writes
-  `.pitest-history/local-fuzz.tsv` after every selected target succeeds. Both
-  that receipt and `.pitest-history/pitest-certification.tsv` survive `clean`;
+  `json-iterator/.pitest-history/local-fuzz.tsv` after every selected target succeeds. Both
+  that receipt and `json-iterator/.pitest-history/pitest-certification.tsv` survive `clean`;
   they are git-ignored machine-local state, durable against the build rather
   than against the machine. A sibling `.running` marker makes a retained TSV
   historical; only successful publication clears it. Read the installed
@@ -791,8 +791,8 @@ of its score as contaminated and re-run it alone.
 ./gradlew -p jmh jmh -PjmhFork=3 -PjmhIncludes=kindDispatch
 ```
 
-Each run that writes a row is archived under `jmh/jmh-results/` (outside `build/`, so
-`clean` cannot erase measurement history), and `build/results/jmh/results.txt` is
+Each run that writes a row is archived under `jmh/jmh-results/` (outside `jmh/build/`, so
+`clean` cannot erase measurement history), and `jmh/build/results/jmh/results.txt` is
 re-rendered after each such run as a newest-wins merge across all archived runs, per
 benchmark, mode and parameter values, under JMH's parameter columns (`N/A` where a row
 has none) — so subset runs converge on a full scoreboard, but rows can be of mixed
@@ -804,7 +804,7 @@ checksums at `@Setup`, and the `jmh` task fails on error at the end of the run: 
 benchmark runs, a benchmark that errors (a throwing `@Setup`, a fork that dies) is named
 with its parameters and fails the task once the run is over, its rows (a late failure's
 short row included) are left out of the archive while the passing benchmarks' rows are
-kept and merged, and the run's console output is saved as `build/results/jmh/output.txt`.
+kept and merged, and the run's console output is saved as `jmh/build/results/jmh/output.txt`.
 `-PjmhFailOnError=false` turns that failure into a warning; `-PjmhFailFast=true` has JMH
 stop at the first error instead, which archives nothing and saves no output.
 
