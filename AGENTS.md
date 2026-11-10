@@ -70,11 +70,15 @@ update procedure; what it cannot know about this repo:
 - **Entries a warm write run never names; keep them through a trim.** The
   `gradle:gradle` rule (the Gradle sources zip IntelliJ fetches, under Gradle Inc.'s
   current signing subkey) and the jmh plugin's `-sources.jar` pin are IDE-only: only an
-  IntelliJ sync with download sources on exercises them. The root window's sync reaches
-  the first. The plugin sits on the jmh build's classpath alone, since sava-build does not
+  IntelliJ sync with download sources on exercises them, and a command-line
+  `-p jmh check jmhJar` never fetches a sources jar. The root window's sync reaches the
+  first. The plugin sits on the jmh build's classpath alone, since sava-build does not
   put it on the root's settings classpath, so only a sync of `jmh/` opened as its own
-  IntelliJ project can exercise the second (sava-build's README, "Adopting and updating",
-  step 5); a command-line `-p jmh check jmhJar` never fetches a sources jar. The
+  IntelliJ project reaches the second. A refusal shows in the sync output. No IDE sync
+  is owed after a policy change, and a session does not ask for one: one that removes
+  or narrows either entry, moves the plugin's pins without its sources jar's, or bumps
+  the wrapper says so in its report (sava-build's README, the closing paragraph of
+  "Adopting and updating"). The
   `org.ow2:ow2:1.5` POM pin is cold-only: asm 9.0, which only the jmh build resolves,
   names that unsigned parent, and Gradle reads it only while no parsed asm 9.0 metadata
   is cached, so only `-p jmh` from an empty `GRADLE_USER_HOME` exercises it. A trim's
