@@ -11,7 +11,7 @@
          <trusted-key id="0CDE80149711EB46DFF17AE421A24B3F8B0F594A" group="org.apache" name="apache" version="16"/>
          <trusted-key id="10F3C7A02ECA55E502BADCF3991EFB94DB91127D" group="org.ow2" name="ow2"/>
          <trusted-key id="18CD85CBC5C1DB1684C5E59FA8E3B39F19E1CCE7">
-            <trusting group="org.pitest" version="1.30.0"/>
+            <trusting group="org.pitest" version="1.30.2"/>
             <trusting group="org.pitest" name="pitest-junit5-plugin" version="1.2.3"/>
          </trusted-key>
          <trusted-key id="1BD97A6A154E7810EE0BC832E2F38302C8075E3D" group="org.gradle.toolchains" name="foojay-resolver" version="1.0.0"/>

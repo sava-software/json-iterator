@@ -26,6 +26,19 @@ decline is reported stale when nothing is left for it to suppress, so
 recording one here would add a warning rather than silence one. Numbers for
 both trials are in `json-iterator/config/pitest/README.md`.
 
+PIT 1.30.2 (sava-build 21.8.7) added a JSpecify filter, on by default, that drops
+`NULL_RETURNS` mutants from methods under a `@NullMarked` default before they run.
+Nothing here is annotated, so the filter removes nothing: every `NullReturnValsMutator`
+mutant stays in the population and is `KILLED`, and none is an accepted row — so the
+unmatched-accepted-row check that would announce a filtered-away acceptance can never
+fire here. A `@NullMarked` on a
+class or a `package-info.java` in either source set (the PIT recompile merges the
+same-package test sources into one root, and JUnit already makes `org.jspecify`
+readable) would silently remove those kills; the only trace is the population line,
+which reads a git-ignored machine-local stash, so a fresh clone sees nothing. A
+`module-info` `@NullMarked` cannot reach PIT here, because the recompile strips
+`module-info`.
+
 ## The class path is PIT's world
 
 The tasks run on the module path; PIT minions run on the class path. A
@@ -160,7 +173,7 @@ configuration every suite launches PIT from, and strict resolution refuses it
 POM with a dummy licence on 2026-11-02). A lenient run, as every
 `-PsavaBuildLocalRepo` command is, only reports that refusal; there the
 toolchain sidecars, which record ArcMutate as absent, are what announce it
-(`AGENTS.md`, "Mutation provenance is bound to PIT 1.30.0"). A regeneration
+(`AGENTS.md`, "Mutation provenance is bound to the recorded toolchain"). A regeneration
 run with a licence present would draft that trust back, so a `com.arcmutate`
 rule in a policy diff is this decision being overturned, never routine.
 Every suite runs on open-source PIT and re-earns each status from scratch —

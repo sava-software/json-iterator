@@ -1,7 +1,7 @@
 schema	1
-pitest	1.30.0
+pitest	1.30.2
 junitPlugin	1.2.3
-toolClasspathSha256	a53a1396775ed72fc1708be0e0bb8bf4a139cc97104b1ae7de00fc26117f1817
+toolClasspathSha256	bde42615bfab20a085fb59a7897769c92e70b12d4ac5c11c71e9ce6404cfa52c
 arcMutateBase	absent
 arcMutateLicenceSha256	absent
 arcMutateLicenceExpires	absent

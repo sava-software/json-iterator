@@ -436,7 +436,8 @@ on a survivor before checking the measured call path and escape analysis.
 watchdog observed slowness, not wrongness: for exactly these mutants the
 ratchet cannot see a weakened covering assertion, because a timeout keeps
 "detecting" no matter what the test asserts. The summary's
-`N timed out (load-dependent)` is therefore an audited set, not a count: every
+`N timed out (watchdog detection; not a cause diagnosis)` is therefore an audited
+set, not a count: every
 member is listed here with the structural cause that makes it spin, and a
 mutant timing out that is *not* on this list is something a reviewer stops on.
 Membership is machine-checked — `iterator-timeouts.csv` / `util-timeouts.csv`

@@ -46,7 +46,9 @@ update procedure; what it cannot know about this repo:
   relative symlinks to the root's metadata and keyring. Run a dependency or policy
   change through both, without the configuration cache (a reused entry resolves
   nothing): `./gradlew --no-configuration-cache check resolveVerificationTools`, then
-  `./gradlew --no-configuration-cache -p jmh check jmhJar`. The release job resolves
+  `./gradlew --no-configuration-cache -p jmh check jmhJar`, and after a policy edit
+  `./gradlew verificationKeyStatus` too, since strict resolution cannot see a revoked
+  key. The release job resolves
   under the same policy; `:aggregation:zipCentralPortalDeployment -Pversion=<any>`
   builds its Central bundle locally, unsigned, when a change might reach that path.
 - **Regenerate from the root, then from `-p jmh`.** Only the jmh build meets JMH's
@@ -115,8 +117,9 @@ the plugin cannot know: which suite owns which class, what has been measured,
 why a mutant was accepted, and what a green gate still does not prove — the
 last of which is inventoried in `HARDENING_NOTES.md`.
 
-The block below is copied from the installed sava-build 21.8.6
-`hardeningAgentTemplate`. Its delimiters support replacement on upgrade; there is no
+The block below is copied from the installed sava-build 21.8.7
+`hardeningAgentTemplate`; the version here is the staleness signal, so move it only after
+diffing the printed block. Its delimiters support replacement on upgrade; there is no
 digest gate. Repository-specific facts and qualifications follow outside the block.
 
 <!-- hardening-template block:start -->
@@ -186,8 +189,11 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
 
 - **Suite choice is reachability, not habit.** `pitestNumbers` mutates
   `DoubleParser`; `pitestUtil` mutates `JHex`/`JIUtil`/`InstantParser`/
-  `FieldMatcher`; `pitestIterator` mutates everything else. The first two finish
-  in ~10s, `pitestIterator` costs ~90s. Whether a sava-build bump owes them is
+  `FieldMatcher`; `pitestIterator` mutates everything else. PIT's own `Total`
+  line read 13 s for `util`, 23 s for `numbers` and 68 s for `iterator` on
+  2026-11-10 (PIT 1.30.2, populations 394/326/1950; Gradle adds its startup on
+  top) — the figures to read a "faster without narrower" run against. Whether a
+  sava-build bump owes them is
   sava-build's rule, in its README ("Upgrading the plugin") and HARDENING.md
   (Lifecycle) at the new pin: it is decided from the files that changed between
   the two pins, never from release notes, and a bump that cannot be ruled out
@@ -221,25 +227,27 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   dead by construction rather than by classifier. Expect line-drift advisories on
   runs after a record rewrite: legacy line fields were allowed to lag, and
   promoting them to tags surfaces the lag as re-read prompts, not regressions.
-- **Mutation provenance is bound to PIT 1.30.0.** All three suites carry the
-  paired record — `<suite>-pitest-version` and `<suite>-pitest-toolchain.tsv` —
-  adopted with sava-build 21.6.9 on 2026-10-25 through
-  `pitest<Suite>BaselineRebase`, after fresh full history-free review runs.
-  Each writer retained every accepted row and added none; the accepted and
-  timeout CSVs were unchanged. The sidecars record ArcMutate
-  as `absent` on all three — the machine-checked form of the namespace decision in
-  `HARDENING_NOTES.md`, so a certificate appearing at this repo's root would now
-  be an announced toolchain transition rather than silent population churn. Never
-  hand-edit either file; the rebase task writes them.
+- **Mutation provenance is bound to the recorded toolchain.** All three suites
+  carry the paired record — `<suite>-pitest-version` and
+  `<suite>-pitest-toolchain.tsv` — and `pitest<Suite>BaselineRebase` is the only
+  thing that moves it; `git log -- 'json-iterator/config/pitest/*-pitest-*'` lists the
+  transitions, and from 21.8.7 on each one's message records what its review run
+  showed (the 1.30.0 transition, 1ea55f2, retained every accepted row with the CSVs
+  unchanged; its message says nothing). The sidecars record
+  ArcMutate as `absent` on all three — the machine-checked form of the namespace
+  decision in `HARDENING_NOTES.md`, so a certificate appearing at this repo's root
+  would now be an announced toolchain transition rather than silent population churn.
 - **Identical rows are siblings, never hand-dedupe.** These baselines carry such
   rows at `matchPattern` and the `DoubleParser` scan guards. The
   2026-07-23 multiset re-triage is the proof it pays: two "siblings of accepted
   equivalents" were real lenient-literal-skip gaps, killed in `TestSkip` along
   with eight neighbouring rows the exact-offset assertions swept up.
-- **Three keys hold accepted survivor siblings alongside audited timeouts** —
+- **Four keys hold accepted survivor siblings alongside audited timeouts** —
   `CharsJsonIterator.skipPastEndQuote/MathMutator`,
-  `JIUtil.escapeQuotesChecked/IncrementsMutator` and
-  `FieldMatcher.of/MathMutator`. Under sava-build 21.5.20 all three reported a
+  `JIUtil.escapeQuotesChecked/IncrementsMutator`,
+  `FieldMatcher.of/MathMutator` and
+  `BytesJsonIterator.skipPastMultiByteEndQuote/MathMutator`. Under sava-build
+  21.5.20 the first three reported a
   flip on every run in byte-identical populations (casebook: "The flip that
   fired forever"); the per-key count comparison in 21.5.21 silenced them, so
   a warning at any of them is real again. `BaseJsonIterator.skipObject/MathMutator`
