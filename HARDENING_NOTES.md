@@ -27,20 +27,23 @@ recording one here would add a warning rather than silence one. Numbers for
 both trials are in `json-iterator/config/pitest/README.md`.
 
 PIT 1.30.2 (sava-build 21.8.7) added a JSpecify filter, on by default, that drops
-`NULL_RETURNS` mutants from methods under a `@NullMarked` default before they run.
-Nothing here is annotated, so the filter removes nothing: every `NullReturnValsMutator`
-mutant stays in the population and is `KILLED`, and none is an accepted row — so the
+`NULL_RETURNS` mutants from methods under a `@NullMarked` default — on the method, its
+class, an enclosing class, or the package's `package-info` — before they run. Nothing
+here is annotated, so the filter removes nothing: every `NullReturnValsMutator` mutant
+stays in the population and is `KILLED`, and none is an accepted row — so the
 unmatched-accepted-row check that would announce a filtered-away acceptance can never
-fire here. A `@NullMarked` on a
-class or a `package-info.java` in either source set (the PIT recompile merges the
-same-package test sources into one root, and JUnit already makes `org.jspecify`
+fire here. A `@NullMarked` arriving in any main or test source (the PIT recompile merges
+the same-package test sources into one root, and JUnit already makes `org.jspecify`
 readable) would silently remove those kills; the only trace would be the population
-line, which reads a git-ignored machine-local stash, so a fresh clone sees nothing. The
-`jspecifyGuard` task, under `check` and ahead of every PIT suite, therefore fails on any
-`org.jspecify` or `@NullMarked` in a main or test source directory (`module-info.java`
-excepted, `//` comment lines ignored), so adopting JSpecify here starts by deciding the
-filter, not by losing kills. A `module-info` `@NullMarked` cannot reach PIT here, because the recompile
-strips `module-info`.
+line, which reads a git-ignored machine-local stash, so a fresh clone sees nothing. Two
+guards therefore fail the build on any class carrying an `org.jspecify.annotations`
+annotation (the whole family, since which of them the filter reads is PIT's to widen):
+`jspecifyGuard`, under `check`, reads the ordinary main and test class outputs and never
+touches the PIT recompile or its tree lock; `jspecifyGuardPitest`, ahead of every PIT
+suite, reads the recompile itself (`build/mutation-classes`, the classes the filter
+reads). So adopting JSpecify here starts by deciding the filter, not by losing kills.
+A `module-info` `@NullMarked`
+cannot reach PIT here, because the recompile strips `module-info`.
 
 ## The class path is PIT's world
 

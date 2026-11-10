@@ -101,43 +101,73 @@ hardening {
 }
 
 // PIT 1.30.2's JSpecify filter drops every NULL_RETURNS mutant of a method under a
-// @NullMarked default before it runs, and the ratchet compares only unkilled rows, so a
-// nullness annotation arriving in any main or test source directory (the PIT recompile
-// merges them into one root; generated test sources included) would silently remove
-// those kills. Nothing here is annotated. This fails 'check' and every PIT suite the day
-// something is, so the filter's effect is decided on purpose rather than discovered from
-// a population line — HARDENING_NOTES.md, "The mutator set". module-info.java is exempt:
-// the recompile strips it, so an annotation there never reaches PIT. Lines that are
-// '//' comments are ignored; a block comment naming the annotation still trips it.
+// @NullMarked default (on the method, its class, an enclosing class or the package's
+// package-info) before it runs, and the ratchet compares only unkilled rows, so a nullness
+// annotation arriving anywhere in the tree PIT mutates would silently remove those kills.
+// Nothing here is annotated. Two guards fail the build the day something is, so the
+// filter's effect is decided on purpose rather than discovered from a population line —
+// HARDENING_NOTES.md, "The mutator set". Both read class files, not sources: JSpecify's
+// annotations have runtime retention, so any source spelling of one leaves its type
+// descriptor, "Lorg/jspecify/annotations/<Name>;", in the class file, where a string or
+// class literal naming the type does not (a variable declared of the annotation type does,
+// in the debug tables; a loud false failure, never a missed hit). The whole package trips
+// it, not just NullMarked: which members the filter reads is PIT's to widen.
+//  - jspecifyGuard, under 'check', reads the ordinary main and test class outputs, which
+//    'check' compiles anyway; it never touches the PIT recompile or its tree lock.
+//  - jspecifyGuardPitest, ahead of every pitest task, reads the plugin's PIT recompile
+//    (compileForPitest → build/mutation-classes), the very classes PIT's filter reads:
+//    merged main and test sources, recompileExcludes applied, module-info stripped. The
+//    local gate runs the suites outside 'check', and compileForPitest is already in their graph.
 val jspecifyGuard = tasks.register("jspecifyGuard") {
-  description = "Fails when a JSpecify nullness annotation appears in the main or test sources"
-  // local vals only: a script-level reference captured by doLast is not configuration-cacheable
-  val sources = files(sourceSets.main.get().allJava, sourceSets.test.get().allJava)
-    .asFileTree.matching { exclude("**/module-info.java") }
+  description = "Fails when a compiled main or test class carries a JSpecify annotation"
+  // local vals and inline logic only: a script-level reference captured by doLast is not
+  // configuration-cacheable (the two scans are therefore spelled out twice)
+  val classes = files(sourceSets.main.get().output.classesDirs, sourceSets.test.get().output.classesDirs)
+    .asFileTree.matching { include("**/*.class"); exclude("**/module-info.class") }
   val projectDirectory = layout.projectDirectory.asFile
   val marker = layout.buildDirectory.file("hardening/jspecifyGuard.ok")
-  inputs.files(sources)
+  inputs.files(classes)
   outputs.file(marker)
   doLast {
-    // the lookahead sits before the indent so backtracking cannot skip it
-    val pattern = Regex("""^(?!\s*//).*?(@NullMarked\b|\borg\.jspecify\b)""")
-    val hits = sources.files
-      .filter { f -> f.readLines().any { line -> pattern.containsMatchIn(line) } }
+    val hits = classes.files
+      .filter { String(it.readBytes(), Charsets.ISO_8859_1).contains("Lorg/jspecify/annotations/") }
       .map { it.relativeTo(projectDirectory).path }
       .sorted()
     if (hits.isNotEmpty()) {
       throw GradleException(
-        "JSpecify annotations in the mutated sources: $hits. PIT 1.30.2's JSpecify filter would " +
-            "drop the NULL_RETURNS mutants under a @NullMarked default without a status; decide " +
-            "the filter on purpose first (HARDENING_NOTES.md, \"The mutator set\")."
+        "Compiled classes carry a JSpecify annotation: $hits. PIT 1.30.2's JSpecify filter drops the " +
+            "NULL_RETURNS mutants under a @NullMarked default without a status; decide the filter " +
+            "on purpose first (HARDENING_NOTES.md, \"The mutator set\")."
       )
     }
     marker.get().asFile.apply { parentFile.mkdirs(); writeText("no JSpecify annotations\n") }
   }
 }
 tasks.named("check") { dependsOn(jspecifyGuard) }
-// the hazard lands when a suite runs, and the local gate runs the suites outside 'check'
-tasks.named { it.startsWith("pitest") }.configureEach { dependsOn(jspecifyGuard) }
+
+val jspecifyGuardPitest = tasks.register("jspecifyGuardPitest") {
+  description = "Fails when a class PIT mutates carries a JSpecify annotation"
+  val recompiled = tasks.named("compileForPitest").map { it.outputs.files.asFileTree.matching { include("**/*.class") } }
+  val projectDirectory = layout.projectDirectory.asFile
+  val marker = layout.buildDirectory.file("hardening/jspecifyGuardPitest.ok")
+  inputs.files(recompiled)
+  outputs.file(marker)
+  doLast {
+    val hits = recompiled.get().files
+      .filter { String(it.readBytes(), Charsets.ISO_8859_1).contains("Lorg/jspecify/annotations/") }
+      .map { it.relativeTo(projectDirectory).path }
+      .sorted()
+    if (hits.isNotEmpty()) {
+      throw GradleException(
+        "Classes PIT mutates carry a JSpecify annotation: $hits. PIT 1.30.2's JSpecify filter drops the " +
+            "NULL_RETURNS mutants under a @NullMarked default without a status; decide the filter " +
+            "on purpose first (HARDENING_NOTES.md, \"The mutator set\")."
+      )
+    }
+    marker.get().asFile.apply { parentFile.mkdirs(); writeText("no JSpecify annotations in the PIT recompile\n") }
+  }
+}
+tasks.named { it.startsWith("pitest") }.configureEach { dependsOn(jspecifyGuardPitest) }
 
 // The mutation ratchet ('pitest<Suite>Verify' against config/pitest/, plus the
 // 'qualityGate' aggregate) comes from the hardening convention plugin.
