@@ -490,25 +490,32 @@ are not accepted as liveness merely because they race the watchdog.
   yielding `KILLED`; that does not make the nonterminating input disappear.
   Keep the audited timeout membership while this endless witness exists;
   a killed-first observation does not prove the loop has been repaired.
-- `BytesJsonIterator.skipPastMultiByteEndQuote` (escape-dispatch
-  `buf[head++]` → `buf[head--]`, admitted 2026-08-03): the reversed cursor
-  lands back on the backslash's *own* index, so the next pass reads the same
-  `\` at the loop head, re-enters the same branch and restores the same state — a
-  fixed point with no exit and no fault. It is a skip, so the loop body writes
-  nothing: transcribed and run outside the codebase on 2026-08-15 it completed
-  500,000,000 iterations with `head` pinned and zero allocation. What makes the
-  *member* flap is the input, not the loop: only the eight simple escapes
-  (`b t n f r " / \`) spin, because the `u` arm's four `head++` hex reads step
-  past the backslash and hand `JHex.decode` the `\` itself, which throws. So a
-  covering test carrying `\uXXXX` kills it while one carrying `\n` hangs it, and
-  the member reads `TIMED_OUT` or `KILLED` according to which the minion reaches
-  first — observed both ways within an hour on 2026-08-03. Removing the timeout
-  would therefore mean removing a legitimate covering input, not fixing a
-  harness bound. The sibling reversal at the loop head is reliably `KILLED`, which is
-  the contrast worth keeping: at the loop head a backward cursor immediately
-  misreads and the scan diverges observably, while at escape dispatch it is invisible
-  because the loop never advances at all. The continuation-byte read has
-  the same fixed point under the same key and the same liveness token.
+- `BytesJsonIterator.skipPastMultiByteEndQuote` (`MathMutator`, one line-less key
+  over every arithmetic mutant in the method; admitted 2026-08-03, re-attributed
+  2026-11-10): two members time out in every full run since 2026-10-28, the
+  **loop-head read** (line 746) and the **continuation-byte read** (line 800), both
+  `buf[head++]` → `buf[head--]`. Reversed at the loop head, the read leaves `head` one
+  *before* the byte it consumed, so a backslash's branch reads the byte in front of
+  the backslash as its escape character; when that byte is one of the eight simple
+  escapes (`b t n f r " / \`) the switch breaks, the loop re-reads the same
+  backslash and restores the same state — a fixed point with no exit and no fault.
+  The opening quote is in that set, so every string that begins with an escape pins
+  it, `\uXXXX` included (the `u` is never read): transcribed and run outside the
+  codebase on `["\uD835\u000` from `TestSkip`, 5,000,000 passes with `head` pinned
+  at 2 and zero allocation. On plain content the reversed cursor walks backward and
+  returns at the opening quote, an observable divergence a covering test can kill, so
+  the status is a test-order race in principle. Reversed at the continuation read, a
+  two-byte lead's `u2` read lands back on the lead, which re-enters the same branch:
+  the same fixed point. The **escape-dispatch read** (line 753) has the mirror fixed
+  point — reversed, it lands on the backslash's own index, and the eight simple
+  escapes spin while `\u` steps forward and hands `JHex.decode` the backslash, which
+  throws — and reads `KILLED` today because a `\uXXXX` covering input reaches it
+  first; it is the same liveness token and stays under the key. The key's other
+  reversals cannot pin: the four hex-digit reads step forward into a throw or resume
+  forward (their accepted and killed rows are the skip-path escape-accumulation
+  family's above), and the `u3`/`u4` continuation reads step forward into a
+  non-continuation throw. All three pinning sites are skips, so no loop
+  body writes anything; liveness, not a resource fault.
 - `CharsJsonIterator.parse` (escape skip `++i` → `--i`): cancels the for
   loop's own `++i`, pinning the cursor on the same backslash — a pure
   oscillation with no exit and no fault. `numEscapes` increments and wraps;
@@ -531,14 +538,15 @@ are not accepted as liveness merely because they race the watchdog.
   walks a fixed `int[]`; nothing grows.
 
 **On retiring a member.** `skipPastMultiByteEndQuote` sits on the quiet counter
-and is not retired on that advisory alone. The flap is a per-mutant test-order
-race over a genuinely endless loop, so the next run that reaches the `\n` input
-before the `\uXXXX` one times out again, and with the member retired that would
-be an unaudited newcomer that `hardeningCertify`'s forced strict audit fails
-hard. A one-in-N member is exactly what an audited set is for. Retire it only on
-evidence the race is gone: the `\n`-carrying covering test removed, or the escape
-dispatch restructured so the reversed cursor can no longer land on its own
-backslash.
+and is not retired on that advisory alone. Each of its three pinning reads is a
+genuinely endless loop on inputs the covering tests carry (a string opening with an
+escape for the loop head, a two-byte lead for the continuation read, a simple escape
+for the dispatch read), so a run that reaches such an input first times out, and with
+the member retired that would be an unaudited newcomer that `hardeningCertify`'s
+forced strict audit fails hard. A one-in-N member is exactly what an audited set is
+for. Retire it only on evidence the fixed points are gone: the scan restructured so
+that a reversed read can no longer land on a byte that re-enters its own branch —
+removing a covering input is not that evidence.
 
 Repair is the other route out. For a parse loop that appends, the document
 bound licenses retirement only when every pass returns, throws, breaks or
