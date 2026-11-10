@@ -34,10 +34,13 @@ unmatched-accepted-row check that would announce a filtered-away acceptance can 
 fire here. A `@NullMarked` on a
 class or a `package-info.java` in either source set (the PIT recompile merges the
 same-package test sources into one root, and JUnit already makes `org.jspecify`
-readable) would silently remove those kills; the only trace is the population line,
-which reads a git-ignored machine-local stash, so a fresh clone sees nothing. A
-`module-info` `@NullMarked` cannot reach PIT here, because the recompile strips
-`module-info`.
+readable) would silently remove those kills; the only trace would be the population
+line, which reads a git-ignored machine-local stash, so a fresh clone sees nothing. The
+`jspecifyGuard` task, under `check` and ahead of every PIT suite, therefore fails on any
+`org.jspecify` or `@NullMarked` in a main or test source directory (`module-info.java`
+excepted, `//` comment lines ignored), so adopting JSpecify here starts by deciding the
+filter, not by losing kills. A `module-info` `@NullMarked` cannot reach PIT here, because the recompile
+strips `module-info`.
 
 ## The class path is PIT's world
 

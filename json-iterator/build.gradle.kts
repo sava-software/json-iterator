@@ -100,5 +100,44 @@ hardening {
   }
 }
 
+// PIT 1.30.2's JSpecify filter drops every NULL_RETURNS mutant of a method under a
+// @NullMarked default before it runs, and the ratchet compares only unkilled rows, so a
+// nullness annotation arriving in any main or test source directory (the PIT recompile
+// merges them into one root; generated test sources included) would silently remove
+// those kills. Nothing here is annotated. This fails 'check' and every PIT suite the day
+// something is, so the filter's effect is decided on purpose rather than discovered from
+// a population line — HARDENING_NOTES.md, "The mutator set". module-info.java is exempt:
+// the recompile strips it, so an annotation there never reaches PIT. Lines that are
+// '//' comments are ignored; a block comment naming the annotation still trips it.
+val jspecifyGuard = tasks.register("jspecifyGuard") {
+  description = "Fails when a JSpecify nullness annotation appears in the main or test sources"
+  // local vals only: a script-level reference captured by doLast is not configuration-cacheable
+  val sources = files(sourceSets.main.get().allJava, sourceSets.test.get().allJava)
+    .asFileTree.matching { exclude("**/module-info.java") }
+  val projectDirectory = layout.projectDirectory.asFile
+  val marker = layout.buildDirectory.file("hardening/jspecifyGuard.ok")
+  inputs.files(sources)
+  outputs.file(marker)
+  doLast {
+    // the lookahead sits before the indent so backtracking cannot skip it
+    val pattern = Regex("""^(?!\s*//).*?(@NullMarked\b|\borg\.jspecify\b)""")
+    val hits = sources.files
+      .filter { f -> f.readLines().any { line -> pattern.containsMatchIn(line) } }
+      .map { it.relativeTo(projectDirectory).path }
+      .sorted()
+    if (hits.isNotEmpty()) {
+      throw GradleException(
+        "JSpecify annotations in the mutated sources: $hits. PIT 1.30.2's JSpecify filter would " +
+            "drop the NULL_RETURNS mutants under a @NullMarked default without a status; decide " +
+            "the filter on purpose first (HARDENING_NOTES.md, \"The mutator set\")."
+      )
+    }
+    marker.get().asFile.apply { parentFile.mkdirs(); writeText("no JSpecify annotations\n") }
+  }
+}
+tasks.named("check") { dependsOn(jspecifyGuard) }
+// the hazard lands when a suite runs, and the local gate runs the suites outside 'check'
+tasks.named { it.startsWith("pitest") }.configureEach { dependsOn(jspecifyGuard) }
+
 // The mutation ratchet ('pitest<Suite>Verify' against config/pitest/, plus the
 // 'qualityGate' aggregate) comes from the hardening convention plugin.
