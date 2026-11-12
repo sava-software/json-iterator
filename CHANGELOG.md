@@ -1,5 +1,13 @@
 # Changelog
 
+## [25.3.3](https://github.com/sava-software/json-iterator/compare/25.3.2...25.3.3) (2026-11-12)
+
+
+### Bug Fixes
+
+* **build:** upgrade to Gradle 9.9 and scope plugin repositories ([0594e6a](https://github.com/sava-software/json-iterator/commit/0594e6a2541c24f02355d23aec4ada33db436f26))
+* **ci:** restrict workflow token permissions ([d55b7cb](https://github.com/sava-software/json-iterator/commit/d55b7cb07ee7873bf12e29dabee9f11cd28a2ec3))
+
 ## [25.3.2](https://github.com/sava-software/json-iterator/compare/25.3.1...25.3.2) (2026-08-17)
 
 
