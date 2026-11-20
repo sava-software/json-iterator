@@ -46,9 +46,16 @@ update procedure; what it cannot know about this repo:
   relative symlinks to the root's metadata and keyring. Run a dependency or policy
   change through both, without the configuration cache (a reused entry resolves
   nothing): `./gradlew --no-configuration-cache check resolveVerificationTools`, then
-  `./gradlew --no-configuration-cache -p jmh check jmhJar`, and after a policy edit
-  `./gradlew verificationKeyStatus` too, since strict resolution cannot see a revoked
-  key. The release job resolves
+  `./gradlew --no-configuration-cache -p jmh check jmhJar`, then the root's audit,
+  `./gradlew --no-configuration-cache -PdependencyAudit checkModuleDirectivesScope`,
+  and after a policy edit `./gradlew verificationKeyStatus` too, since strict
+  resolution cannot see a revoked key. The audit is the only run that resolves the
+  dependency-analysis plugin's chain, and the rules of twelve keys are met by it alone:
+  `com.autonomousapps`, the Square key's (moshi and kotlinpoet), okio, moshix,
+  caffeine, guava, j2objc-annotations, errorprone, `org.jetbrains.kotlin`, and three
+  exact-version rules for listed keys (guava-parent 26.0-android, oss-parent 9,
+  `org.jetbrains:annotations` 13.0). The other two runs pass whatever became of those
+  rules, so a write run and a cold run owe the audit too. The release job resolves
   under the same policy; `:aggregation:zipCentralPortalDeployment -Pversion=<any>`
   builds its Central bundle locally, unsigned, when a change might reach that path.
 - **Regenerate from the root, then from `-p jmh`.** Only the jmh build meets JMH's
@@ -70,14 +77,17 @@ update procedure; what it cannot know about this repo:
 - **Entries a warm write run never names; keep them through a trim.** The
   `gradle:gradle` rule (the Gradle sources zip IntelliJ fetches, under Gradle Inc.'s
   current signing subkey) and the jmh plugin's `-sources.jar` pin are IDE-only: only an
-  IntelliJ sync with download sources on exercises them, and a command-line
-  `-p jmh check jmhJar` never fetches a sources jar. The root window's sync reaches the
-  first. The plugin sits on the jmh build's classpath alone, since sava-build does not
-  put it on the root's settings classpath, so only a sync of `jmh/` opened as its own
-  IntelliJ project reaches the second. A refusal shows in the sync output. No IDE sync
-  is owed after a policy change, and a session does not ask for one: one that removes
-  or narrows either entry, moves the plugin's pins without its sources jar's, or bumps
-  the wrapper says so in its report (sava-build's README, the closing paragraph of
+  IntelliJ sync exercises them, and a command-line `-p jmh check jmhJar` never fetches a
+  sources jar. The root window's sync reaches the first whatever its download-sources
+  setting, and with it the sources of the Kotlin that Gradle embeds, under the
+  `org.jetbrains.kotlin` rule, so that rule stays through a trim even where no
+  command-line run but the audit meets it. The plugin sits on the jmh build's classpath
+  alone, since sava-build does not put it on the root's settings classpath, so only a
+  sync of `jmh/` opened as its own IntelliJ project reaches the second. A refusal shows
+  in the sync output. No IDE sync is owed after a policy change, and a session does not
+  ask for one: one that removes or narrows either entry or the Kotlin rule, moves the
+  plugin's pins without its sources jar's, or bumps the wrapper says so in its report
+  (sava-build's README, the closing paragraph of
   "Adopting and updating"). The
   `org.ow2:ow2:1.5` POM pin is cold-only: asm 9.0, which only the jmh build resolves,
   names that unsigned parent, and Gradle reads it only while no parsed asm 9.0 metadata
@@ -107,7 +117,10 @@ the previously published jar. When done, drop the property and bump the pinned v
 `jmh/build.gradle.kts`'s plugins block, `id("me.champeau.jmh") version "<version>" apply
 false`, follows `jmh-gradle-plugin` in
 sava-build's `gradle/libs.versions.toml` instead, and the policy's pins for that plugin
-(its jar, module metadata, marker POM and sources jar) move with it.
+(its jar, module metadata, marker POM and sources jar) move with it. Likewise the
+dependency-analysis plugin that `settings.gradle.kts` declares on demand follows
+`dependency-analysis-gradle-plugin` there, and the policy's rules for its chain move with
+it; only an audit run (`-PdependencyAudit`) resolves that chain.
 
 ## Verification & the mutation ratchet
 
@@ -121,7 +134,7 @@ the plugin cannot know: which suite owns which class, what has been measured,
 why a mutant was accepted, and what a green gate still does not prove — the
 last of which is inventoried in `HARDENING_NOTES.md`.
 
-The block below is copied from the installed sava-build 21.8.7
+The block below is copied from the installed sava-build 21.8.9
 `hardeningAgentTemplate`; the version here is the staleness signal, so move it only after
 diffing the printed block. Its delimiters support replacement on upgrade; there is no
 digest gate. Repository-specific facts and qualifications follow outside the block.
@@ -179,9 +192,9 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   the test body. Exclusions must cover the test source set, not a naming convention.
 - Git-ignored scratch sources (`Integ.java` drivers) never sit in a hardened project's
   `main` or `test` source set; keep them in a git-ignored `scratch` source set instead.
-- Verify by the absence of failures: trust the exit code and the `.running`
-  sentinel, not a summary. `MINION_DIED` and `RUN_ERROR` are not results; re-run once
-  on a quiet machine. A suite that got faster without getting narrower is a bug report.
+- Verify by the absence of failures: trust the exit code and the `.running` sentinel,
+  not a summary. `MINION_DIED` and `RUN_ERROR` are not results: re-run once, unless the
+  plugin says it did. A suite that got faster without getting narrower is a bug report.
 - Fuzz findings become a committed seed input and a named regression test. Run
   `fuzzAll` locally with an explicit `-PmaxFuzzTime` and `-PmaxParallelFuzzTargets`
   before a release. Where one thing has two representations, fuzz the differential.
@@ -212,8 +225,10 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   PIT suites are too slow for hosted runners. Don't wire the full gate into CI to
   "fix" that; it's a decision. The pre-release ritual is certification plus an
   explicit local `fuzzAll -PmaxFuzzTime=600 -PmaxParallelFuzzTargets=1`
-  campaign (§ fuzzing) plus `verificationKeyStatus` from the root plus a
-  change-scoped jmh A/B per benchmark discipline.
+  campaign (§ fuzzing) plus `verificationKeyStatus` from the root plus
+  `./gradlew -PdependencyAudit checkModuleDirectivesScope` (the module-directive
+  scope check, which `check` and CI no longer run; `settings.gradle.kts` says
+  why) plus a change-scoped jmh A/B per benchmark discipline.
 - **Legacy baseline labels are metadata, not proof of triage.** Rows predating
   label support still print as `unlabeled`. The installed writers preserve notes
   and expose no family-label editor; do not hand-edit rows to relabel them.
@@ -423,8 +438,14 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   changing thread counts, and the machine's load average at the time is context
   to record, not a cause to infer. Budget for it: a release certification can
   lose two minutes to one invalid minion outcome, and the correct response is a
-  single quiet re-run, never a refresh flag. **Copy the offending coordinate out
-  before re-running** — the quiet re-run overwrites the only report that held it.
+  single re-run, never a refresh flag, and since sava-build 21.8.9 it needs no
+  quiet machine. On this macOS host the plugin may already have made that
+  re-run itself: when the refusal says the report is its own repeat, read both
+  attempts (the first is kept under `json-iterator/build/reports/pitest-rerun/<suite>/`)
+  instead of running a third. **Copy the offending coordinate and the
+  `pitest.stderr.log` beside the report out before re-running**, since the
+  re-run replaces both, and read the log first: at `Minion did not start or died
+  during analysis` the row may name a mutant whose tests never ran.
   A repeat at the same coordinate is not a louder load signal, and it is not
   proof of a defect there either: a stable mutation-unit partition can report an
   aggregate failure at the same coordinate every time. Recurrence localizes the
