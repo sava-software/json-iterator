@@ -421,31 +421,17 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   would otherwise delete the allocation under test — so if an allocation-bound
   row ever reads `SURVIVED` against a bound you can reproduce by hand, isolate
   before touching the baseline. Isolated execution is diagnosis, never a record.
-- **Witnessed 2026-08-03: a per-mutant `RUN_ERROR` fails a whole certification.**
-  A cold certification died in `pitestIteratorVerify` on `RUN_ERROR x1`, and the
-  identical re-run certified all three suites — one occurrence in three
-  certification runs. That is the observed rate and nothing more: a `RUN_ERROR`
-  diagnoses neither load nor memory, so it never justifies raising heap or
-  changing thread counts, and the machine's load average at the time is context
-  to record, not a cause to infer. Budget for it: a release certification can
-  lose two minutes to one invalid minion outcome, and the correct response is a
-  single re-run, never a refresh flag, and since sava-build 21.8.9 it needs no
-  quiet machine. On this macOS host the plugin may already have made that
-  re-run itself: when the refusal says the report is its own repeat, read both
-  attempts (the first is kept under `json-iterator/build/reports/pitest-rerun/<suite>/`)
-  instead of running a third. **Copy the offending coordinate and the
-  `pitest.stderr.log` beside the report out before re-running**, since the
-  re-run replaces both, and read the log first: at `Minion did not start or died
-  during analysis` the row may name a mutant whose tests never ran.
-  A repeat at the same coordinate is not a louder load signal, and it is not
-  proof of a defect there either: a stable mutation-unit partition can report an
-  aggregate failure at the same coordinate every time. Recurrence localizes the
-  observation, not its cause. Compare shapes before blaming the mutant — a
-  history-free full run against `-PmutateOnly=<class> -PnoMutationHistory`, and
-  where they disagree, `-PisolateMutants`. Since 21.5.26 the unfiltered
-  `pitest.stdout.log` / `pitest.stderr.log` sit beside the report, so the daemon
-  log under `~/.gradle/daemon/<version>/` is the fallback rather than the
-  first stop.
+- **A per-mutant `RUN_ERROR` fails a whole certification, and one is transient.**
+  Witnessed 2026-08-03: a cold certification died in `pitestIteratorVerify` on
+  `RUN_ERROR x1`, and the identical re-run certified all three suites. The
+  refusal says what to read before running again, including, after the
+  plugin's own macOS repeat, both attempts' logs; the first attempt's are under
+  `json-iterator/build/reports/pitest-rerun/<suite>/`, and the next full run
+  deletes them. Recurrence at one coordinate localizes the observation, not its
+  cause, since a stable mutation-unit partition can report an aggregate failure
+  at the same coordinate every time: compare a history-free full run against
+  `-PmutateOnly=<class> -PnoMutationHistory`, and where they disagree,
+  `-PisolateMutants`.
 - **Verify by the absence of failures, not the presence of passes.** A green
   `check` can mean the build cache short-circuited rather than that tests ran —
   on 2026-08-03 a post-`clean` `check` came back in 698ms with `:test`
