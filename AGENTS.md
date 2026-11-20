@@ -383,11 +383,13 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   by doubling, and `widenToCharBuf:200` dropping the doubling headroom across a
   *sequence* of widening reads — and the second needed `testObject` rather than
   `applyCharsAsInt`, because only that overload reaches `widenToCharBuf` at all.
-- **All test-source classes here are `Test*` or `*Fuzz*` today**, and the
-  `iterator` suite excludes those patterns — but a shared fake extracted to a
-  top-level `RecordingFoo`/`StubFoo` would match neither and silently join the
-  mutated population. After registering or widening a suite, confirm no mutated
-  class lives under `src/test`.
+- **All test-source classes here are `Test*`, `*Fuzz*` or in the `factories`
+  package today** (the source fixtures `ByteArray`, `ByteArrayInputStream`,
+  `CharArray` and `JsonIteratorFactory`), and the `iterator` suite excludes all
+  three patterns; keep `systems.comodal.jsoniter.factories.*` when editing its
+  exclusions. A shared fake extracted to a top-level `RecordingFoo`/`StubFoo` would
+  match none of them and silently join the mutated population. After registering
+  or widening a suite, confirm no mutated class lives under `src/test`.
 - **Ownership here reads `35 production class(es) owned, 1 explicitly
   declined`.** `PowersOfFive` is the single declined opt-out — it sits inside the
   `iterator` target universe, is excluded there, and carries
