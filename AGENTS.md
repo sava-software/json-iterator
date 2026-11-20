@@ -46,16 +46,9 @@ update procedure; what it cannot know about this repo:
   relative symlinks to the root's metadata and keyring. Run a dependency or policy
   change through both, without the configuration cache (a reused entry resolves
   nothing): `./gradlew --no-configuration-cache check resolveVerificationTools`, then
-  `./gradlew --no-configuration-cache -p jmh check jmhJar`, then the root's audit,
-  `./gradlew --no-configuration-cache -PdependencyAudit checkModuleDirectivesScope`,
-  and after a policy edit `./gradlew verificationKeyStatus` too, since strict
-  resolution cannot see a revoked key. The audit is the only run that resolves the
-  dependency-analysis plugin's chain, and the rules of twelve keys are met by it alone:
-  `com.autonomousapps`, the Square key's (moshi and kotlinpoet), okio, moshix,
-  caffeine, guava, j2objc-annotations, errorprone, `org.jetbrains.kotlin`, and three
-  exact-version rules for listed keys (guava-parent 26.0-android, oss-parent 9,
-  `org.jetbrains:annotations` 13.0). The other two runs pass whatever became of those
-  rules, so a write run and a cold run owe the audit too. The release job resolves
+  `./gradlew --no-configuration-cache -p jmh check jmhJar`, and after a policy edit
+  `./gradlew verificationKeyStatus` too, since strict resolution cannot see a revoked
+  key. The release job resolves
   under the same policy; `:aggregation:zipCentralPortalDeployment -Pversion=<any>`
   builds its Central bundle locally, unsigned, when a change might reach that path.
 - **Regenerate from the root, then from `-p jmh`.** Only the jmh build meets JMH's
@@ -71,17 +64,18 @@ update procedure; what it cannot know about this repo:
   merge what you reviewed, and re-create the link. A key a trim dropped comes back from
   git history, its rule, list line and keyring block together (`git show <trim commit>
   -- gradle/verification-metadata.xml gradle/verification-keyring.keys
-  gradle/verification/version-scoped-keys.txt | git apply -R`; c99be45 is the trim that
-  dropped JMH 1.36's chain), never from a write run, which consults key servers and
-  writes the key back in shapes the guard refuses.
+  gradle/verification/version-scoped-keys.txt | git apply -R` reverses everything that
+  commit dropped, so keep only that key's rule, list line and block and review the result;
+  c99be45 is the trim that dropped JMH 1.36's chain), never from a write run, which
+  consults key servers and writes the key back in shapes the guard refuses.
 - **Entries a warm write run never names; keep them through a trim.** The
   `gradle:gradle` rule (the Gradle sources zip IntelliJ fetches, under Gradle Inc.'s
   current signing subkey) and the jmh plugin's `-sources.jar` pin are IDE-only: only an
   IntelliJ sync exercises them, and a command-line `-p jmh check jmhJar` never fetches a
   sources jar. The root window's sync reaches the first whatever its download-sources
   setting, and with it the sources of the Kotlin that Gradle embeds, under the
-  `org.jetbrains.kotlin` rule, so that rule stays through a trim even where no
-  command-line run but the audit meets it. The plugin sits on the jmh build's classpath
+  `org.jetbrains.kotlin` rule, so that rule stays through a trim although no
+  command-line run meets it. The plugin sits on the jmh build's classpath
   alone, since sava-build does not put it on the root's settings classpath, so only a
   sync of `jmh/` opened as its own IntelliJ project reaches the second. A refusal shows
   in the sync output. No IDE sync is owed after a policy change, and a session does not
@@ -117,10 +111,7 @@ the previously published jar. When done, drop the property and bump the pinned v
 `jmh/build.gradle.kts`'s plugins block, `id("me.champeau.jmh") version "<version>" apply
 false`, follows `jmh-gradle-plugin` in
 sava-build's `gradle/libs.versions.toml` instead, and the policy's pins for that plugin
-(its jar, module metadata, marker POM and sources jar) move with it. Likewise the
-dependency-analysis plugin that `settings.gradle.kts` declares on demand follows
-`dependency-analysis-gradle-plugin` there, and the policy's rules for its chain move with
-it; only an audit run (`-PdependencyAudit`) resolves that chain.
+(its jar, module metadata, marker POM and sources jar) move with it.
 
 ## Verification & the mutation ratchet
 
@@ -225,10 +216,8 @@ digest gate. Repository-specific facts and qualifications follow outside the blo
   PIT suites are too slow for hosted runners. Don't wire the full gate into CI to
   "fix" that; it's a decision. The pre-release ritual is certification plus an
   explicit local `fuzzAll -PmaxFuzzTime=600 -PmaxParallelFuzzTargets=1`
-  campaign (§ fuzzing) plus `verificationKeyStatus` from the root plus
-  `./gradlew -PdependencyAudit checkModuleDirectivesScope` (the module-directive
-  scope check, which `check` and CI no longer run; `settings.gradle.kts` says
-  why) plus a change-scoped jmh A/B per benchmark discipline.
+  campaign (§ fuzzing) plus `verificationKeyStatus` from the root plus a
+  change-scoped jmh A/B per benchmark discipline.
 - **Legacy baseline labels are metadata, not proof of triage.** Rows predating
   label support still print as `unlabeled`. The installed writers preserve notes
   and expose no family-label editor; do not hand-edit rows to relabel them.
@@ -680,6 +669,20 @@ body is otherwise two compares. And the benefit is close to nil — the identica
 documents, not attackers. Don't re-propose it as a security measure; the UTF-8
 validation is what carried that value. Re-propose only with a workload where field
 names are not the dominant read.
+
+**The dependency-analysis plugin is deliberately not declared (2026-11-20).** sava-build
+stopped shipping it in 21.8.8, so `check` has no module-directive scope check unless a
+build declares the plugin itself (sava-build's README, "Dependency analysis"). Here that
+check could only ever read the `testModuleInfo` block: the main module requires nothing
+and the library publishes no dependencies, so the worst it catches is a stale test
+`requires`, or a missing one the code reaches through another (`org.junit.jupiter.params`
+re-exports the JUnit API), neither of which any consumer sees. Declaring it, even on
+demand, kept eleven signing keys trusted for that one run, three of them only at exact old
+releases, and made every policy change owe a third run. Those eleven left the policy with
+it (the Kotlin rule, which the audit also met, stays for the IDE sync); the newest commit
+that `git log -S com.autonomousapps -- gradle/verification-metadata.xml` lists is that
+trim, and reverse-applying its policy hunks restores all of them. Re-declare it only once the main module
+has `requires` worth checking.
 
 **Library javadoc never names downstream consumers.** This is a core library; its
 public docs must not reference consumer projects or their types (a `JupiterPrice`,
